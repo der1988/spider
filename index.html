@@ -31,15 +31,18 @@
   </header>
   <footer class="controls">
     <p id="message" role="status"></p>
-    <p class="keys"><kbd>A</kbd><kbd>D</kbd> Muovi <kbd>W</kbd> Risali <kbd>S</kbd> Stacca · Tieni <kbd>Spazio</kbd>, mira con le frecce e rilascia per tirare</p>
-    <p id="gamepad-guide" class="keys" hidden>Sinistro: muovi, ↑ risali, ↓ stacca · Destro: mira e lascia per tirare</p>
+    <p class="keys"><kbd>A</kbd><kbd>D</kbd> Muovi <kbd>W</kbd> Risali <kbd>S</kbd> Stacca <kbd>J</kbd> Salta · Tieni <kbd>Spazio</kbd>, mira con le frecce e rilascia per tirare</p>
+    <p id="gamepad-guide" class="keys" hidden>Sinistro: muovi, ↑ risali, ↓ stacca · Destro: mira e lascia per tirare · A/×: salta</p>
   </footer>
   <div class="touch" aria-label="Comandi touch">
     <div id="stick" role="group" aria-label="Analogico sinistro: muovi, su risali, giù stacca">
       <span class="stick-nub" aria-hidden="true"></span>
     </div>
-    <div id="aim-stick" role="group" aria-label="Analogico destro: inclina per mirare, rilascia per tirare">
-      <span class="stick-nub" aria-hidden="true"></span>
+    <div class="right-controls">
+      <button id="jump" type="button" aria-label="Salto">↑ Salto</button>
+      <div id="aim-stick" role="group" aria-label="Analogico destro: inclina per mirare, rilascia per tirare">
+        <span class="stick-nub" aria-hidden="true"></span>
+      </div>
     </div>
   </div>
   <p class="rotate">Ruota il telefono per giocare in orizzontale.</p>

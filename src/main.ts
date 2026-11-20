@@ -1,8 +1,8 @@
 import './style.css';
 import {area} from './area';
-import {aimHit, createSpider, DEFAULT_TUNING, detach, shoot, tickSpider, type Point} from './spider';
+import {aimHit, createSpider, DEFAULT_TUNING, detach, queueJump, shoot, tickSpider, type Point} from './spider';
 import {drawScene} from './web-render';
-import {availableAnchors, bridgePreview, buildBridge, createWeb, fixSilk, leaveSilk, recoverFlies, saveWeb, tickFlies, WEB_KEY} from './threads';
+import {availableAnchors, bridgePreview, buildBridge, createWeb, fixSilk, leaveSilk, recoverFlies, tickFlies, WEB_KEY} from './threads';
 import {Soundscape} from './soundscape';
 import {AimGesture, silkMotion} from './aim-gesture';
 
@@ -19,12 +19,11 @@ const gamepadGuide = get('gamepad-guide');
 const soundKey = 'tamago.audio';
 let audioOn = true;
 
-let savedWeb: string | null = null;
 try {
   audioOn = localStorage.getItem(soundKey) !== 'off';
-  savedWeb = localStorage.getItem(WEB_KEY);
+  localStorage.removeItem(WEB_KEY);
 } catch { /* File previews can deny storage. */ }
-const web = createWeb(savedWeb);
+const web = createWeb();
 const audio = new Soundscape(audioOn);
 const count = get<HTMLOutputElement>('web-count');
 let catches = 0;
@@ -45,10 +44,6 @@ function updateCount() {
   count.value = web.strands.length + (web.strands.length === 1 ? ' filo' : ' fili') +
     ' · ' + catches + (catches === 1 ? ' mosca' : ' mosche') + ' · Seta ' + web.silk;
 }
-function persistWeb() {
-  try { localStorage.setItem(WEB_KEY,saveWeb(web)); } catch { /* Keep the web in memory. */ }
-  updateCount();
-}
 updateCount();
 
 let checkpoint = 0;
@@ -65,6 +60,7 @@ let padStick = {x:0,y:0};
 let downHeld = false;
 let padReel = false;
 let padDetach = false;
+let padJump = false;
 
 let landedAt = -Infinity;
 let shot: {from:Point; to:Point; hit:boolean; until:number} | undefined;
@@ -132,7 +128,7 @@ function fire(target: Point) {
   if (bridge) {
     shot = {from,to:bridge.to,hit:true,until:performance.now()+160};
     audio.play('attach',.075);
-    persistWeb();
+    updateCount();
     say('Filo portante teso! Cammina sul ponte fino alla foglia alta.');
     return;
   }
@@ -236,6 +232,7 @@ function resetPad() {
   downHeld = false;
   padReel = false;
   padDetach = false;
+  padJump = false;
   padGesture.reset(true);
   gamepadGuide.hidden = true;
 }
@@ -266,6 +263,9 @@ function pollPad(time: number) {
   const detachHeld = !!pad.buttons[1]?.pressed;
   if (detachHeld && !padDetach) releaseRope();
   padDetach = detachHeld;
+  const jumpHeld = !!pad.buttons[0]?.pressed;
+  if (jumpHeld && !padJump) queueJump(spider);
+  padJump = jumpHeld;
   sampleAim(padGesture,{x:pad.axes[2] ?? 0,y:pad.axes[3] ?? 0},time);
 }
 
@@ -273,10 +273,21 @@ window.addEventListener('gamepaddisconnected',event => {
   if (event.gamepad.index === padIndex) resetPad();
 });
 
+const jumpButton = get<HTMLButtonElement>('jump');
+jumpButton.addEventListener('pointerdown',event => {
+  if (event.button !== 0) return;
+  event.preventDefault();
+  queueJump(spider);
+});
+jumpButton.addEventListener('click',event => {
+  if (event.detail === 0) queueJump(spider);
+});
+jumpButton.addEventListener('contextmenu',event => event.preventDefault());
+
 const aimKeys: Record<string, Point> = {
   ArrowLeft:{x:-1,y:0}, ArrowRight:{x:1,y:0}, ArrowUp:{x:0,y:-1}, ArrowDown:{x:0,y:1},
 };
-const commands = new Set([...Object.keys(aimKeys), 'Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD']);
+const commands = new Set([...Object.keys(aimKeys), 'Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyJ']);
 
 function moveAim(dx: number, dy: number) {
   const x = aimOffset.x + dx;
@@ -290,6 +301,7 @@ window.addEventListener('keydown', event => {
     (event.code === 'Space' && event.target.closest('button, summary')))) return;
   event.preventDefault();
   if (event.code === 'KeyS' && !event.repeat) releaseRope();
+  if (event.code === 'KeyJ' && !event.repeat) queueJump(spider);
   const direction = aimKeys[event.code];
   if (direction && !keys.has(event.code)) moveAim(direction.x * 4, direction.y * 4);
   keys.add(event.code);
@@ -301,6 +313,7 @@ window.addEventListener('keyup', event => {
 });
 function clearInput() {
   keys.clear();
+  spider.jumpBuffer = 0;
   movementStick.reset();
   aimStick.reset();
   touchGesture.reset();
@@ -317,10 +330,12 @@ function goal(check: Point, radius: number) {
 }
 function update(dt: number, time: number) {
   const touchMove = movementStick.read();
-  const stick = Math.hypot(touchMove.x,touchMove.y) > .16 ? touchMove : padStick;
+  const deadZone = .12;
+  const stick = Math.hypot(touchMove.x,touchMove.y) > deadZone ? touchMove : padStick;
   const moveKey = Number(keys.has('KeyD')) - Number(keys.has('KeyA'));
   const x = stick.x;
-  const move = moveKey || Math.sign(x) * Math.max(0,(Math.abs(x) - .16) / .84);
+  const analogMove = Math.max(0,(Math.abs(x)-deadZone)/(1-deadZone));
+  const move = moveKey || Math.sign(x)*Math.pow(analogMove,.8);
   const dx = Number(keys.has('ArrowRight')) - Number(keys.has('ArrowLeft'));
   const dy = Number(keys.has('ArrowDown')) - Number(keys.has('ArrowUp'));
   if (dx || dy) {
@@ -334,7 +349,8 @@ function update(dt: number, time: number) {
   const wasGrounded = spider.grounded;
   const oldX = spider.x;
   const landingSpeed = spider.vy;
-  tickSpider(spider, area.surfaces, {move,reel:reeling}, dt, tuning, web.strands);
+  const jumped = tickSpider(spider, area.surfaces, {move,reel:reeling}, dt, tuning, web.strands);
+  if (jumped) audio.play('jump');
   const lineTaut = spider.rope !== undefined &&
     Math.hypot(spider.x-spider.rope.x,spider.y-spider.rope.y) >= spider.rope.length - .6;
   walkingInput = !!move;
@@ -348,7 +364,7 @@ function update(dt: number, time: number) {
   }
   taut = lineTaut;
   if (fixSilk(web,spider,area.surfaces)) {
-    persistWeb();
+    updateCount();
     audio.play('fix');
     say('Filo fissato. Le mosche possono restare nella trama.');
   }
@@ -364,7 +380,7 @@ function update(dt: number, time: number) {
     say('Mosca impigliata! Cammina sul filo per recuperare la seta.');
   }
   if (recoverFlies(web,spider,time)) {
-    persistWeb();
+    updateCount();
     audio.play('discovery');
     say('Seta +1 per mosca. Da un appiglio marcato, mira alla foglia alta.');
   }
@@ -402,6 +418,7 @@ function update(dt: number, time: number) {
 
   if (spider.y > area.bounds.bottom || spider.x < area.bounds.left - 20 || spider.x > area.bounds.right + 20) {
     spider = createSpider(checkpoint ? area.checkpoints[checkpoint - 1] : area.spawn);
+    camera = locateCamera();
     shot = undefined;
     web.loose.length = 0;
     taut = false;
@@ -420,9 +437,8 @@ function update(dt: number, time: number) {
   }
   if (!web.reward && goal(area.bridgeDiscovery,15)) {
     web.reward = true;
-    persistWeb();
     audio.play('discovery');
-    say('Seme d’ambra trovato! La scorciatoia resta anche alla riapertura.');
+    say('Seme d’ambra trovato! Puoi riattraversare il ponte.');
   }
   if (!discovered && goal(area.discovery, 15)) {
     discovered = true;
@@ -441,7 +457,7 @@ function locateCamera() {
   const maxX = Math.max(area.bounds.left, area.bounds.right - canvas.width);
   const x = Math.max(area.bounds.left, Math.min(maxX, spider.x - canvas.width * .34));
   const y = Math.max(area.bounds.top, Math.min(area.bounds.bottom - canvas.height, spider.y - canvas.height * .79));
-  return {x:Math.round(x),y:Math.round(y)};
+  return {x,y};
 }
 function resize() {
   canvas.height = 200;
@@ -455,7 +471,8 @@ let lastFrame = 0;
 let remainder = 0;
 const step = 1 / 120;
 function frame(time: number) {
-  remainder += Math.min(.05, (time - (lastFrame || time)) / 1000);
+  const elapsed = Math.min(.05,(time-(lastFrame || time))/1000);
+  remainder += elapsed;
   lastFrame = time;
   pollPad(time);
   sampleAim(touchGesture,aimStick.read(),time);
@@ -463,7 +480,10 @@ function frame(time: number) {
     update(step,time);
     remainder -= step;
   }
-  camera = locateCamera();
+  const target = locateCamera();
+  const follow = 1-Math.exp(-elapsed*20);
+  camera.x += (target.x-camera.x)*follow;
+  camera.y += (target.y-camera.y)*follow;
   const aim = worldAim();
   const extended = bridgePreview(web,spider,area.surfaces,aim,tuning.range);
   const hit = extended?.to ?? aimHit(spider,area.surfaces,aim,tuning);

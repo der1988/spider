@@ -47,35 +47,12 @@ export function flyPosition(center: Point, phase: number, time: number): Point {
   };
 }
 
-export function createWeb(serialized?: string | null): Web {
-  let strands: Strand[] = [];
-  let silk = 0;
-  let reward = false;
-  if (serialized) {
-    try {
-      const record = JSON.parse(serialized);
-      const entries: unknown = Array.isArray(record) ? record : record?.strands;
-      if (Number.isSafeInteger(record?.silk)) silk = clamp(record.silk,0,999);
-      reward = record?.reward === true;
-      const point = (p: unknown): p is Point => {
-        if (!p || typeof p !== 'object') return false;
-        const {x,y} = p as Point;
-        return Number.isFinite(x) && Number.isFinite(y) && Math.abs(x) < 1000 && Math.abs(y) < 1000;
-      };
-      if (Array.isArray(entries)) {
-        strands = entries.slice(-MAX_STRANDS).flatMap((entry: unknown) => {
-          if (!entry || typeof entry !== 'object') return [];
-          const {from,to,bearing} = entry as Strand;
-          return point(from) && point(to) && distance(from,to) >= 9 ? [{from,to,shakeUntil:0,...(bearing === true ? {bearing:true as const} : {})}] : [];
-        });
-      }
-    } catch { /* An invalid local record starts with an empty web. */ }
-  }
+export function createWeb(): Web {
   const flies = habitats.map((center, index) => {
     const phase = index * 1.39;
     return {center,phase,position:flyPosition(center,phase,0)};
   });
-  return {strands,flies,loose:[],silk,reward};
+  return {strands:[],flies,loose:[],silk:0,reward:false};
 }
 
 function sweptHit(from: Point, to: Point, strand: Strand) {
@@ -179,13 +156,6 @@ export function tickFlies(web: Web, seconds: number, time: number) {
     }
   }
   return caught;
-}
-
-export function saveWeb(web: Web) {
-  return JSON.stringify({
-    strands:web.strands.map(({from,to,bearing}) => ({from,to,bearing})),
-    silk:web.silk,reward:web.reward,
-  });
 }
 
 export function recoverFlies(web: Web, spider: Spider, time: number) {

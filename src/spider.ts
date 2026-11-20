@@ -27,6 +27,8 @@ export interface Spider extends Point {
   facing: -1 | 1
   rope?: Rope
   thread?: WalkLine
+  jumpBuffer: number
+  groundGrace: number
 }
 
 interface Input {
@@ -60,9 +62,16 @@ export const SPIDER_HALF_HEIGHT = 8
 const STEP = 1 / 120
 const EPSILON = 1e-7
 const MAX_SWING_SPEED = 210
+const JUMP_SPEED = 118
+const JUMP_BUFFER = .13
+const GROUND_GRACE = .09
 
 export function createSpider(point: Point): Spider {
-  return {...point, vx: 0, vy: 0, grounded: false, facing: 1}
+  return {...point, vx: 0, vy: 0, grounded: false, facing: 1, jumpBuffer: 0, groundGrace: 0}
+}
+
+export function queueJump(spider: Spider) {
+  spider.jumpBuffer = JUMP_BUFFER
 }
 
 export function detach(spider: Spider) {
@@ -229,6 +238,18 @@ function step(spider: Spider, surfaces: readonly Rect[], input: Input, dt: numbe
     spider.vx += direction * Math.min(Math.abs(move) * acceleration * dt, Math.max(0, MAX_SWING_SPEED - direction * spider.vx))
   }
 
+  spider.groundGrace = spider.grounded && !spider.rope
+    ? GROUND_GRACE : Math.max(0,spider.groundGrace-dt)
+  const jumped = spider.jumpBuffer > 0 && spider.groundGrace > 0 && !spider.rope
+  if (jumped) {
+    spider.vy = -JUMP_SPEED
+    spider.grounded = false
+    spider.groundGrace = 0
+    spider.jumpBuffer = 0
+  } else {
+    spider.jumpBuffer = Math.max(0,spider.jumpBuffer-dt)
+  }
+
   spider.vy = Math.min(320, spider.vy + tuning.gravity * dt)
   const dx = spider.vx * dt
   const follow = walkThread(spider,surfaces,threads,dx)
@@ -268,6 +289,7 @@ function step(spider: Spider, surfaces: readonly Rect[], input: Input, dt: numbe
     spider.x + SPIDER_HALF_WIDTH > surface.x + EPSILON &&
     spider.x - SPIDER_HALF_WIDTH < surface.x + surface.w - EPSILON,
   )
+  return jumped
 }
 
 export function tickSpider(
@@ -278,9 +300,13 @@ export function tickSpider(
   overrides?: Partial<Tuning>,
   threads: readonly WalkLine[] = [],
 ) {
-  if (!Number.isFinite(dtSeconds) || dtSeconds <= 0) return
+  if (!Number.isFinite(dtSeconds) || dtSeconds <= 0) return false
   const tuning = overrides ? {...DEFAULT_TUNING, ...overrides} : DEFAULT_TUNING
   const elapsed = Math.min(dtSeconds, 0.05)
   const steps = Math.ceil(elapsed / STEP)
-  for (let index = 0; index < steps; index++) step(spider, surfaces, input, elapsed / steps, tuning, threads)
+  let jumped = false
+  for (let index = 0; index < steps; index++) {
+    if (step(spider, surfaces, input, elapsed / steps, tuning, threads)) jumped = true
+  }
+  return jumped
 }

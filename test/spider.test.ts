@@ -5,6 +5,7 @@ import {
   aimHit,
   createSpider,
   detach,
+  queueJump,
   shoot,
   tickSpider,
   type Point,
@@ -124,4 +125,41 @@ test('the optional canopy discovery is reachable by transferring between two gri
 
   assert.equal(spider.grounded, true);
   assert.ok(Math.hypot(spider.x - area.discovery.x, spider.y - area.discovery.y) < 15);
+});
+
+test('jump can use the last step off an edge but cannot be repeated in midair', () => {
+  const halfStep = 1 / 120;
+  const floor = [{x:0,y:80,w:80,h:20}];
+  const spider = createSpider({x:81,y:72});
+  tickSpider(spider,floor,{move:0,reel:false},halfStep);
+  assert.ok(spider.grounded);
+  for (let i=0; i<60 && spider.grounded; i++) {
+    tickSpider(spider,floor,{move:1,reel:false},halfStep);
+  }
+  assert.equal(spider.grounded,false);
+  queueJump(spider);
+  assert.equal(tickSpider(spider,floor,{move:1,reel:false},halfStep),true);
+  const launchSpeed = spider.vy;
+  queueJump(spider);
+  assert.equal(tickSpider(spider,floor,{move:1,reel:false},halfStep),false);
+  assert.ok(spider.vy > launchSpeed);
+});
+
+test('jump pressed just before landing is buffered and does not unhook an active rope', () => {
+  const halfStep = 1 / 120;
+  const surfaces = [{x:0,y:80,w:100,h:20},{x:35,y:-4,w:30,h:8,grip:true}];
+  const spider = createSpider({x:50,y:68});
+  spider.vy = 55;
+  queueJump(spider);
+  let jumps = 0;
+  for (let i=0; i<24; i++) {
+    jumps += Number(tickSpider(spider,surfaces,{move:0,reel:false},halfStep));
+  }
+  assert.equal(jumps,1);
+
+  assert.ok(shoot(spider,surfaces,{x:50,y:0}));
+  const line = spider.rope;
+  queueJump(spider);
+  assert.equal(tickSpider(spider,surfaces,{move:0,reel:false},halfStep),false);
+  assert.equal(spider.rope,line);
 });
