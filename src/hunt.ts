@@ -5,7 +5,6 @@ export const WIDTH = 360;
 export const HEIGHT = 204;
 export const ROUND = 60;
 export const WEB_SECONDS = 10;
-export const CHARGE_SECONDS = .8;
 export const LIMIT = 6;
 export const spawn = {x:45,y:189};
 export const platforms: Rect[] = [

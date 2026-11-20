@@ -1,6 +1,7 @@
 import './style.css';
-import {createSpider,detach,queueJump,shoot,tickSpider,type Point} from './spider';
-import {capStrands,CHARGE_SECONDS,createHunt,LIMIT,platforms,spawn,tickHunt,WEB_SECONDS} from './hunt';
+import type {Point} from './spider';
+import {castCrawler,closeCrawlerRopes,createCrawler,jumpCrawler,tickCrawler} from './crawler';
+import {capStrands,createHunt,LIMIT,platforms,spawn,tickHunt,WEB_SECONDS} from './hunt';
 import {fixSilk,leaveSilk,WEB_KEY} from './threads';
 import {renderHunt} from './hunt-render';
 import {samplePlayStation,silkMotion} from './pad-controls';
@@ -13,11 +14,8 @@ const timeLabel = get('time');
 const scoreLabel = get('score');
 const strandsLabel = get('strands');
 const sound = get<HTMLButtonElement>('sound');
-const jump = get<HTMLInputElement>('jump');
 const intro = 'Osserva i due corridoi. Aggancia una piattaforma e staccati vicino a una seconda superficie per tendere un filo.';
 const waiting = 'Collega il joypad PlayStation e premi un tasto.';
-const chargeLabel = get('charge');
-const power = get<HTMLProgressElement>('power');
 let audioOn = true;
 try {
   audioOn = localStorage.getItem('tamago.audio')!=='off';
@@ -40,9 +38,7 @@ window.addEventListener('pointerdown',event => {
 },{capture:true});
 
 let hunt = createHunt();
-let charge: number|undefined;
-let jumpVelocity = 65;
-let spider = createSpider(spawn);
+let spider = createCrawler(spawn,platforms);
 let aimDirection: Point = {x:.56,y:-.828};
 let previous: ReturnType<typeof samplePlayStation>['shoulders']|undefined;
 let activePad: number|undefined;
@@ -66,11 +62,10 @@ function pad() {
 }
 
 function shootSilk() {
-  const old=spider.rope;
   audio.play('launch');
-  if (shoot(spider,platforms,worldAim())) {
-    if(old) leaveSilk(hunt,old,155);
+  if (castCrawler(spider,platforms,worldAim())) {
     audio.play('attach',.06);
+    if (spider.firstAnchor) say('Doppio filo. Dondoli sull’ultimo appiglio.');
   } else audio.play('miss',.06);
 }
 function step(dt: number,input: ReturnType<typeof samplePlayStation>) {
@@ -78,15 +73,14 @@ function step(dt: number,input: ReturnType<typeof samplePlayStation>) {
   const motion=silkMotion(m,down);
   down=motion.down;
   if (motion.detach && spider.rope) {
-    leaveSilk(hunt,spider.rope,155);
-    detach(spider);
+    const old=closeCrawlerRopes(spider);
+    if (old) leaveSilk(hunt,old,155);
     audio.play('release');
   }
   const deadzone=.12;
-  const move=Math.sign(m.x)*Math.max(0,(Math.abs(m.x)-deadzone)/(1-deadzone));
-  const grip=motion.reel && !spider.rope;
+  const axis=(n: number)=>Math.sign(n)*Math.max(0,(Math.abs(n)-deadzone)/(1-deadzone));
   const active=hunt.strands.filter(s=>(s.expiresAt??Infinity)>hunt.clock+dt);
-  if (tickSpider(spider,platforms,{move,reel:motion.reel,gripThread:grip},dt,{jumpSpeed:jumpVelocity},active)) audio.play('jump');
+  tickCrawler(spider,platforms,{x:axis(m.x),y:axis(m.y)},motion.reel,dt,active);
   const before=hunt.strands.length;
   if(fixSilk(hunt,spider,platforms)) {
     for (const strand of hunt.strands.slice(before)) strand.expiresAt=hunt.clock+WEB_SECONDS;
@@ -126,23 +120,14 @@ function frame(time: number) {
     if(input.aim) aimDirection=input.aim;
     if(hunt.phase==='over' && cross && !crossHeld) {
       hunt=createHunt();
-      charge=undefined;
-      spider=createSpider(spawn);
+      spider=createCrawler(spawn,platforms);
       down=false;
       audio.resetMusic();
       say(intro);
     }
     crossHeld=cross;
     if(hunt.phase!=='over') {
-      if (input.jump) charge=0;
-      if (charge !== undefined) {
-        if (input.shoulders.l1) charge=Math.min(1,charge+elapsed/CHARGE_SECONDS);
-        else {
-          jumpVelocity=65+(Number(jump.value)-65)*charge;
-          queueJump(spider);
-          charge=undefined;
-        }
-      }
+      if(input.jump && jumpCrawler(spider)) audio.play('jump');
       if(input.fire) shootSilk();
       remainder+=elapsed;
       while(remainder>=1/120) {
@@ -150,7 +135,6 @@ function frame(time: number) {
         if (step(1/120,input)) { remainder=0; break; }
       }
     }
-    if(hunt.phase==='over') charge=undefined;
     if(time-lastSound>65) {
       lastSound=time;
       const d=hunt.phase==='hunting' ? Math.hypot(spider.x-hunt.fly.p.x,spider.y-hunt.fly.p.y) : Infinity;
@@ -161,10 +145,8 @@ function frame(time: number) {
     if(activePad!==undefined) {
       say(waiting);
       audio.nearby(Infinity,time);
-      spider.jumpBuffer=0;
     }
     previous=undefined;
-    charge=undefined;
     activePad=undefined;
     remainder=0;
     down=false;
@@ -174,8 +156,6 @@ function frame(time: number) {
     [strandsLabel,hunt.strands.length+' / '+LIMIT+' fili']] as const;
   for (const [element,text] of labels) if (element.textContent!==text) element.textContent=text;
   timeLabel.dataset.urgent=String(seconds<=5 && hunt.phase!=='caught');
-  chargeLabel.hidden=charge===undefined;
-  power.value=charge??0;
   renderHunt(context,hunt,spider,aimDirection);
   requestAnimationFrame(frame);
 }

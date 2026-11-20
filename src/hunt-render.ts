@@ -1,5 +1,6 @@
 import {HEIGHT, LIMIT, platforms, WIDTH, type Hunt} from './hunt';
-import type {Point,Spider} from './spider';
+import type {Point} from './spider';
+import type {Crawler,Support} from './crawler';
 
 const ink = '#243c2d';
 const cream = '#eff3c8';
@@ -16,7 +17,7 @@ function line(ctx: CanvasRenderingContext2D,a: Point,b: Point,color: string,dott
     block(ctx,a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,1,1,color);
   }
 }
-export function renderHunt(ctx: CanvasRenderingContext2D,hunt: Hunt,spider: Spider,direction: Point) {
+export function renderHunt(ctx: CanvasRenderingContext2D,hunt: Hunt,spider: Crawler,direction: Point) {
   const pressure = hunt.phase==='caught' ? 0 : 1-Math.min(1,hunt.time/20);
   block(ctx,0,0,WIDTH,HEIGHT,`rgb(${Math.round(194-pressure*25)},${Math.round(207-pressure*20)},${Math.round(146-pressure*10)})`);
   for (let x=17; x<WIDTH; x+=39) {
@@ -47,6 +48,7 @@ export function renderHunt(ctx: CanvasRenderingContext2D,hunt: Hunt,spider: Spid
     line(ctx,hunt.retired.strand.from,hunt.retired.strand.to,cream,true);
   }
   for (const loose of hunt.loose) line(ctx,loose.from,spider,'#829660',true);
+  if (spider.firstAnchor) line(ctx,spider,spider.firstAnchor,'#9cb77a',true);
   if (spider.rope) line(ctx,spider,spider.rope,cream);
   // Keep the direction marker just outside the body, regardless of the ray hit.
   const edgeX = direction.x>0 ? WIDTH-3-spider.x : spider.x-2;
@@ -73,16 +75,26 @@ export function renderHunt(ctx: CanvasRenderingContext2D,hunt: Hunt,spider: Spid
     }
   }
 
-  const {x,y} = spider;
-  const gait = spider.grounded && Math.abs(spider.vx)>4 ? Math.floor(hunt.clock*16)%2 : 0;
-  const tuck = spider.rope ? 2 : 0;
+  avatar(ctx,spider,hunt.clock);
+}
+
+const matrix: Record<Support,[number,number,number,number]> = {
+  floor:[1,0,0,1], left:[0,1,-1,0], right:[0,-1,1,0], ceiling:[-1,0,0,-1],
+};
+
+function avatar(ctx: CanvasRenderingContext2D,spider: Crawler,time: number) {
+  ctx.save();
+  ctx.transform(...matrix[spider.support??'floor'],Math.round(spider.x),Math.round(spider.y));
+  const gait=spider.grounded && Math.hypot(spider.vx,spider.vy)>4 ? Math.floor(time*16)%2 : 0;
+  const tuck=spider.rope ? 2 : 0;
   for(let leg=0;leg<8;leg++){
-    const ox=x-5.5+leg*1.55;
-    const foot={x:ox+((leg+gait)%2 ? -1 : 1),y:y+6-tuck-((leg+gait)%2)};
-    line(ctx,{x:ox,y:y+2},foot,ink);
+    const x=-5.5+leg*1.55;
+    const stride=(leg+gait)%2;
+    line(ctx,{x,y:2},{x:x+(stride ? -1 : 1),y:6-tuck-stride},ink);
   }
-  block(ctx,x-5,y-3,9,6,ink);
-  block(ctx,x-4,y-2,5,4,'#638155');
-  block(ctx,x+spider.facing*3,y-2,3,4,ink);
-  block(ctx,x+spider.facing*4,y-1,1,1,cream);
+  block(ctx,-5,-3,9,6,ink);
+  block(ctx,-4,-2,5,4,'#638155');
+  block(ctx,spider.facing*3,-2,3,4,ink);
+  block(ctx,spider.facing*4,-1,1,1,cream);
+  ctx.restore();
 }
