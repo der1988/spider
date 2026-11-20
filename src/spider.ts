@@ -29,11 +29,13 @@ export interface Spider extends Point {
   thread?: WalkLine
   jumpBuffer: number
   groundGrace: number
+  jumpRising?: boolean
 }
 
 interface Input {
   move: number
   reel: boolean
+  jumpHeld?: boolean
 }
 
 export interface Tuning {
@@ -44,6 +46,7 @@ export interface Tuning {
   walkSpeed: number
   airAcceleration: number
   minLength: number
+  jumpSpeed: number
 }
 
 export const DEFAULT_TUNING: Readonly<Tuning> = {
@@ -54,6 +57,7 @@ export const DEFAULT_TUNING: Readonly<Tuning> = {
   walkSpeed: 54,
   airAcceleration: 120,
   minLength: 15,
+  jumpSpeed: 118,
 }
 
 export const SPIDER_HALF_WIDTH = 7
@@ -62,7 +66,6 @@ export const SPIDER_HALF_HEIGHT = 8
 const STEP = 1 / 120
 const EPSILON = 1e-7
 const MAX_SWING_SPEED = 210
-const JUMP_SPEED = 118
 const JUMP_BUFFER = .13
 const GROUND_GRACE = .09
 
@@ -242,7 +245,8 @@ function step(spider: Spider, surfaces: readonly Rect[], input: Input, dt: numbe
     ? GROUND_GRACE : Math.max(0,spider.groundGrace-dt)
   const jumped = spider.jumpBuffer > 0 && spider.groundGrace > 0 && !spider.rope
   if (jumped) {
-    spider.vy = -JUMP_SPEED
+    spider.vy = -tuning.jumpSpeed
+    spider.jumpRising = true
     spider.grounded = false
     spider.groundGrace = 0
     spider.jumpBuffer = 0
@@ -250,6 +254,11 @@ function step(spider: Spider, surfaces: readonly Rect[], input: Input, dt: numbe
     spider.jumpBuffer = Math.max(0,spider.jumpBuffer-dt)
   }
 
+  if (spider.jumpRising && input.jumpHeld === false && spider.vy < -52) {
+    spider.vy = -52
+    spider.jumpRising = false
+  }
+  if (spider.vy >= 0 || spider.rope) spider.jumpRising = false
   spider.vy = Math.min(320, spider.vy + tuning.gravity * dt)
   const dx = spider.vx * dt
   const follow = walkThread(spider,surfaces,threads,dx)

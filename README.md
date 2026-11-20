@@ -1,32 +1,15 @@
-# Tamago
+# Tamago · La caccia
 
-**Il sentiero di seta** è la prima area di Tamago, un gioco LCD in cui un piccolo ragno attraversa il sottobosco.
+Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense, apri il gioco nel browser e premi un tasto. Fai clic nella pagina se il browser richiede un gesto per attivare l’audio.
 
-Collega un DualShock 4 o DualSense al PC, apri il gioco e premi un tasto sul controller. Se il browser blocca l’audio all’avvio, fai clic nella pagina una volta.
-
-- **Stick sinistro** per muoverti e dondolare. Quando sei appeso, spingi su per risalire e giù per staccarti.
-- **Stick destro** per mirare. **R1** lancia la seta nella direzione indicata, anche se hai già lasciato lo stick.
-- **L1** salta. Il gioco si controlla con il joypad e si adatta alla finestra.
-- Sopra la foglia della rugiada inizia la salita a zig zag. Da sotto le foglie, cerca l’estremità libera verso il prossimo appiglio. In cima trovi il **germoglio della chioma**. Ai bordi laterali il sentiero fa il giro e continua dal lato opposto.
-- Al primo vuoto puoi tendere fili sulla rotta delle mosche. Cammina su un filo per recuperare una mosca e guadagnare seta per un ponte. Ricarica la pagina per iniziare una nuova partita.
+- **Stick sinistro** per muoverti e dondolare. Con un filo attivo, spingi su per risalire e giù per staccarti.
+- **Stick destro** per mirare e **R1** per lanciare. Aggancia una piattaforma e staccati vicino a una seconda superficie per fissare un filo.
+- **L1** per saltare. Rilascialo presto per un saltello o tienilo durante la salita per un salto più alto. Puoi regolare l’altezza massima dal menu **Salto**.
+- Osserva i due corridoi ai lati della piattaforma centrale. Prova a chiudere due passaggi, oppure aspetta a fissare il filo finché la mosca è già in manovra. Avvicinandoti la fai accelerare e cercare un varco. Il filo tratteggiato è il prossimo a sparire quando ne aggiungi un settimo.
+- Ogni cattura vale un punto e dà 60 secondi per la mosca successiva. Le tele restano mentre continui la partita. Allo scadere, premi **×** per ripartire con l’arena pulita.
 
 ## Sviluppo
 
-Servono Node.js 24 e npm.
+Con Node.js 24, esegui `npm ci` e `npm run dev`. Per i controlli esegui `npm run lint`, `npm test` e `npm run build`. La build Vite usa `dist` e conserva il supporto offline dopo il primo caricamento.
 
-```sh
-npm ci
-npm run dev
-npm run lint
-npm test
-npm run build
-npm run preview
-```
-
-Il service worker è attivo nel build di produzione. Per verificarlo in locale usa il server di preview, attendi l'attivazione del worker, poi passa offline e ricarica. I punti sicuri della prima area valgono per la sessione di gioco.
-
-## Pubblicazione
-
-Il preset Vite per Vercel usa `npm run build` e la cartella `dist`. Dopo il primo caricamento via HTTPS, il service worker rende disponibile anche l’avvio offline. La preferenza audio resta salvata nel browser.
-
-[Note su fisica e comandi](docs/architettura.md)
+[Note su fisica, mosca e timer](docs/architettura.md)

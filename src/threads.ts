@@ -55,7 +55,7 @@ export function createWeb(): Web {
   return {strands:[],flies,loose:[],silk:0,reward:false};
 }
 
-function sweptHit(from: Point, to: Point, strand: Strand) {
+export function sweptHit(from: Point, to: Point, strand: Strand) {
   const travel = difference(to, from);
   const silk = difference(strand.to, strand.from);
   const offset = difference(strand.from, from);
@@ -69,7 +69,7 @@ function sweptHit(from: Point, to: Point, strand: Strand) {
 }
 
 // Keep endpoints on the surface boundary and reject segments through solid interiors.
-function crossesSolid(from: Point, to: Point, rect: Rect) {
+export function crossesSolid(from: Point, to: Point, rect: Rect) {
   let first = 0;
   let last = 1;
   for (const axis of ['x','y'] as const) {
@@ -107,12 +107,12 @@ function contacts(body: Point, surfaces: readonly Rect[]) {
   return points;
 }
 
-export function leaveSilk(web: Web, from: Point, reach: number) {
+export function leaveSilk(web: Pick<Web,'loose'>, from: Point, reach: number) {
   web.loose.push({from:{x:from.x,y:from.y},reach});
   if (web.loose.length > 8) web.loose.shift();
 }
 
-export function fixSilk(web: Web, body: Point, surfaces: readonly Rect[]) {
+export function fixSilk(web: Pick<Web,'loose'|'strands'>, body: Point, surfaces: readonly Rect[]) {
   if (!web.loose.length) return 0;
   const available = contacts(body,surfaces);
   let fixed = 0;

@@ -2,39 +2,35 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#c5cf91">
-<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#202f24">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./touch.png">
 <link rel="icon" href="./icon-192.png">
-<title>Tamago · Il sentiero di seta</title>
+<title>Tamago · La caccia</title>
 </head>
 <body>
-<main class="scene">
-  <canvas id="world" aria-label="Il ragno e il sottobosco"></canvas>
-  <header class="hud">
-    <div><span class="brand">TAMAGO</span><h1>Il sentiero di seta</h1></div>
+<main class="shell">
+  <header>
+    <h1>Tamago</h1>
+    <div class="scores">
+      <output id="time" aria-label="Secondi rimanenti">60 s</output>
+      <output id="score" aria-label="Catture">0 catture</output>
+      <output id="strands" aria-label="Fili fissati">0 / 6 fili</output>
+    </div>
     <div class="tools">
-      <output id="web-count" aria-label="Ragnatela">0 fili · 0 mosche</output>
-      <span id="altitude" aria-hidden="true">Quota 0</span>
       <button id="sound" type="button" aria-pressed="true">Audio On</button>
-      <details id="tuning">
-        <summary>Fisica</summary>
-        <div class="settings">
-          <label>Portata <output id="range-value"></output><input id="range" type="range" min="100" max="220" step="1"></label>
-          <label>Accelerazione <output id="acceleration-value"></output><input id="acceleration" type="range" min="180" max="720" step="10"></label>
-          <label>Risalita <output id="reelSpeed-value"></output><input id="reelSpeed" type="range" min="30" max="120" step="1"></label>
-          <button id="reset-tuning" type="button">Valori iniziali</button>
-        </div>
+      <details><summary>Salto</summary>
+        <label>Altezza massima <input id="jump" type="range" min="105" max="160" value="130"></label>
       </details>
     </div>
   </header>
-  <footer class="controls">
-    <p id="message" role="status"></p>
-    <p id="gamepad-guide" class="keys" hidden>
-      Sinistro: muovi, ↑ risali, ↓ stacca · Destro: mira · <kbd>R1</kbd> Tela · <kbd>L1</kbd> Salto
-    </p>
+  <section class="stage" aria-label="Arena di caccia">
+    <canvas id="world" width="360" height="204" aria-label="Ragno, mosca e ragnatele"></canvas>
+  </section>
+  <footer>
+    <p id="message" role="status">Collega il joypad PlayStation e premi un tasto.</p>
+    <p>Sinistro: muovi, ↑ risali, ↓ stacca · Destro: mira · <kbd>R1</kbd> Tela · <kbd>L1</kbd> Salto</p>
   </footer>
 </main>
 <script type="module" src="/src/main.ts"></script>

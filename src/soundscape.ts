@@ -12,6 +12,8 @@ export class Soundscape {
   private flyTone?: OscillatorNode;
   private announced = false;
   private paused = false;
+  private nextBeat = 0;
+  private beat = 0;
   private pending: {effect:Sound; delay:number; at:number}[] = [];
 
   constructor(private enabled: boolean) {}
@@ -101,6 +103,32 @@ export class Soundscape {
     const strength = Math.max(0,1 - distance / 85);
     this.buzzing.gain.setTargetAtTime(strength * .027,ctx.currentTime,.075);
     this.flyTone.frequency.setTargetAtTime(122 + Math.sin(time * .014) * 15,ctx.currentTime,.075);
+  }
+
+  resetMusic() {
+    this.nextBeat = 0;
+    this.beat = 0;
+  }
+
+  music(remaining: number) {
+    const ctx = this.context;
+    if (!this.enabled || this.paused || !ctx || ctx.state !== 'running' || !this.master ||
+      ctx.currentTime < this.nextBeat) return;
+    const stress = 1-Math.min(1,remaining/20);
+    const time = ctx.currentTime;
+    const melody = [196,0,247,294,0,247,220,0];
+    const frequency = melody[this.beat++ % melody.length] || (stress>.28 ? 147 : 0);
+    this.nextBeat = time + .62-stress*.36;
+    if (!frequency) return;
+    const tone = ctx.createOscillator();
+    const envelope = ctx.createGain();
+    tone.frequency.value = frequency;
+    envelope.gain.setValueAtTime(.001,time);
+    envelope.gain.linearRampToValueAtTime(.035+stress*.024,time+.022);
+    envelope.gain.exponentialRampToValueAtTime(.001,time+.22);
+    tone.connect(envelope).connect(this.master);
+    tone.start(time);
+    tone.stop(time+.23);
   }
 
   play(effect: Sound, delay = 0) {
