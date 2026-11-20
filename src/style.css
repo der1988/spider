@@ -35,7 +35,7 @@ kbd { background: #c6d29a; border: 1px solid var(--rule); padding: 0 3px; }
     padding: 0 max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
     pointer-events: none;
   }
-  #stick, #aim-stick, #silk {
+  #stick, #aim-stick {
     pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none;
     border-radius: 50%; display: grid; place-items: center;
   }
@@ -50,13 +50,10 @@ kbd { background: #c6d29a; border: 1px solid var(--rule); padding: 0 3px; }
     background: #aab974; pointer-events: none;
     transform: translate(var(--stick-x, 0px), var(--stick-y, 0px));
   }
-  .aim-controls { display: grid; justify-items: end; gap: 5px; }
-  #silk {
-    width: clamp(63px, 18dvh, 84px); min-height: 44px; padding: 0;
-    border-radius: 5px; background: #dbe4ab; border: 2px solid var(--rule); border-bottom-width: 5px;
-    font-size: 14px; text-transform: uppercase;
-  }
-  #silk[data-held=true] { background: #aab974; }
+  .move-controls { display: grid; gap: 5px; }
+  .rope-controls { display: flex; gap: 4px; pointer-events: auto; }
+  .rope-controls button { min-height: 44px; touch-action: none; user-select: none; padding-inline: 5px; }
+  #aim-stick[data-aiming=true] { border-color: var(--ink); }
   .controls { inset-inline: max(108px, calc(env(safe-area-inset-left) + 108px)) max(98px, calc(env(safe-area-inset-right) + 98px)); }
 }
 @media (orientation: portrait) and (pointer: coarse) {
@@ -70,3 +67,7 @@ kbd { background: #c6d29a; border: 1px solid var(--rule); padding: 0 3px; }
 
 #web-count { white-space: nowrap; align-self: center; font-size: 10px; padding: 5px; background: var(--paper); border: 1px solid var(--rule); }
 @media (max-width: 480px) { #web-count { position: absolute; top: 43px; right: 0; } }
+
+#gamepad-guide[hidden] { display: none; }
+#gamepad-guide:not([hidden]) { display: block; }
+.controls:has(#gamepad-guide:not([hidden])) .keys:not(#gamepad-guide) { display: none; }

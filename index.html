@@ -32,16 +32,20 @@
   <footer class="controls">
     <p id="message" role="status"></p>
     <p class="keys"><kbd>A</kbd><kbd>D</kbd> Muovi <kbd>W</kbd> Risali <kbd>S</kbd> Stacca · Tieni <kbd>Spazio</kbd>, mira con le frecce e rilascia per tirare</p>
+    <p id="gamepad-guide" class="keys" hidden>Stick sinistro: muovi · Stick destro: mira e lascia per tirare · LB/L1: risali · B/○: stacca</p>
   </footer>
   <div class="touch" aria-label="Comandi touch">
-    <div id="stick" role="group" aria-label="Analogico: sposta, mira, risali o stacca">
-      <span class="stick-nub" aria-hidden="true"></span>
-    </div>
-    <div class="aim-controls">
-      <button id="silk" type="button" aria-label="Tela: rilascia per tirare nella direzione del mirino">Tela</button>
-      <div id="aim-stick" role="group" aria-label="Analogico destro: orienta il mirino">
+    <div class="move-controls">
+      <div class="rope-controls">
+        <button id="reel" type="button">Risali</button>
+        <button id="unhook" type="button">Stacca</button>
+      </div>
+      <div id="stick" role="group" aria-label="Analogico sinistro: muovi e dai slancio">
         <span class="stick-nub" aria-hidden="true"></span>
       </div>
+    </div>
+    <div id="aim-stick" role="group" aria-label="Analogico destro: inclina per mirare, rilascia per tirare">
+      <span class="stick-nub" aria-hidden="true"></span>
     </div>
   </div>
   <p class="rotate">Ruota il telefono per giocare in orizzontale.</p>

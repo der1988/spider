@@ -4,6 +4,7 @@ import {aimHit, createSpider, DEFAULT_TUNING, detach, shoot, tickSpider, type Po
 import {drawScene} from './web-render';
 import {createWeb, fixSilk, leaveSilk, tickFlies, WEB_KEY} from './threads';
 import {Soundscape} from './soundscape';
+import {AimGesture} from './aim-gesture';
 
 const get = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = get<HTMLCanvasElement>('world');
@@ -14,7 +15,7 @@ const touch = matchMedia('(pointer: coarse)');
 const tuning = {...DEFAULT_TUNING};
 const tuningKeys = ['range', 'acceleration', 'reelSpeed'] as const;
 const keys = new Set<string>();
-const silk = get<HTMLButtonElement>('silk');
+const gamepadGuide = get('gamepad-guide');
 const soundKey = 'tamago.audio';
 let audioOn = true;
 
@@ -32,6 +33,12 @@ let catchLook: {point:Point; until:number} | undefined;
 let taut = false;
 let lastTension = -Infinity;
 let lastBuzz = 0;
+let stride = 0;
+let stepFace = 1;
+let walkingInput = false;
+let idlePose: {kind:'groom'|'probe'|'freeze'; since:number; until:number} | undefined;
+let nextIdle = 2700;
+let flyNearby = false;
 let ropeReach = tuning.range;
 
 function updateCount() {
@@ -46,8 +53,14 @@ let discovered = false;
 let finished = false;
 const initialAim = {x:40,y:-63};
 let aimOffset = {...initialAim};
-let silkPointer: number | undefined;
-let downHeld = false;
+const touchGesture = new AimGesture();
+const padGesture = new AimGesture();
+let padIndex: number | undefined;
+let gamepadAvailable = typeof navigator.getGamepads === 'function';
+let padMove = 0;
+let padReel = false;
+let padDetach = false;
+let reelPointer: number | undefined;
 let landedAt = -Infinity;
 let shot: {from:Point; to:Point; hit:boolean; until:number} | undefined;
 let camera: Point = {x:0,y:0};
@@ -57,8 +70,8 @@ function say(text: string) {
 }
 
 function intro() {
-  return touch.matches
-    ? 'Mira al rametto con l’analogico destro e premi Tela.'
+  return touch.matches || padIndex !== undefined
+    ? 'Inclina lo stick destro verso il rametto, poi lascialo al centro per tirare.'
     : 'Tieni Spazio, punta il rametto con le frecce e rilascia Spazio per agganciarti.';
 }
 say(intro());
@@ -125,10 +138,12 @@ function fire(target: Point) {
   audio.play(hit ? 'attach' : 'miss',.075);
   const firstCrossing = checkpoint === 0 && from.x < area.checkpoints[0].x;
   const instructions = firstCrossing
-    ? (touch.matches ? 'Spingi l’analogico a destra, poi in giù sopra la foglia per staccarti.'
+    ? (padIndex !== undefined ? 'Dondola a destra con lo stick sinistro, poi premi B/○ sopra la foglia.'
+      : touch.matches ? 'Spingi lo stick sinistro a destra, poi tocca Stacca sopra la foglia.'
       : 'Tieni D per dondolare, poi premi S sopra la foglia.')
+    : padIndex !== undefined ? 'Dondola con lo stick sinistro, risali con LB/L1 o staccati con B/○.'
     : touch.matches
-    ? 'Analogico: di lato per dondolare, su per risalire, giù per staccarti.'
+    ? 'Dondola con lo stick sinistro. Tocca Risali o Stacca.'
     : 'Dai slancio con A/D. Risali con W o staccati con S.';
   say(hit ? instructions : 'Nessun appiglio. Punta un rametto.');
 }
@@ -138,10 +153,10 @@ function releaseRope() {
   detach(spider);
   taut = false;
   audio.play('release');
-  say(touch.matches ? 'Puoi mirare di nuovo mentre sei in aria.' : 'Puoi mirare con Spazio anche mentre sei in aria.');
+  say(touch.matches || padIndex !== undefined ? 'Puoi mirare di nuovo mentre sei in aria.' : 'Puoi mirare con Spazio anche mentre sei in aria.');
 }
 
-function analog(id: string, onMove?: (point: Point) => void) {
+function analog(id: string, onMove?: (point: Point) => void, onEnd?: (released: boolean) => void) {
   const element = get(id);
   let pointer: number | undefined;
   let position = {x:0,y:0};
@@ -175,44 +190,89 @@ function analog(id: string, onMove?: (point: Point) => void) {
   });
   for (const type of ['pointerup','pointercancel','lostpointercapture'] as const) {
     element.addEventListener(type,event => {
-      if (event.pointerId === pointer) reset();
+      if (event.pointerId !== pointer) return;
+      onEnd?.(type === 'pointerup');
+      reset();
     });
   }
   element.addEventListener('contextmenu',event => event.preventDefault());
   return {read:() => position,reset};
 }
-const movementStick = analog('stick');
-const aimStick = analog('aim-stick', point => {
-  const length = Math.hypot(point.x,point.y);
-  if (length < .23) return;
+function setDirection(point: Point) {
   const radius = Math.min(tuning.range,75);
-  aimOffset = {x:point.x * radius / length,y:point.y * radius / length};
+  aimOffset = {x:point.x*radius,y:point.y*radius};
+}
+
+function sampleAim(gesture: AimGesture, point: Point, time: number) {
+  const fired = gesture.sample(point,time);
+  if (gesture.aiming && gesture.angle) setDirection(gesture.angle);
+  if (fired) {
+    setDirection(fired);
+    fire(worldAim());
+  }
+}
+
+const movementStick = analog('stick');
+const aimStick = analog('aim-stick', point => sampleAim(touchGesture,point,performance.now()), released => {
+  if (released) sampleAim(touchGesture,{x:0,y:0},performance.now());
+  // A new touch has its own pointer and no physical stick bounce.
+  touchGesture.reset();
 });
 
-function resetSilk() {
-  silkPointer = undefined;
-  silk.dataset.held = 'false';
-}
-silk.addEventListener('pointerdown', event => {
-  if (event.button !== 0 || silkPointer !== undefined) return;
-  silk.setPointerCapture(event.pointerId);
-  silkPointer = event.pointerId;
-  silk.dataset.held = 'true';
+const reel = get<HTMLButtonElement>('reel');
+reel.addEventListener('pointerdown',event => {
+  if (event.button !== 0 || reelPointer !== undefined) return;
+  reel.setPointerCapture(event.pointerId);
+  reelPointer = event.pointerId;
 });
-silk.addEventListener('pointerup', event => {
-  if (event.pointerId !== silkPointer) return;
-  resetSilk();
-  fire(worldAim());
-});
-for (const type of ['pointercancel', 'lostpointercapture'] as const) {
-  silk.addEventListener(type, event => {
-    if (event.pointerId === silkPointer) resetSilk();
+for (const type of ['pointerup','pointercancel','lostpointercapture'] as const) {
+  reel.addEventListener(type,event => {
+    if (event.pointerId === reelPointer) reelPointer = undefined;
   });
 }
-silk.addEventListener('click', event => {
-  if (event.detail === 0) fire(worldAim());
+get('unhook').onclick = releaseRope;
+
+function resetPad() {
+  padIndex = undefined;
+  padMove = 0;
+  padReel = false;
+  padDetach = false;
+  padGesture.reset(true);
+  gamepadGuide.hidden = true;
+}
+
+function pollPad(time: number) {
+  if (document.hidden || !gamepadAvailable) return;
+  let gamepads: (Gamepad | null)[];
+  try {
+    gamepads = Array.from(navigator.getGamepads());
+  } catch {
+    gamepadAvailable = false;
+    resetPad();
+    return;
+  }
+  const pad = gamepads.find(p => p?.connected && p.mapping === 'standard');
+  if (!pad) {
+    if (padIndex !== undefined) resetPad();
+    return;
+  }
+  if (pad.index !== padIndex) {
+    resetPad();
+    padIndex = pad.index;
+    gamepadGuide.hidden = false;
+    if (message.textContent?.includes('rametto')) say(intro());
+  }
+  padMove = pad.axes[0] ?? 0;
+  padReel = !!(pad.buttons[4]?.pressed || pad.buttons[6]?.pressed);
+  const detachHeld = !!pad.buttons[1]?.pressed;
+  if (detachHeld && !padDetach) releaseRope();
+  padDetach = detachHeld;
+  sampleAim(padGesture,{x:pad.axes[2] ?? 0,y:pad.axes[3] ?? 0},time);
+}
+
+window.addEventListener('gamepaddisconnected',event => {
+  if (event.gamepad.index === padIndex) resetPad();
 });
-silk.addEventListener('contextmenu', event => event.preventDefault());
 
 const aimKeys: Record<string, Point> = {
   ArrowLeft:{x:-1,y:0}, ArrowRight:{x:1,y:0}, ArrowUp:{x:0,y:-1}, ArrowDown:{x:0,y:1},
@@ -238,14 +298,15 @@ window.addEventListener('keydown', event => {
 window.addEventListener('keyup', event => {
   if (!keys.delete(event.code)) return;
   event.preventDefault();
-  if (event.code === 'Space' && silkPointer === undefined) fire(worldAim());
+  if (event.code === 'Space') fire(worldAim());
 });
 function clearInput() {
   keys.clear();
   movementStick.reset();
   aimStick.reset();
-  downHeld = false;
-  resetSilk();
+  touchGesture.reset();
+  reelPointer = undefined;
+  resetPad();
 }
 window.addEventListener('blur', clearInput);
 document.addEventListener('visibilitychange', () => {
@@ -258,23 +319,27 @@ function goal(check: Point, radius: number) {
 function update(dt: number, time: number) {
   const stick = movementStick.read();
   const moveKey = Number(keys.has('KeyD')) - Number(keys.has('KeyA'));
-  const move = moveKey || Math.sign(stick.x) * Math.max(0,(Math.abs(stick.x) - .16) / .84);
+  const x = Math.abs(stick.x) > .16 ? stick.x : padMove;
+  const move = moveKey || Math.sign(x) * Math.max(0,(Math.abs(x) - .16) / .84);
   const dx = Number(keys.has('ArrowRight')) - Number(keys.has('ArrowLeft'));
   const dy = Number(keys.has('ArrowDown')) - Number(keys.has('ArrowUp'));
   if (dx || dy) {
     const speed = 112 * dt / Math.hypot(dx,dy);
     moveAim(dx * speed,dy * speed);
   }
-  const pullingDown = stick.y > .65;
-  if (pullingDown && !downHeld) releaseRope();
-  downHeld = pullingDown;
-  const reel = keys.has('KeyW') || stick.y < -.5;
+  const reeling = keys.has('KeyW') || reelPointer !== undefined || padReel;
   const wasGrounded = spider.grounded;
+  const oldX = spider.x;
   const landingSpeed = spider.vy;
-  tickSpider(spider, area.surfaces, {move,reel}, dt, tuning);
+  tickSpider(spider, area.surfaces, {move,reel:reeling}, dt, tuning);
   const lineTaut = spider.rope !== undefined &&
     Math.hypot(spider.x-spider.rope.x,spider.y-spider.rope.y) >= spider.rope.length - .6;
-  if (lineTaut && (!taut || reel) && time - lastTension > 510) {
+  walkingInput = !!move;
+  if (move) stepFace = Math.sign(move);
+  if (wasGrounded && spider.grounded) {
+    stride += Math.max(Math.abs(spider.x-oldX),Math.abs(move)*dt*20) * Math.PI/8;
+  }
+  if (lineTaut && (!taut || reeling) && time - lastTension > 510) {
     lastTension = time;
     audio.play('tension');
   }
@@ -296,6 +361,27 @@ function update(dt: number, time: number) {
     audio.play('catch');
     say(caught.length === 1 ? 'Una mosca è rimasta nella ragnatela!' : 'Altre mosche nella ragnatela!');
   }
+  const restless = !!move || reeling || !spider.grounded || dx !== 0 || dy !== 0 ||
+    keys.has('Space') || touchGesture.aiming || padGesture.aiming ||
+    (shot !== undefined && shot.until > time);
+  if (restless) {
+    idlePose = undefined;
+    nextIdle = time + 2100 + Math.random()*2500;
+  } else {
+    const close = web.flies.some(fly => fly.caughtAt === undefined &&
+      Math.hypot(fly.position.x-spider.x,fly.position.y-spider.y) < 31);
+    if (!idlePose || idlePose.until < time) {
+      idlePose = undefined;
+      if (close && !flyNearby) {
+        idlePose = {kind:'freeze',since:time,until:time+380};
+      } else if (time > nextIdle) {
+        const kind = Math.random() < .55 ? 'groom' : 'probe';
+        idlePose = {kind,since:time,until:time+(kind === 'groom' ? 820 : 610)};
+        nextIdle = time + 2350 + Math.random()*3800;
+      }
+    }
+    flyNearby = close;
+  }
   if (time-lastBuzz > 60) {
     lastBuzz = time;
     const distances = web.flies.filter(fly => fly.caughtAt === undefined)
@@ -313,6 +399,8 @@ function update(dt: number, time: number) {
     web.loose.length = 0;
     taut = false;
     aimOffset = {...initialAim};
+    touchGesture.reset(true);
+    padGesture.reset(true);
     say('Riprova dal punto sicuro. ' + (checkpoint ? 'Cerca il prossimo appiglio sopra di te.' : intro()));
     return;
   }
@@ -356,6 +444,8 @@ const step = 1 / 120;
 function frame(time: number) {
   remainder += Math.min(.05, (time - (lastFrame || time)) / 1000);
   lastFrame = time;
+  pollPad(time);
+  sampleAim(touchGesture,aimStick.read(),time);
   while (remainder >= step) {
     update(step,time);
     remainder -= step;
@@ -363,8 +453,13 @@ function frame(time: number) {
   camera = locateCamera();
   const aim = worldAim();
   const hit = aimHit(spider,area.surfaces,aim,tuning);
-  const aiming = keys.has('Space') || silkPointer !== undefined || Math.hypot(aimStick.read().x,aimStick.read().y) >= .23;
-  drawScene(context,area,spider,{camera,time,aim,hit,aiming,shot,landedAt,discovered,web,catchLook});
+  const aiming = keys.has('Space') || Object.keys(aimKeys).some(key => keys.has(key)) ||
+    touchGesture.aiming || padGesture.aiming;
+  get('aim-stick').dataset.aiming = String(touchGesture.aiming);
+  drawScene(context,area,spider,{
+    camera,time,aim,hit,aiming,shot,landedAt,discovered,web,catchLook,
+    stride,walkingInput,stepFace,taut,idlePose,
+  });
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

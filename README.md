@@ -4,7 +4,8 @@
 
 - Muoviti con **A/D**. Punta un rametto con le **frecce** e premi e rilascia **Spazio** per agganciarti.
 - Una volta appeso, usa **A/D** per darti slancio, **W** per risalire e **S** per staccarti mantenendo la velocità. Puoi lanciare un altro filo mentre sei in aria.
-- Su telefono gioca in orizzontale. L’analogico a sinistra muove il ragno: spingilo in alto per risalire e in basso per staccarti. L’analogico destro mira anche mentre ti muovi e conserva la direzione quando lo lasci. Premi **Tela** per tirare al rilascio.
+- Su telefono gioca in orizzontale. L’analogico sinistro muove il ragno e dà slancio. Inclina il destro per mirare e rilascialo per tirare. Usa **Risali** e **Stacca** per controllare il filo.
+- Con un gamepad riconosciuto dal browser, usa lo stick sinistro per muoverti e quello destro per mirare e tirare al ritorno al centro. **LB/L1** o **LT/L2** fanno risalire, **B/○** stacca.
 - Staccati e raggiungi un’altra superficie entro la portata: il filo si fissa e può catturare una mosca. I fili fissati restano al loro posto anche quando ricarichi.
 - Attraversa il primo vuoto e cerca la rugiada sul percorso alto. Se cadi, riparti dall’ultimo punto sicuro. **Fisica** permette di regolare portata, accelerazione e risalita.
 

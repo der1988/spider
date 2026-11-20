@@ -7,6 +7,11 @@ interface View {
   time: number;
   aim: Point;
   aiming: boolean;
+  stride: number;
+  walkingInput: boolean;
+  stepFace: number;
+  taut: boolean;
+  idlePose?: {kind:'groom'|'probe'|'freeze'; since:number; until:number};
   web: Web;
   catchLook?: {point:Point; until:number};
   hit?: Point;
@@ -176,53 +181,70 @@ function surface(ctx: CanvasRenderingContext2D, item: Surface, camera: Point) {
   }
 }
 
-function avatar(ctx: CanvasRenderingContext2D, spider: Spider, p: Point, view: View) {
+function avatar(ctx: CanvasRenderingContext2D, spider: Spider, p: Point, view: View, area: Area) {
   const {time,landedAt} = view;
-  const walking = spider.grounded && Math.abs(spider.vx) > 2;
-  const gait = walking ? [0,1,0,-1][Math.floor(time / 92) % 4] : 0;
-  const landing = spider.grounded && time >= landedAt && time - landedAt < 130;
-  const launching = view.shot && view.shot.until > time;
+  const walking = spider.grounded && (view.walkingInput || Math.abs(spider.vx) > 2);
+  const landingAge = time-landedAt;
+  const land = spider.grounded && landingAge >= 0 && landingAge < 215;
+  const launch = view.shot && view.shot.until > time ? (view.shot.until-time) / 160 : 0;
   const dangling = !!spider.rope && !spider.grounded;
-  const grooming = spider.grounded && !walking && !view.aiming && time % 5200 > 4520;
-  const focus = launching ? view.shot?.to
-    : view.catchLook && view.catchLook.until > time ? view.catchLook.point
-    : view.aiming ? view.aim : undefined;
+  const bracing = !spider.grounded && spider.vy > 56;
+  const idle = !view.aiming && !walking && !launch && !land ? view.idlePose : undefined;
+  const idleTime = idle ? time-idle.since : 0;
+  const focus = launch ? view.shot?.to
+    : view.aiming ? view.aim
+    : view.catchLook && view.catchLook.until > time ? view.catchLook.point : undefined;
   const angle = focus ? Math.round(Math.atan2(focus.y-spider.y,focus.x-spider.x) / (Math.PI/4)) * (Math.PI/4) : 0;
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
-  const facing = focus ? 1 : spider.facing;
-  const at = (x: number, y: number) => ({
-    x:p.x + x * facing * cos - y * sin,
-    y:p.y + x * facing * sin + y * cos + Number(landing),
-  });
+  const facing = focus ? 1 : (walking ? view.stepFace : spider.facing);
+  const leaf = walking ? area.surfaces.find(r => r.kind === 'leaf' &&
+    Math.abs(spider.y+8-r.y) < 1 && spider.x >= r.x-5 && spider.x <= r.x+r.w+5) : undefined;
+  const edge = leaf ? (facing > 0 ? leaf.x+leaf.w-spider.x : spider.x-leaf.x) : Infinity;
+  const feeler = edge < 19 ? Math.round(Math.max(0,19-edge)/5) : 0;
+  const bodyLag = walking ? Math.sin(view.stride-.78) * 1.25 - Number(feeler > 0) : 0;
+  const compression = land ? (landingAge < 84 ? 2 : -Math.sin((landingAge-84)*Math.PI/131)) : 0;
+  const crouch = view.aiming && spider.grounded ? 2 : idle?.kind === 'freeze' ? 1 : 0;
+  const recoil = launch ? Math.round(2.2*Math.sin(launch*Math.PI/2)) : 0;
+  const center = {x:p.x+facing*bodyLag,y:p.y+crouch+compression};
+  const at = (x: number, y: number, foot = false) => {
+    const origin = foot ? p : center;
+    return {x:origin.x+x*facing*cos-y*sin,y:origin.y+x*facing*sin+y*cos};
+  };
 
   for (let leg = 0; leg < 4; leg++) {
-    const startX = -6 + leg * 3;
-    const shift = (leg % 2 ? -gait : gait) * 2;
-    const footX = -10 + leg * 6;
-    const width = launching ? 1.16 : dangling ? .73 : 1;
-    const footY = landing ? 4 : dangling ? 3 : 6;
-    const groom = grooming && leg === 3 ? 4 + Math.floor(time / 100) % 2 : 0;
-    line(ctx,at(startX,1),at(startX-2,dangling ? -2 : -4),color.bark);
-    line(ctx,at(startX-2,dangling ? -2 : -4),at((footX-1)*width,0),color.bark);
-    line(ctx,at(startX,2),at(startX+shift,landing ? 2 : 4),color.dark);
-    line(ctx,at(startX+shift,landing ? 2 : 4),at((footX+shift)*width,footY-groom),color.dark);
+    const startX = -6+leg*3;
+    for (const side of [-1,1]) {
+      const phase = view.stride + ((leg + Number(side > 0)) % 2) * Math.PI;
+      const stride = walking ? Math.sin(phase)*3 : 0;
+      const lift = walking ? Math.max(0,Math.cos(phase))*2 : 0;
+      const front = leg >= 2;
+      const reach = front ? feeler + (view.aiming ? 3 : 0) + recoil : -recoil;
+      const groom = idle?.kind === 'groom' && leg === 3 && side === 1
+        ? 4 + Math.sin(idleTime/52)*2 : 0;
+      const probe = idle?.kind === 'probe' && leg === 3 && side === 1
+        ? Math.sin(Math.min(Math.PI,idleTime*Math.PI/610))*4 : 0;
+      const tuck = dangling && view.taut && !bracing ? .72 : bracing ? 1.12 : 1;
+      const knee = at(startX+stride*.4+Number(front && view.aiming),side*(land ? 2 : 4));
+      const footY = side*(bracing ? 7 : dangling && view.taut ? 3 : 6) - (side > 0 ? lift+groom : 0);
+      const foot = at((-9+leg*6)*tuck+stride+reach+probe,footY,true);
+      if (bracing) {
+        foot.x += Math.max(-2,Math.min(2,spider.vx / 65));
+        foot.y += 2;
+      }
+      line(ctx,at(startX,side),knee,side < 0 ? color.bark : color.dark);
+      line(ctx,knee,foot,side < 0 ? color.bark : color.dark);
+    }
   }
 
-  if (!focus || !sin) {
-    ctx.save();
-    ctx.translate(p.x,p.y + Number(landing));
-    ctx.scale(facing * Math.sign(cos),1);
-    pixelSprite(ctx,spiderBody,-7,-5);
-    ctx.restore();
-    return;
-  }
   const palette: Record<string,string> = {'#':color.dark,'+':color.bark,o:color.moss,'*':color.silk};
-  for (let y = -9; y <= 9; y++) for (let x = -9; x <= 9; x++) {
-    const sourceX = Math.round(x*cos+y*sin)+7;
+  const extent = 10;
+  for (let y = -extent; y <= extent; y++) for (let x = -extent; x <= extent; x++) {
+    const longitudinal = (x*cos+y*sin)*facing;
+    const sourceX = Math.round(longitudinal) + 7 + (longitudinal < -1 ? recoil : 0);
     const sourceY = Math.round(-x*sin+y*cos)+5;
-    const fill = palette[spiderBody[sourceY]?.[sourceX]];
-    if (fill) block(ctx,p.x+x,p.y+y,1,1,fill);
+    const ink = palette[spiderBody[sourceY]?.[sourceX]];
+    if (ink) block(ctx,center.x+x,center.y+y,1,1,ink);
   }
 }
 
@@ -313,5 +335,5 @@ export function drawScene(ctx: CanvasRenderingContext2D, area: Area, spider: Spi
     block(ctx,aim.x-1,aim.y,3,1,view.hit ? color.silk : color.bark);
     block(ctx,aim.x,aim.y-1,1,3,view.hit ? color.silk : color.bark);
   }
-  avatar(ctx,spider,p,view);
+  avatar(ctx,spider,p,view,area);
 }
