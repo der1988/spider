@@ -1,8 +1,11 @@
 # Tamago
 
-Una creatura virtuale in un mondo LCD a tutto schermo. Dopo la schiusa tieni premute le frecce sul display o sulla tastiera per partire dalla radura. Avvicinati ai luccichii per trovare bacche nel bosco, conchiglie in spiaggia, cristalli in grotta e sorgenti nel prato. Dopo 90 secondi puoi tornare a raccoglierli. Fermati per recuperare energia e usa i comandi di cura quando servono.
+**Il sentiero di seta** è la prima area di Tamago, un gioco LCD in cui un piccolo ragno attraversa il sottobosco.
 
-Tamago riparte dall'ultima posizione e ogni partita conserva il proprio mondo. L'audio si avvia al primo gesto e puoi disattivarlo toccando **Audio On**.
+- Muoviti con **← →**. Tieni premuto **S**, punta un rametto col mouse e rilascia **S** per agganciarti.
+- Una volta appeso, usa **← →** per darti slancio, **↑** per risalire e **Spazio** per staccarti mantenendo la velocità. Puoi lanciare un altro filo mentre sei in aria.
+- Su touch, trascina sul paesaggio e rilascia sul bersaglio per tirare. I pulsanti sul display controllano camminata, risalita e sgancio.
+- Attraversa il primo vuoto e cerca la rugiada sul percorso alto. Se cadi, riparti dall’ultimo punto sicuro. **Fisica** permette di regolare portata, accelerazione e risalita.
 
 ## Sviluppo
 
@@ -17,7 +20,7 @@ npm run build
 npm run preview
 ```
 
-In sviluppo aggiungi `?rapido` per far avanzare il tempo a 360× con un salvataggio separato. Un adulto richiede circa otto minuti in questa modalità. Il service worker è attivo nel build di produzione. Per verificarlo in locale usa il server di preview, attendi l'attivazione del worker, poi passa offline e ricarica.
+Il service worker è attivo nel build di produzione. Per verificarlo in locale usa il server di preview, attendi l'attivazione del worker, poi passa offline e ricarica. I punti sicuri della prima area valgono per la sessione di gioco.
 
 ## Vercel e iPhone 13
 
@@ -26,6 +29,6 @@ In sviluppo aggiungi `?rapido` per far avanzare il tempo a 360× con un salvatag
 3. Dal menu di condivisione scegli **Aggiungi alla schermata Home**. Se presente, abilita **Apri come app web**, quindi tocca **Aggiungi**.
 4. Apri Tamago dalla schermata Home mentre sei ancora online per inizializzare il salvataggio e la cache nell'app installata. Poi puoi giocare offline sullo stesso dispositivo.
 
-I progressi sono locali al browser o all'app installata. La cancellazione dei dati del sito può rimuoverli. Safari e l'app installata possono avere contenitori distinti.
+La preferenza audio è locale al browser o all’app installata.
 
 Le decisioni sulla simulazione, il salvataggio e il lavoro con Codex sono in [docs/architettura.md](docs/architettura.md).

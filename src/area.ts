@@ -1,0 +1,41 @@
+import type {Point, Rect} from './spider.ts';
+
+export interface Area {
+  surfaces: Array<Rect & {kind:'earth'|'twig'|'leaf'|'root'}>;
+  discovery: Point;
+  spawn: Point;
+  checkpoints: Point[];
+  bounds: {left:number; right:number; bottom:number; top:number};
+  finish: Point;
+}
+
+export const area: Area = {
+  spawn: {x:39,y:143},
+  bounds: {left:-47,right:510,top:-64,bottom:240},
+  checkpoints: [
+    {x:129,y:156},
+    {x:172,y:105},
+    {x:285,y:158},
+  ],
+  discovery: {x:449,y:1},
+  finish: {x:483,y:158},
+  surfaces: [
+    // The rametto is the only support above the first gap.
+    {x:-65,y:52,w:18,h:104,kind:'root'},
+    {x:-65,y:151,w:121,h:110,kind:'earth'},
+    {x:64,y:76,w:29,h:8,kind:'twig',grip:true},
+    {x:101,y:164,w:52,h:8,kind:'leaf'},
+    {x:106,y:172,w:46,h:89,kind:'earth'},
+
+    // The next branch is left of the root face so the player can climb beside it.
+    {x:130,y:61,w:28,h:8,kind:'twig',grip:true},
+    {x:146,y:113,w:63,h:148,kind:'root'},
+    {x:209,y:166,w:319,h:95,kind:'earth'},
+    {x:510,y:-85,w:18,h:251,kind:'root'},
+
+    // Optional high route: transfer from the first grip to the distant canopy.
+    {x:232,y:43,w:28,h:8,kind:'twig',grip:true},
+    {x:381,y:-34,w:36,h:8,kind:'twig',grip:true},
+    {x:428,y:16,w:55,h:8,kind:'leaf'},
+  ],
+};

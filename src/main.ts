@@ -1,311 +1,287 @@
 import './style.css';
-import {act, advance, loadGame, movementEnergy, saveGame, type Action} from './game';
-import {drawWorld} from './render';
-import {discoveries, ready, travel, zoneAt, zoneIndex} from './world';
+import {area} from './area';
+import {aimHit, createSpider, DEFAULT_TUNING, detach, shoot, tickSpider, type Point} from './spider';
+import {drawScene} from './web-render';
 
-function element<T extends HTMLElement = HTMLElement>(id: string) {
-  return document.getElementById(id) as T;
-}
-
-const actions = [
-  ['feed','Nutri'], ['play','Gioca'], ['clean','Pulisci'], ['heal','Cura'],
-] as const;
-const fields = [
-  ['hunger','Sazietà'], ['happiness','Felicità'], ['energy','Energia'],
-  ['hygiene','Igiene'], ['health','Salute'],
-] as const;
-const stages = {egg:'UOVO', baby:'CUCCIOLO', teen:'ADOLESCENTE', adult:'ADULTO'};
-const canvas = element<HTMLCanvasElement>('world');
-const context = canvas.getContext('2d')!;
-const message = element('message');
-const soundButton = element<HTMLButtonElement>('sound');
-const speed = import.meta.env.DEV && new URLSearchParams(location.search).has('rapido') ? 360 : 1;
-const epoch = Date.UTC(2025, 0, 1);
-const now = () => epoch + (Date.now() - epoch) * speed;
-const storage = {
-  getItem: (key: string) => localStorage.getItem(speed === 1 ? key : 'demo:' + key),
-  setItem: (key: string, value: string) => localStorage.setItem(speed === 1 ? key : 'demo:' + key, value),
-};
+const get = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+const canvas = get<HTMLCanvasElement>('world');
+const context = canvas.getContext('2d', {alpha:false})!;
+const message = get('message');
+const audioButton = get<HTMLButtonElement>('sound');
+const touch = matchMedia('(pointer: coarse)');
+const tuning = {...DEFAULT_TUNING};
+const tuningKeys = ['range', 'acceleration', 'reelSpeed'] as const;
+const keys = new Set<string>();
+const held = new Map<number, string>();
 const soundKey = 'tamago.audio';
-let state = loadGame(storage, now());
-let sound = true;
-try { sound = localStorage.getItem(soundKey) !== 'off'; } catch { /* Storage can be unavailable. */ }
-
-type Direction = -1 | 1;
-let facing: Direction = 1;
-let reaction: Action | 'discover' | undefined;
-let reactionUntil = 0;
+let audioOn = true;
 let audio: AudioContext | undefined;
-let activated = false;
-let showedSaveFailure = false;
-let previousZone = zoneIndex(state.world.position);
-message.textContent = state.stage === 'egg' ? 'La schiusa è vicina…' : 'Tieni premuta una freccia per esplorare.';
-if (speed !== 1) message.textContent += ' Modalità rapida';
+try { audioOn = localStorage.getItem(soundKey) !== 'off'; } catch { /* File previews can deny storage. */ }
 
-function persist() {
-  if (!saveGame(storage, state)) {
-    message.textContent = 'Salvataggio locale non disponibile.';
-    showedSaveFailure = true;
-  } else if (showedSaveFailure) {
-    message.textContent = 'Salvataggio ripristinato.';
-    showedSaveFailure = false;
-  }
+let checkpoint = 0;
+let spider = createSpider(area.spawn);
+let discovered = false;
+let finished = false;
+let aiming = false;
+let touchAim: number | undefined;
+let aimScreen: Point | undefined;
+let landedAt = -Infinity;
+let shot: {from:Point; to:Point; hit:boolean; until:number} | undefined;
+let camera: Point = {x:0,y:0};
+
+function say(text: string) {
+  if (message.textContent !== text) message.textContent = text;
 }
 
-function beep(discovery = false) {
-  if (!sound || !activated) return;
+function intro() {
+  return touch.matches
+    ? 'Trascina sul paesaggio verso il rametto e rilascia per lanciare la seta.'
+    : 'Tieni S, punta il rametto sopra il vuoto e rilascia S per agganciarti.';
+}
+say(intro());
+
+const tones = {
+  attach:[680, 920], miss:[270, 175], release:[470, 310],
+  land:[195], discovery:[520, 660, 880], start:[420],
+};
+function play(effect: keyof typeof tones) {
+  if (!audioOn || !audio) return;
+  if (audio.state !== 'running') void audio.resume().catch(() => {});
+  const oscillator = audio.createOscillator();
+  const gain = audio.createGain();
+  const start = audio.currentTime;
+  oscillator.type = 'triangle';
+  const notes = tones[effect];
+  notes.forEach((note, i) => oscillator.frequency.setValueAtTime(note, start + i * .065));
+  gain.gain.setValueAtTime(.12, start);
+  gain.gain.exponentialRampToValueAtTime(.001, start + notes.length * .065 + .06);
+  oscillator.connect(gain).connect(audio.destination);
+  oscillator.start(start);
+  oscillator.stop(start + notes.length * .065 + .06);
+}
+function unlock() {
+  if (!audioOn) return;
   try {
-    audio ??= new AudioContext();
-    if (audio.state !== 'running') void audio.resume().catch(() => {});
-    const oscillator = audio.createOscillator();
-    const volume = audio.createGain();
-    const time = audio.currentTime;
-    oscillator.type = 'triangle';
-    oscillator.frequency.setValueAtTime(discovery ? 440 : 520, time);
-    oscillator.frequency.setValueAtTime(680, time + .055);
-    if (discovery) oscillator.frequency.setValueAtTime(880, time + .12);
-    volume.gain.setValueAtTime(.1, time);
-    volume.gain.exponentialRampToValueAtTime(.001, time + .19);
-    oscillator.connect(volume).connect(audio.destination);
-    oscillator.start(time);
-    oscillator.stop(time + .19);
-  } catch {
-    // Audio is optional when the browser denies playback.
+    if (!audio) {
+      audio = new AudioContext();
+      play('start');
+    } else if (audio.state !== 'running') void audio.resume().catch(() => {});
+  } catch { /* Audio is optional in browsers that block playback. */ }
+}
+function audioLabel() {
+  audioButton.textContent = audioOn ? 'Audio On' : 'Audio Off';
+  audioButton.setAttribute('aria-pressed', String(audioOn));
+}
+audioLabel();
+audioButton.onclick = () => {
+  audioOn = !audioOn;
+  try { localStorage.setItem(soundKey, audioOn ? 'on' : 'off'); } catch { /* Keep the setting for this session. */ }
+  if (audioOn) unlock();
+  else if (audio?.state === 'running') void audio.suspend().catch(() => {});
+  audioLabel();
+};
+window.addEventListener('keydown', unlock);
+window.addEventListener('pointerup', event => {
+  if (event.target !== audioButton) unlock();
+}, {capture:true});
+
+for (const name of tuningKeys) {
+  const input = get<HTMLInputElement>(name);
+  input.oninput = () => {
+    tuning[name] = Number(input.value);
+    get(name + '-value').textContent = input.value;
+  };
+}
+function syncTuning() {
+  for (const name of tuningKeys) {
+    get<HTMLInputElement>(name).value = String(tuning[name]);
+    get(name + '-value').textContent = String(tuning[name]);
   }
 }
-
-function activate(event: Event) {
-  if (activated || event.target === soundButton) return;
-  activated = true;
-  beep();
-}
-window.addEventListener('pointerdown', activate, {capture:true});
-window.addEventListener('pointerup', () => {
-  if (sound && activated && audio?.state !== 'running') beep();
-});
-window.addEventListener('keydown', activate, {capture:true});
-
-function renderAudio() {
-  soundButton.setAttribute('aria-pressed', String(sound));
-  soundButton.textContent = sound ? 'Audio On' : 'Audio Off';
-}
-soundButton.onclick = () => {
-  sound = !sound;
-  activated = true;
-  try { localStorage.setItem(soundKey, sound ? 'on' : 'off'); } catch { /* Keep session preference. */ }
-  renderAudio();
-  if (sound) beep();
-  else if (audio?.state === 'running') void audio.suspend().catch(() => {});
+get('reset-tuning').onclick = () => {
+  Object.assign(tuning, DEFAULT_TUNING);
+  syncTuning();
 };
+syncTuning();
 
-const statValues = fields.map(([, label]) => {
-  const term = document.createElement('dt');
-  term.textContent = label;
-  const value = document.createElement('dd');
-  element('details').append(term, value);
-  return value;
+function screenPoint(event: PointerEvent): Point {
+  const rect = canvas.getBoundingClientRect();
+  return {x:(event.clientX - rect.left) * canvas.width / rect.width,
+    y:(event.clientY - rect.top) * canvas.height / rect.height};
+}
+function worldAim() {
+  const point = aimScreen;
+  return point ? {x:camera.x + point.x,y:camera.y + point.y} : undefined;
+}
+function fire() {
+  const target = worldAim();
+  if (!target) return;
+  const from = {x:spider.x,y:spider.y};
+  const dx = target.x - from.x;
+  const dy = target.y - from.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance < 1) return;
+
+  const hit = shoot(spider, area.surfaces, target, tuning);
+  const length = tuning.range / distance;
+  const to = hit && spider.rope
+    ? {x:spider.rope.x,y:spider.rope.y}
+    : {x:from.x + dx * length,y:from.y + dy * length};
+  shot = {from,to,hit,until:performance.now() + 160};
+  play(hit ? 'attach' : 'miss');
+  const firstCrossing = checkpoint === 0 && from.x < area.checkpoints[0].x;
+  const instructions = firstCrossing
+    ? (touch.matches ? 'Tieni ▶, poi tocca Stacca sopra la foglia.'
+      : 'Tieni → per dondolare, poi premi Spazio sopra la foglia.')
+    : touch.matches
+    ? 'Dai slancio con le frecce. Tocca Risali o Stacca.'
+    : 'Dai slancio con ← →. Risali con ↑ o staccati con Spazio.';
+  say(hit ? instructions : 'Nessun appiglio. Punta i rametti o il bordo di una foglia.');
+}
+function releaseRope() {
+  if (!spider.rope) return;
+  detach(spider);
+  play('release');
+  say(touch.matches ? 'Puoi mirare di nuovo mentre sei in aria.' : 'Puoi mirare con S anche mentre sei in aria.');
+}
+
+window.addEventListener('pointermove', event => {
+  if (event.pointerType === 'mouse' || event.pointerId === touchAim) aimScreen = screenPoint(event);
 });
-
-function refresh() {
-  element('stage').textContent = state.sick ? 'MALATO' : stages[state.stage];
-  element<HTMLProgressElement>('fullness').value = state.hunger;
-  element<HTMLProgressElement>('energy').value = state.energy;
-  fields.forEach(([key], index) => {
-    statValues[index].textContent = Math.round(state[key]) + '%';
-  });
+canvas.addEventListener('pointerdown', event => {
+  aimScreen = screenPoint(event);
+  if (event.pointerType === 'mouse' || touchAim !== undefined) return;
+  canvas.setPointerCapture(event.pointerId);
+  touchAim = event.pointerId;
+  aiming = true;
+});
+canvas.addEventListener('pointerup', event => {
+  if (event.pointerId !== touchAim) return;
+  aimScreen = screenPoint(event);
+  touchAim = undefined;
+  aiming = false;
+  fire();
+});
+function cancelAim(event: PointerEvent) {
+  if (event.pointerId !== touchAim) return;
+  touchAim = undefined;
+  aiming = false;
 }
+canvas.addEventListener('pointercancel', cancelAim);
+canvas.addEventListener('lostpointercapture', cancelAim);
 
-function updateLocation() {
-  const index = zoneIndex(state.world.position);
-  const {kind} = zoneAt(state.world.seed, index);
-  element('zone').textContent = kind === 'clearing' ? 'Radura' : discoveries[kind].name;
-}
-
-function react(action: Action | 'discover') {
-  reaction = action;
-  reactionUntil = performance.now() + 900;
-}
-
-for (const [action, label] of actions) {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.textContent = label;
-  button.onclick = () => {
-    const result = act(state, action, now());
-    state = result.state;
-    message.textContent = result.message;
-    if (state.stage !== 'egg') react(action);
-    beep();
-    refresh();
-    persist();
-  };
-  element('actions').append(button);
-}
-
-element('stats').onclick = () => {
-  const panel = element('details');
-  panel.hidden = !panel.hidden;
-  element('stats').setAttribute('aria-expanded', String(!panel.hidden));
-};
-
-const pointers = new Map<number, Direction>();
-const keys = new Set<Direction>();
-const left = element<HTMLButtonElement>('left');
-const right = element<HTMLButtonElement>('right');
-function renderHeld() {
-  const held = [...keys, ...pointers.values()];
-  left.dataset.held = String(held.includes(-1));
-  right.dataset.held = String(held.includes(1));
-}
-for (const [button, direction] of [[left, -1], [right, 1]] as const) {
+const commands = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'Space', 'KeyS']);
+window.addEventListener('keydown', event => {
+  if (!commands.has(event.code) || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (event.target instanceof HTMLElement && (event.target.closest('input') ||
+    (event.code === 'Space' && event.target.closest('button, summary')))) return;
+  event.preventDefault();
+  if (event.code === 'Space' && !event.repeat) releaseRope();
+  if (event.code === 'KeyS') aiming = true;
+  keys.add(event.code);
+});
+window.addEventListener('keyup', event => {
+  if (!keys.delete(event.code)) return;
+  event.preventDefault();
+  if (event.code === 'KeyS') {
+    aiming = false;
+    fire();
+  }
+});
+for (const [id, key] of [['left','ArrowLeft'], ['right','ArrowRight'], ['reel','ArrowUp']]) {
+  const button = get(id);
   button.addEventListener('pointerdown', event => {
     if (event.button !== 0) return;
     button.setPointerCapture(event.pointerId);
-    pointers.set(event.pointerId, direction);
-    renderHeld();
+    held.set(event.pointerId, key);
   });
-  const release = (event: PointerEvent) => {
-    pointers.delete(event.pointerId);
-    renderHeld();
-    persist();
-  };
-  button.addEventListener('pointerup', release);
-  button.addEventListener('pointercancel', release);
-  button.addEventListener('lostpointercapture', release);
-  button.addEventListener('contextmenu', event => event.preventDefault());
-}
-
-const keyDirection = (key: string): Direction | undefined =>
-  key === 'ArrowLeft' ? -1 : key === 'ArrowRight' ? 1 : undefined;
-window.addEventListener('keydown', event => {
-  const direction = keyDirection(event.key);
-  if (direction === undefined || event.metaKey || event.altKey || event.ctrlKey) return;
-  event.preventDefault();
-  keys.add(direction);
-  renderHeld();
-});
-window.addEventListener('keyup', event => {
-  const direction = keyDirection(event.key);
-  if (direction === undefined) return;
-  keys.delete(direction);
-  renderHeld();
-  persist();
-});
-
-function clearControls() {
-  pointers.clear();
-  keys.clear();
-  renderHeld();
-}
-window.addEventListener('blur', clearControls);
-
-let timer: number;
-let hiddenAt: number | undefined;
-function tick() {
-  const previous = state.stage;
-  state = advance(state, now());
-  if (state.stage !== previous) message.textContent = previous === 'egg'
-    ? 'L’uovo si è schiuso! Esplora con le frecce.' : 'Tamago è cresciuto!';
-  refresh();
-  persist();
-}
-function visibility() {
-  clearInterval(timer);
-  if (document.hidden) {
-    clearControls();
-    hiddenAt = Date.now();
-  } else if (hiddenAt !== undefined) {
-    if (state.stage !== 'egg') state.energy = movementEnergy(state.energy, (Date.now() - hiddenAt) / 1000, false);
-    hiddenAt = undefined;
+  for (const event of ['pointerup', 'pointercancel', 'lostpointercapture'] as const) {
+    button.addEventListener(event, pointer => held.delete(pointer.pointerId));
   }
-  tick();
-  if (!document.hidden) timer = window.setInterval(tick, 1000);
 }
-document.addEventListener('visibilitychange', visibility);
-window.addEventListener('pagehide', () => {
-  clearControls();
-  persist();
+get('detach').onclick = releaseRope;
+function clearInput() {
+  keys.clear();
+  held.clear();
+  touchAim = undefined;
+  aiming = false;
+}
+window.addEventListener('blur', clearInput);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) clearInput();
 });
 
-let ground = 103;
-function resize() {
-  const {clientWidth, clientHeight} = canvas;
-  if (canvas.height !== 128) canvas.height = 128;
-  const controls = document.querySelector('footer')!;
-  const available = controls.offsetTop - 4;
-  ground = Math.min(103, Math.floor(available * 128 / Math.max(1, clientHeight)));
-  const width = Math.max(1, Math.round(clientWidth * canvas.height / Math.max(1, clientHeight)));
-  if (canvas.width !== width) canvas.width = width;
+function goal(check: Point, radius: number) {
+  return Math.hypot(spider.x - check.x, spider.y - check.y) < radius;
 }
-const layout = new ResizeObserver(resize);
-layout.observe(canvas);
-layout.observe(document.querySelector('footer')!);
+function update(dt: number, time: number) {
+  const isHeld = (key: string) => keys.has(key) || [...held.values()].includes(key);
+  const move = (Number(isHeld('ArrowRight')) - Number(isHeld('ArrowLeft'))) as -1 | 0 | 1;
+  const wasGrounded = spider.grounded;
+  const landingSpeed = spider.vy;
+  tickSpider(spider, area.surfaces, {move,reel:isHeld('ArrowUp')}, dt, tuning);
+  if (spider.grounded && !wasGrounded) {
+    landedAt = time;
+    if (landingSpeed > 30) play('land');
+  }
+
+  if (spider.y > area.bounds.bottom || spider.x < area.bounds.left - 20 || spider.x > area.bounds.right + 20) {
+    spider = createSpider(checkpoint ? area.checkpoints[checkpoint - 1] : area.spawn);
+    shot = undefined;
+    say('Riprova dal punto sicuro. ' + (checkpoint ? 'Cerca il prossimo appiglio sopra di te.' : intro()));
+    return;
+  }
+
+  for (let index = checkpoint; index < area.checkpoints.length; index++) {
+    if (!spider.grounded || !goal(area.checkpoints[index], 24)) continue;
+    checkpoint = index + 1;
+    say(index === 0 ? 'Prima sponda! Usa il filo per risalire verso la prossima foglia.'
+      : 'Punto sicuro. Cerca la rugiada in alto con due lanci in aria.');
+  }
+  if (!discovered && goal(area.discovery, 15)) {
+    discovered = true;
+    play('discovery');
+    say('Rugiada trovata! Hai raggiunto il sentiero alto.');
+  }
+  if (!finished && goal(area.finish, 17)) {
+    finished = true;
+    say(discovered ? 'Area completata · rugiada trovata.'
+      : 'Area completata. Puoi tornare a cercare la rugiada in alto.');
+    play('discovery');
+  }
+}
+
+function locateCamera() {
+  const maxX = Math.max(area.bounds.left, area.bounds.right - canvas.width);
+  const x = Math.max(area.bounds.left, Math.min(maxX, spider.x - canvas.width * .34));
+  const y = Math.max(area.bounds.top, Math.min(area.bounds.bottom - canvas.height, spider.y - canvas.height * .79));
+  return {x:Math.round(x),y:Math.round(y)};
+}
+function resize() {
+  canvas.height = 200;
+  canvas.width = Math.max(1, Math.round(canvas.clientWidth * 200 / Math.max(1, canvas.clientHeight)));
+  camera = locateCamera();
+}
+window.addEventListener('resize', resize);
 resize();
 
-const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 let lastFrame = 0;
-let lastPaint = -Infinity;
-let lastDistance = NaN;
+let remainder = 0;
+const step = 1 / 120;
 function frame(time: number) {
-  const seconds = Math.min(.05, (time - (lastFrame || time)) / 1000);
+  remainder += Math.min(.05, (time - (lastFrame || time)) / 1000);
   lastFrame = time;
-  const leftHeld = left.dataset.held === 'true';
-  const rightHeld = right.dataset.held === 'true';
-  const moving = state.stage !== 'egg' && leftHeld !== rightHeld && !document.hidden;
-  if (state.stage !== 'egg' && !document.hidden) {
-    state.energy = movementEnergy(state.energy, seconds, moving);
+  while (remainder >= step) {
+    update(step,time);
+    remainder -= step;
   }
-  if (moving) {
-    facing = leftHeld ? -1 : 1;
-    const rate = 12 + Math.min(1, state.energy / 20) * 18;
-    const found = travel(state.world, state.world.position + facing * seconds * rate, Date.now());
-    const index = zoneIndex(state.world.position);
-    if (index !== previousZone) {
-      previousZone = index;
-      updateLocation();
-      message.textContent = index === 0 ? 'Di nuovo nella radura.' : 'Avvicinati al luccichio per scoprire cosa c’è.';
-    }
-    if (found) {
-      state[found.need] = Math.min(100, state[found.need] + found.amount);
-      message.textContent = found.text;
-      react('discover');
-      beep(true);
-      refresh();
-      persist();
-    }
-    const distance = Math.round(state.world.position / 4);
-    if (distance !== lastDistance) {
-      element('distance').textContent = distance === 0 ? 'RADURA · 0 m' : distance > 0 ? distance + ' m EST' : -distance + ' m OVEST';
-      lastDistance = distance;
-    }
-  }
-  if (time - lastPaint >= 1000 / 36) {
-    lastPaint = time;
-    const wallTime = Date.now();
-    drawWorld(context, {
-      ground,
-      seed:state.world.seed,
-      position:state.world.position,
-      stage:state.stage,
-      form:state.form === 'bud' ? 'bloom' : state.form ? 'stone' : undefined,
-      mood:state.sick ? 'sick' : state.happiness < 45 ? 'sad' : 'happy',
-      facing,
-      walking:moving,
-      reaction:time < reactionUntil ? reaction : undefined,
-      ready:index => ready(state.world, index, wallTime),
-    }, reducedMotion.matches ? 0 : time);
-  }
+  camera = locateCamera();
+  const aim = aiming ? worldAim() : undefined;
+  const hit = aim ? aimHit(spider, area.surfaces, aim, tuning) : undefined;
+  drawScene(context, area, spider, {camera,time,aim,hit,shot,landedAt,discovered});
   requestAnimationFrame(frame);
 }
-
-renderAudio();
-renderHeld();
-updateLocation();
-const startingDistance = Math.round(state.world.position / 4);
-element('distance').textContent = startingDistance === 0 ? 'RADURA · 0 m' : startingDistance > 0
-  ? startingDistance + ' m EST' : -startingDistance + ' m OVEST';
-visibility();
 requestAnimationFrame(frame);
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+if (import.meta.env.PROD && /^https?:$/.test(location.protocol) && 'serviceWorker' in navigator) {
   void navigator.serviceWorker.register('./sw.js').catch(error => console.warn('Offline non disponibile', error));
 }
