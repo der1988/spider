@@ -4,7 +4,7 @@
 
 - Muoviti con **A/D**. Tieni premuto **Spazio**, punta un rametto con le **frecce** e rilascia **Spazio** per agganciarti.
 - Una volta appeso, usa **A/D** per darti slancio, **W** per risalire e **S** per staccarti mantenendo la velocità. Puoi lanciare un altro filo mentre sei in aria.
-- Su touch, trascina sul paesaggio e rilascia sul bersaglio per tirare. I pulsanti sul display controllano camminata, risalita e sgancio.
+- Su telefono gioca in orizzontale. L’analogico a sinistra muove il ragno: spingilo in alto per risalire e in basso per staccarti. Tieni premuto **Tela** a destra, mira con l’analogico e rilascia **Tela** per tirare.
 - Attraversa il primo vuoto e cerca la rugiada sul percorso alto. Se cadi, riparti dall’ultimo punto sicuro. **Fisica** permette di regolare portata, accelerazione e risalita.
 
 ## Sviluppo

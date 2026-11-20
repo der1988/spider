@@ -26,10 +26,43 @@ button:focus-visible, summary:focus-visible, input:focus-visible { outline: 2px 
 .controls { bottom: max(10px, env(safe-area-inset-bottom)); display: grid; justify-items: center; gap: 8px; }
 #message, .keys { font-size: 11px; line-height: 1.45; margin: 0; text-align: center; }
 kbd { background: #c6d29a; border: 1px solid var(--rule); padding: 0 3px; }
-.touch { display: none; pointer-events: auto; width: min(100%, 400px); gap: 6px; grid-template-columns: repeat(4, 1fr); }
-.touch button { min-height: 44px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.touch, .rotate { display: none; }
 @media (pointer: coarse), (max-width: 620px) {
   .keys { display: none; }
-  .touch { display: grid; }
   .hud, .controls { inset-inline: max(8px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-right)); }
+  .touch {
+    position: absolute; inset: 0; display: flex; align-items: end; justify-content: space-between;
+    padding: 0 max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+    pointer-events: none;
+  }
+  #stick, #silk {
+    pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none;
+    border-radius: 50%; display: grid; place-items: center;
+  }
+  #stick {
+    width: clamp(76px, 23dvh, 108px); aspect-ratio: 1;
+    background: #e0e7b2d9; border: 2px solid var(--rule);
+    box-shadow: inset 0 0 0 6px #aab974;
+  }
+  .stick-nub {
+    display: block; width: 39%; aspect-ratio: 1;
+    border: 2px solid var(--ink); border-radius: 50%;
+    background: #aab974; pointer-events: none;
+    transform: translate(var(--stick-x, 0px), var(--stick-y, 0px));
+  }
+  #silk {
+    width: clamp(66px, 19dvh, 90px); aspect-ratio: 1; padding: 0;
+    background: #dbe4ab; border: 2px solid var(--rule); border-bottom-width: 5px;
+    font-size: 14px; text-transform: uppercase;
+  }
+  #silk[data-held=true] { background: #aab974; }
+  .controls { inset-inline: max(108px, calc(env(safe-area-inset-left) + 108px)) max(98px, calc(env(safe-area-inset-right) + 98px)); }
+}
+@media (orientation: portrait) and (pointer: coarse) {
+  .rotate {
+    display: block; position: absolute; top: max(65px, calc(env(safe-area-inset-top) + 48px));
+    left: 8px; margin: 0; font-size: 10px; background: var(--paper);
+    padding: 4px 6px; pointer-events: none;
+  }
+  .controls { inset-inline: 10px; bottom: max(128px, calc(env(safe-area-inset-bottom) + 120px)); }
 }

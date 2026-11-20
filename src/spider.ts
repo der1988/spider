@@ -22,7 +22,7 @@ export interface Spider extends Point {
 }
 
 interface Input {
-  move: -1 | 0 | 1
+  move: number
   reel: boolean
 }
 
@@ -180,13 +180,15 @@ function constrainRope(spider: Spider, surfaces: readonly Rect[], rope: Rope) {
 }
 
 function step(spider: Spider, surfaces: readonly Rect[], input: Input, dt: number, tuning: Tuning) {
-  if (input.move) spider.facing = input.move
+  const move = Math.max(-1, Math.min(1, input.move))
+  const direction = move < 0 ? -1 : 1
+  if (move) spider.facing = direction
   if (spider.grounded && !spider.rope) {
     // Preserve faster horizontal momentum on landing and settle into a walk.
-    spider.vx = approach(spider.vx, input.move * tuning.walkSpeed, tuning.acceleration * dt)
-  } else if (input.move) {
+    spider.vx = approach(spider.vx, move * tuning.walkSpeed, tuning.acceleration * dt)
+  } else if (move) {
     const acceleration = spider.rope ? tuning.acceleration : tuning.airAcceleration
-    spider.vx += input.move * Math.min(acceleration * dt, Math.max(0, MAX_SWING_SPEED - input.move * spider.vx))
+    spider.vx += direction * Math.min(Math.abs(move) * acceleration * dt, Math.max(0, MAX_SWING_SPEED - direction * spider.vx))
   }
 
   spider.vy = Math.min(320, spider.vy + tuning.gravity * dt)

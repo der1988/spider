@@ -1,11 +1,12 @@
 {
   "id":"./",
-  "name":"Tamago — Virtual Pet",
+  "name":"Tamago — Il sentiero di seta",
   "short_name":"Tamago",
   "lang":"it",
   "start_url":"./",
   "scope":"./",
   "display":"standalone",
+  "orientation":"landscape",
   "background_color":"#a5b28b",
   "theme_color":"#a5b28b",
   "icons":[
