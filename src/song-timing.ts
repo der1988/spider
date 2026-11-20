@@ -1,6 +1,6 @@
 // Seconds in the decoded MP3. Edit these cues to adjust the shipped alignment.
 export const defaultLoopStart = 15.330;
-export const loopEnd = 240.566;
+export const firstTrackEnd = 240.330;
 export const clockCue = 4;
 export const loopCue = 5;
 export const captions: readonly (readonly [start: number,end: number,text: string])[] = [

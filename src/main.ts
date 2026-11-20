@@ -36,11 +36,12 @@ try {
   localStorage.removeItem(WEB_KEY);
 } catch { /* Storage may be unavailable. */ }
 const audio = new Soundscape(audioOn);
-const asset = document.querySelector<HTMLMetaElement>('meta[name=tamago-soundtrack]')!.content;
-const musicBytes = fetch(asset).then(response => response.ok ? response.arrayBuffer() : undefined)
-  .catch(() => undefined);
+function fetchTrack(name: string) {
+  const url=document.querySelector<HTMLMetaElement>('meta[name="'+name+'"]')!.content;
+  return fetch(url).then(response=>response.ok ? response.arrayBuffer() : undefined).catch(()=>undefined);
+}
 const timing = loadTiming();
-const song = new Soundtrack(musicBytes,timing.loopStart);
+const song = new Soundtrack([fetchTrack('tamago-soundtrack'),fetchTrack('tamago-upgrade')],timing.loopStart);
 const leaderboard = bindLeaderboard();
 song.setMuted(!audioOn);
 let contextAudio: AudioContext|undefined;
@@ -223,8 +224,8 @@ function frame(time: number) {
     }
   }
   song.connect(contextAudio);
-  const position = song.time;
-  if (opening && song.started && position>=huntStart(timing)) {
+  const position = song.position;
+  if (opening && song.started && position.track==='first' && position.time>=huntStart(timing)) {
     opening=false;
     say(gamepad ? intro : waiting);
   }
@@ -272,7 +273,7 @@ function frame(time: number) {
   const remaining = (hunt.time/hunt.difficulty.duration).toFixed(3);
   if (clockMeter.style.getPropertyValue('--remaining')!==remaining) clockMeter.style.setProperty('--remaining',remaining);
   renderHunt(context,hunt,spider,aimDirection,{
-    time:position, beat, shot:opening && song.started ? openingShot(position,timing) : undefined,
+    time:position.time, beat, shot:opening && song.started ? openingShot(position.time,timing) : undefined,
   });
   requestAnimationFrame(frame);
 }
