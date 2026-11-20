@@ -8,13 +8,13 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./touch.png">
 <link rel="icon" href="./icon-192.png">
-<title>Tamago · La caccia</title>
+<title>Tamago 2.0 · La caccia</title>
 </head>
 <body>
 <main class="shell">
   <header>
     <div class="hunt-info">
-      <h1>Tamago</h1>
+      <h1>Tamago 2.0</h1>
       <div class="scores">
         <span id="level" class="level">Livello 1</span>
         <output id="score" aria-label="Catture">0 catture</output>
@@ -22,7 +22,7 @@
       </div>
     </div>
     <div id="clock" class="clock" data-phase="ready">
-      <span class="clock-caption" aria-hidden="true">Tempo</span>
+      <span class="clock-caption">Tempo · <span id="round-time">60 s</span></span>
       <span class="clock-rhythm" aria-hidden="true"></span>
       <output id="time" aria-label="Secondi rimanenti" aria-live="off">60 s</output>
       <span class="clock-rhythm" aria-hidden="true"></span>
@@ -32,6 +32,7 @@
       <button id="start" type="button">Avvia</button>
       <button id="pause" type="button" aria-pressed="false" disabled>Pausa</button>
       <button id="calibrate" type="button">Sincronizza</button>
+      <button id="show-board" type="button">Classifica</button>
       <button id="sound" type="button" aria-pressed="true">Audio On</button>
     </div>
   </header>
@@ -58,6 +59,27 @@
     <button type="button" id="calibration-save">Salva</button>
     <button type="button" id="calibration-close">Chiudi</button>
   </div>
+</dialog>
+<dialog id="scoreboard" aria-labelledby="board-title">
+  <div class="board-header">
+    <h2 id="board-title">Classifica online</h2>
+    <button id="board-close" type="button">Chiudi</button>
+  </div>
+  <form id="score-form" hidden>
+    <p id="score-result"></p>
+    <fieldset>
+      <legend>Nome · cinque lettere A–Z</legend>
+      <div id="score-letters" class="score-letters"></div>
+    </fieldset>
+    <p><kbd>↑</kbd> <kbd>↓</kbd> Cambia lettera · <kbd>←</kbd> <kbd>→</kbd> Spostati · <kbd>×</kbd> Conferma · <kbd>○</kbd> Salta</p>
+    <div class="board-actions">
+      <button id="score-save" type="submit">Salva punteggio</button>
+      <button id="score-skip" type="button">Salta</button>
+    </div>
+  </form>
+  <p id="board-status" role="status"></p>
+  <button id="board-reload" type="button" hidden>Riprova</button>
+  <ol id="board-entries" aria-label="Classifica per numero di catture"></ol>
 </dialog>
 <script type="module" src="/src/main.ts"></script>
 </body>

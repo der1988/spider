@@ -1,7 +1,7 @@
 import './style.css';
 import {DEFAULT_TUNING,type Point} from './spider';
 import {anchorCrawlerRope,castCrawler,closeCrawlerRopes,createCrawler,jumpCrawler,tickCrawler} from './crawler';
-import {capStrands,createHunt,LIMIT,platforms,ROUND,spawn,tickHunt,WEB_SECONDS} from './hunt';
+import {capStrands,createHunt,LIMIT,platforms,spawn,tickHunt,WEB_SECONDS} from './hunt';
 import {fixSilk,leaveSilk,WEB_KEY} from './threads';
 import {renderHunt} from './hunt-render';
 import {samplePlayStation,silkMotion} from './pad-controls';
@@ -9,6 +9,8 @@ import {Soundscape} from './soundscape';
 import {Soundtrack} from './soundtrack';
 import {beatAt, huntStart, loadTiming, lyricAt, openingShot} from './song-cues';
 import {bindCalibration} from './song-calibration';
+import {difficultyChanges} from './difficulty';
+import {bindLeaderboard,newRunId} from './leaderboard';
 
 const get = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const context = get<HTMLCanvasElement>('world').getContext('2d',{alpha:false})!;
@@ -17,6 +19,7 @@ const levelLabel = get('level');
 const timeLabel = get('time');
 const clock = get('clock');
 const clockMeter = get('clock-meter');
+const roundLabel = get('round-time');
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const scoreLabel = get('score');
 const strandsLabel = get('strands');
@@ -38,6 +41,7 @@ const musicBytes = fetch(asset).then(response => response.ok ? response.arrayBuf
 let timing = loadTiming();
 const song = new Soundtrack(musicBytes,timing.loopStart);
 const calibration = get<HTMLDialogElement>('calibration');
+const leaderboard = bindLeaderboard();
 song.setMuted(!audioOn);
 let contextAudio: AudioContext|undefined;
 let requestedStart = false;
@@ -85,11 +89,13 @@ sound.onclick = () => {
 };
 syncAudio();
 window.addEventListener('keydown',event => {
-  if (event.code==='Escape' && !event.repeat && !calibration.open) togglePause();
+  if (event.code==='Escape' && !event.repeat && !calibration.open && !leaderboard.open) togglePause();
 });
 document.addEventListener('visibilitychange',syncPause);
 
 let hunt = createHunt();
+let runId = newRunId();
+let difficultyNotice: {text:string; until:number}|undefined;
 let spider = createCrawler(spawn,platforms);
 let aimDirection: Point = {x:.56,y:-.828};
 let previous: ReturnType<typeof samplePlayStation>['shoulders']|undefined;
@@ -99,6 +105,7 @@ let down = false;
 let lastFrame=0;
 let remainder=0;
 let lastSound=0;
+const catchesText = (count: number) => count+(count===1 ? ' cattura' : ' catture');
 function say(text: string) { if(message.textContent!==text) message.textContent=text; }
 const worldAim = () => ({x:spider.x+aimDirection.x*70,y:spider.y+aimDirection.y*70});
 
@@ -152,10 +159,20 @@ function step(dt: number,input: ReturnType<typeof samplePlayStation>) {
     audio.play('catch');
     say('Livello '+hunt.score+' · Mosca catturata!');
   } else if(result==='new') {
-    say('Livello '+(hunt.score+1)+' · Nuova mosca, 60 secondi e arena pulita.');
+    const base = 'Livello '+(hunt.score+1)+' · Nuova mosca, '+hunt.difficulty.duration+' secondi.';
+    const changes = difficultyChanges(hunt.score);
+    if (changes.length) {
+      difficultyNotice = {text:base+' Mosca '+changes.join(', ')+'.',until:hunt.clock+3};
+      say(difficultyNotice.text);
+    } else say(base);
   } else if(result==='over') {
-    say('Tempo scaduto al livello '+(hunt.score+1)+' · '+hunt.score+' catture. Premi × per ricominciare.');
+    say('Tempo scaduto al livello '+(hunt.score+1)+' · '+catchesText(hunt.score)+'. Premi × per ricominciare.');
     audio.play('miss');
+    leaderboard.show({id:runId,catches:hunt.score});
+  }
+  if (difficultyNotice && hunt.clock>=difficultyNotice.until) {
+    if (message.textContent===difficultyNotice.text) say(intro);
+    difficultyNotice=undefined;
   }
   return result==='over';
 }
@@ -168,6 +185,8 @@ function frame(time: number) {
   const gamepad=pad();
   let input: ReturnType<typeof samplePlayStation>|undefined;
   let retry=false;
+  const boardWasOpen=leaderboard.open;
+  if (!calibration.open) leaderboard.handlePad(gamepad,time);
   if (gamepad) {
     const cross=!!gamepad.buttons[0]?.pressed;
     const options=!!gamepad.buttons[9]?.pressed;
@@ -182,7 +201,7 @@ function frame(time: number) {
     input=samplePlayStation(gamepad,previous);
     previous=input.shoulders;
     retry=cross && !crossHeld;
-    if (options && !optionsHeld && !calibration.open) togglePause();
+    if (options && !optionsHeld && !calibration.open && !leaderboard.open) togglePause();
     crossHeld=cross;
     optionsHeld=options;
   } else {
@@ -212,10 +231,12 @@ function frame(time: number) {
     say(gamepad ? intro : waiting);
   }
 
-  if (input && !opening && !paused && !calibration.open && !document.hidden) {
+  if (input && !opening && !paused && !calibration.open && !boardWasOpen && !leaderboard.open && !document.hidden) {
     if (input.aim) aimDirection=input.aim;
     if (hunt.phase==='over' && retry) {
       hunt=createHunt();
+      runId=newRunId();
+      difficultyNotice=undefined;
       spider=createCrawler(spawn,platforms);
       down=false;
       say(intro);
@@ -233,7 +254,7 @@ function frame(time: number) {
 
   if (time-lastSound>65) {
     lastSound=time;
-    const d=input && !opening && hunt.phase==='hunting' ?
+    const d=input && !opening && !leaderboard.open && hunt.phase==='hunting' ?
       Math.hypot(spider.x-hunt.fly.p.x,spider.y-hunt.fly.p.y) : Infinity;
     audio.nearby(d,time);
   }
@@ -241,7 +262,7 @@ function frame(time: number) {
   if (lyric.textContent!==caption) lyric.textContent=caption;
   const seconds=Math.ceil(hunt.time);
   const level=hunt.score+Number(hunt.phase!=='caught');
-  const labels = [[levelLabel,'Livello '+level],[timeLabel,seconds+' s'],[scoreLabel,hunt.score+(hunt.score===1 ? ' cattura' : ' catture')],
+  const labels = [[levelLabel,'Livello '+level],[timeLabel,seconds+' s'],[roundLabel,hunt.difficulty.duration+' s'],[scoreLabel,catchesText(hunt.score)],
     [strandsLabel,hunt.strands.length+' / '+LIMIT+' fili']] as const;
   for (const [element,text] of labels) if (element.textContent!==text) element.textContent=text;
   const beat = reduceMotion.matches ? 0 : beatAt(position);
@@ -250,7 +271,7 @@ function frame(time: number) {
   const phase = opening ? 'ready' : hunt.phase==='caught' ? 'running' :
     seconds<=5 ? 'urgent' : hunt.time<20 ? 'low' : 'running';
   if (clock.dataset.phase!==phase) clock.dataset.phase=phase;
-  const remaining = (hunt.time/ROUND).toFixed(3);
+  const remaining = (hunt.time/hunt.difficulty.duration).toFixed(3);
   if (clockMeter.style.getPropertyValue('--remaining')!==remaining) clockMeter.style.setProperty('--remaining',remaining);
   renderHunt(context,hunt,spider,aimDirection,{
     time:position, beat, shot:opening && song.started ? openingShot(position,timing) : undefined,

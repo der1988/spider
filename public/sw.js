@@ -27,6 +27,7 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const {request} = event;
   if (request.method !== 'GET' || !request.url.startsWith(scope)) return;
+  if (new URL(request.url).pathname===new URL('api/scores',scope).pathname) return;
   event.respondWith((async () => {
     const cache = await caches.open(activeCache);
     if (request.mode === 'navigate') {

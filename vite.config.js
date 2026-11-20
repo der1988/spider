@@ -3,7 +3,11 @@ import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
+const proxy = {'/api/scores':'http://127.0.0.1:8787'};
+
 export default defineConfig({
+  server: {proxy},
+  preview: {proxy},
   base: './',
   plugins: [{
     name: 'version-tamago-worker',

@@ -95,3 +95,19 @@ dialog h2 { margin: 0; font-size: 16px; }
 dialog audio, dialog select { width: 100%; margin: 5px 0; }
 dialog select { font: inherit; padding: 5px; }
 .calibration-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.board-header, .board-actions { display: flex; align-items: center; gap: 6px; }
+.board-header { justify-content: space-between; }
+#scoreboard { max-height: min(600px, 92dvh); }
+#scoreboard fieldset { min-width: 0; border: 1px solid var(--border); margin: 10px 0; padding: 9px; }
+.score-letters { display: flex; gap: 6px; }
+.score-letters input {
+  width: clamp(29px, 9vw, 45px); padding: 5px 0;
+  background: #192c20; color: #e6f0b6; border: 1px solid var(--border);
+  text-align: center; font: bold 23px ui-monospace, monospace;
+}
+.score-letters input:focus { outline: 2px solid #e6f0b6; outline-offset: 1px; }
+#board-entries { margin-bottom: 0; padding-left: 2.7em; font-variant-numeric: tabular-nums; }
+#board-entries:empty { display: none; }
+#board-entries li { padding: 5px 0; border-top: 1px solid #526b48; }
+.score-row { display: flex; justify-content: space-between; gap: 12px; }
