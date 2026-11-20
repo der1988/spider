@@ -1,6 +1,6 @@
 # Tamago
 
-Una creatura virtuale originale su un piccolo display LCD. Aspetta la schiusa, poi nutrila, gioca con lei e tienila pulita. Apri **Bisogni** per vedere tutti gli indicatori. Puoi toccare direttamente un'azione o usare **Seleziona**, **Conferma** e **Indietro**. Durante il sonno puoi cambiare la luce. **Cura** è utile quando la creatura si ammala.
+Una creatura virtuale originale su un piccolo display LCD. Aspetta la schiusa, poi nutrila, gioca con lei e tienila pulita. Apri **Bisogni** per vedere tutti gli indicatori. Puoi toccare direttamente un'azione o usare **Seleziona**, **Conferma** e **Indietro**. **Riposa** fa dormire Tamago per 30 minuti e gli restituisce energia, anche se chiudi il gioco. Durante il sonno puoi cambiare la luce. **Cura** è utile quando la creatura si ammala.
 
 ## Sviluppo
 

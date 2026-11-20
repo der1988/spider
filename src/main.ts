@@ -10,6 +10,7 @@ const actions = [
   {id:'feed', label:'Nutri', icon:['01100','11110','11111','01110','00100']},
   {id:'play', label:'Gioca', icon:['00100','10101','01110','10101','00100']},
   {id:'clean', label:'Pulisci', icon:['00100','00110','01110','11111','01110']},
+  {id:'rest', label:'Riposa', icon:['00110','01100','01100','01101','00110']},
   {id:'light', label:'Luce', icon:['01110','10001','10001','01110','00100']},
   {id:'heal', label:'Cura', icon:['00100','00100','11111','00100','00100']},
 ] as const;
@@ -64,7 +65,7 @@ const actionButtons = actions.map(({id, label, icon}, index) => {
   const iconCanvas = document.createElement('canvas');
   iconCanvas.width = iconCanvas.height = 5;
   const ink = iconCanvas.getContext('2d')!;
-  ink.fillStyle = '#c6ccb9';
+  ink.fillStyle = '#1b2418';
   icon.forEach((row, y) => Array.from(row).forEach((pixel, x) => {
     if (pixel === '1') ink.fillRect(x, y, 1, 1);
   }));
@@ -93,7 +94,7 @@ function select(index: number) {
 
 function refresh() {
   element('stage').textContent = stages[state.stage];
-  element('clock').textContent = state.sick ? 'MALATO' : state.sleeping ? 'SONNO' : state.stage === 'egg' ? '' : 'SVEGLIO';
+  element('clock').textContent = state.sleeping ? 'SONNO' : state.sick ? 'MALATO' : state.stage === 'egg' ? '' : 'SVEGLIO';
   element<HTMLProgressElement>('fullness').value = state.hunger;
   fields.forEach(([key], index) => {
     statValues[index].textContent = Math.round(state[key]) + '%';
@@ -133,7 +134,7 @@ function perform(action: Action) {
   const result = act(state, action, now());
   state = result.state;
   message.textContent = result.message;
-  if (action !== 'light' && state.stage !== 'egg' && !state.sleeping) {
+  if (action !== 'light' && action !== 'rest' && state.stage !== 'egg' && !state.sleeping) {
     reaction = action;
     reactionUntil = performance.now() + 750;
   }

@@ -9,6 +9,7 @@ import {
   HATCH_MS,
   loadGame,
   MAX_ABSENCE_MS,
+  REST_MS,
   SAVE_KEY,
   saveGame,
   TEEN_MS,
@@ -115,4 +116,23 @@ test('neglect can cause sickness and treatment restores health', () => {
   const treated = act(pet, 'heal', now).state;
   assert.equal(treated.sick, false);
   assert.ok(treated.health > pet.health);
+});
+
+test('a manual nap restores energy across reload and ends on time', () => {
+  const storage = memoryStorage();
+  const awake = advance(createGame(birth), hatch);
+  const nap = act(awake, 'rest', hatch).state;
+  assert.equal(nap.sleeping, true);
+  assert.equal(nap.lightOn, false);
+  assert.equal(saveGame(storage, nap), true);
+
+  const midway = loadGame(storage, hatch + REST_MS / 2);
+  assert.equal(midway.sleeping, true);
+  assert.ok(midway.energy > awake.energy);
+  assert.equal(act(midway, 'rest', hatch + REST_MS / 2).state.restUntil, nap.restUntil);
+
+  const woken = loadGame(storage, hatch + REST_MS);
+  assert.equal(woken.sleeping, false);
+  assert.equal(woken.lightOn, true);
+  assert.ok(woken.energy > midway.energy);
 });

@@ -3,6 +3,7 @@ const HOUR = 60 * MINUTE
 const DAY = 24 * HOUR
 const AWAKE_MS = 16 * HOUR
 
+export const REST_MS = 30 * MINUTE
 export const HATCH_MS = 10_000
 export const TEEN_MS = 12 * HOUR
 export const ADULT_MS = 48 * HOUR
@@ -12,7 +13,7 @@ export const BACKUP_KEY = 'tamago.backup'
 
 export type Stage = 'egg' | 'baby' | 'teen' | 'adult'
 export type Form = 'bud' | 'comet'
-export type Action = 'feed' | 'play' | 'clean' | 'light' | 'heal'
+export type Action = 'feed' | 'play' | 'clean' | 'light' | 'heal' | 'rest'
 
 export interface State {
   stage: Stage
@@ -22,6 +23,7 @@ export interface State {
   energy: number
   hygiene: number
   health: number
+  restUntil?: number
   sleeping: boolean
   lightOn: boolean
   sick: boolean
@@ -47,8 +49,13 @@ export function createGame(now: number): State {
   }
 }
 
+function restingAt(state: State, time: number) {
+  const end = state.restUntil
+  return end !== undefined && time > end - REST_MS && time <= end
+}
+
 function simulateMinute(state: State, elapsed: number) {
-  const asleep = isSleeping(elapsed)
+  const asleep = isSleeping(elapsed) || restingAt(state, state.bornAt + elapsed)
   state.hunger = clamp(state.hunger - (asleep ? 3 : 6) / 60)
   state.happiness = clamp(state.happiness - (asleep ? 0 : 4) / 60)
   state.hygiene = clamp(state.hygiene - (asleep ? 2 : 5) / 60)
@@ -82,7 +89,7 @@ export function advance(state: State, now: number): State {
     simulateMinute(next, next.simulatedAt - next.bornAt)
   }
 
-  next.sleeping = isSleeping(elapsed)
+  next.sleeping = isSleeping(elapsed) || now < (next.restUntil ?? 0)
   if (!next.sleeping) next.lightOn = true
   next.stage = elapsed >= ADULT_MS ? 'adult' : elapsed >= TEEN_MS ? 'teen' : 'baby'
   if (next.stage === 'adult' && next.form === null) {
@@ -97,6 +104,13 @@ export function advance(state: State, now: number): State {
 export function act(state: State, action: Action, now: number): { state: State; message: string } {
   const next = { ...advance(state, now) }
   if (next.stage === 'egg') return { state: next, message: 'Si sta ancora schiudendo…' }
+  if (action === 'rest') {
+    if (next.sleeping) return { state: next, message: 'Sta già riposando…' }
+    next.restUntil = next.updatedAt + REST_MS
+    next.sleeping = true
+    next.lightOn = false
+    return { state: next, message: 'Riposa per 30 minuti.' }
+  }
   if (action === 'light') {
     if (!next.sleeping) return { state: next, message: 'Puoi cambiare la luce durante il sonno.' }
     next.lightOn = !next.lightOn
@@ -141,6 +155,8 @@ function decode(raw: string | null): State | undefined {
     if (![value.sleeping, value.lightOn, value.sick].every((flag) => typeof flag === 'boolean')) {
       return undefined
     }
+    if (value.restUntil !== undefined && (!Number.isSafeInteger(value.restUntil) ||
+      value.restUntil < value.bornAt + REST_MS || value.restUntil > value.updatedAt + REST_MS)) return undefined
     const times = [value.bornAt, value.updatedAt, value.simulatedAt]
     if (!times.every(Number.isSafeInteger) || value.bornAt < 0 || value.updatedAt < value.bornAt ||
       value.simulatedAt < value.bornAt + HATCH_MS ||
