@@ -1,9 +1,10 @@
-import type { Area } from './area';
-import type { Point, Rect, Spider } from './spider';
+import {visibleCopies, type Area} from './area';
+import {threadFloor, type Point, type Rect, type Spider} from './spider';
 import type {Web} from './threads';
 
 interface View {
   camera: Point;
+  backgroundX: number;
   time: number;
   aim: Point;
   anchors: Point[];
@@ -107,7 +108,7 @@ const relic = [
 function background(ctx: CanvasRenderingContext2D, camera: Point, time: number) {
   const { width, height } = ctx.canvas;
   block(ctx, 0, 0, width, height, color.sky);
-  const glowX = Math.round(width * 0.48 - camera.x * 0.055);
+  const glowX = Math.round(width*(.48+Math.sin(camera.x/280)*.10));
   for (let row = -18; row <= 18; row += 2) {
     const radius = Math.floor(Math.sqrt(19 * 19 - row * row));
     block(ctx, glowX - radius, 66 + row, radius * 2, 2, color.glow);
@@ -286,12 +287,20 @@ function reticle(ctx: CanvasRenderingContext2D, p: Point, inRange: boolean) {
   block(ctx, p.x, p.y, 1, 1, fill);
 }
 
-export function drawScene(ctx: CanvasRenderingContext2D, area: Area, spider: Spider, view: View) {
-  const camera = { x: Math.round(view.camera.x), y: Math.round(view.camera.y) };
-  const local = (p: Point): Point => ({ x: Math.round(p.x - camera.x), y: Math.round(p.y - camera.y) });
-  ctx.imageSmoothingEnabled = false;
-  background(ctx, camera, view.time);
-  for (const item of area.surfaces) surface(ctx, item, camera);
+function drawSection(ctx: CanvasRenderingContext2D, area: Area, view: View, camera: Point) {
+  const local = (p: Point): Point => ({x:Math.round(p.x-camera.x),y:Math.round(p.y-camera.y)});
+  for (const item of area.surfaces) surface(ctx,item,camera);
+  for (const ramp of area.ramps) {
+    const start = Math.max(ramp.from.x,camera.x);
+    const end = Math.min(ramp.to.x,camera.x+ctx.canvas.width);
+    for (let x=start; x<end; x++) {
+      const y = threadFloor(ramp,x);
+      if (y === undefined) continue;
+      const ground = Math.round(y-camera.y);
+      block(ctx,x-camera.x,ground,1,Math.max(0,261-y),color.earth);
+      block(ctx,x-camera.x,ground,1,2,color.moss);
+    }
+  }
 
   const find = local(area.discovery);
   if (!view.discovered) {
@@ -306,15 +315,6 @@ export function drawScene(ctx: CanvasRenderingContext2D, area: Area, spider: Spi
     const glimmer = Math.floor(view.time/290) % 2;
     pixelSprite(ctx,relic,seed.x-6,seed.y-5-glimmer);
   }
-  for (const anchor of view.anchors) {
-    const p = local(anchor);
-    for (const [x,y] of [[0,-8],[8,0],[0,8],[-8,0]]) {
-      const q = {x:p.x+x,y:p.y+y};
-      line(ctx,q,{x:p.x-y,y:p.y+x},color.dark);
-    }
-    block(ctx,p.x-1,p.y-1,3,3,color.silk);
-  }
-  const p = local(spider);
   for (const thread of view.web.strands) {
     const from = local(thread.from);
     const to = local(thread.to);
@@ -330,14 +330,33 @@ export function drawScene(ctx: CanvasRenderingContext2D, area: Area, spider: Spi
     }
     for (const end of [from,to]) block(ctx,end.x-1,end.y-1,3,3,color.middle);
   }
+  for (const fly of view.web.flies) {
+    if (fly.returnsAt === undefined) drawFly(ctx,local(fly.position),view.time,fly.caughtAt);
+  }
+}
+
+export function drawScene(ctx: CanvasRenderingContext2D, area: Area, spider: Spider, view: View) {
+  const camera = {x:Math.round(view.camera.x),y:Math.round(view.camera.y)};
+  const local = (p: Point): Point => ({x:Math.round(p.x-camera.x),y:Math.round(p.y-camera.y)});
+  ctx.imageSmoothingEnabled = false;
+  background(ctx,{...camera,x:Math.round(view.backgroundX)},view.time);
+  for (const offset of visibleCopies(camera.x,camera.x+ctx.canvas.width)) {
+    drawSection(ctx,area,view,{...camera,x:camera.x-offset});
+  }
+  for (const anchor of view.anchors) {
+    const p = local(anchor);
+    for (const [x,y] of [[0,-8],[8,0],[0,8],[-8,0]]) {
+      const q = {x:p.x+x,y:p.y+y};
+      line(ctx,q,{x:p.x-y,y:p.y+x},color.dark);
+    }
+    block(ctx,p.x-1,p.y-1,3,3,color.silk);
+  }
+  const p = {x:Math.floor(ctx.canvas.width/2),y:Math.floor(ctx.canvas.height/2)};
   for (const end of view.web.loose) {
     const anchor = local(end.from);
     const middle = {x:(anchor.x+p.x)/2,y:(anchor.y+p.y)/2+7};
     line(ctx,anchor,middle,color.middle);
     line(ctx,middle,p,color.middle);
-  }
-  for (const fly of view.web.flies) {
-    if (fly.returnsAt === undefined) drawFly(ctx,local(fly.position),view.time,fly.caughtAt);
   }
   if (spider.rope) {
     const anchor = local(spider.rope);

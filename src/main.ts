@@ -1,5 +1,5 @@
 import './style.css';
-import {area} from './area';
+import {area, loopShift, loopSurfaces} from './area';
 import {aimHit, createSpider, DEFAULT_TUNING, detach, queueJump, shoot, tickSpider, type Point} from './spider';
 import {drawScene} from './web-render';
 import {availableAnchors, bridgePreview, buildBridge, createWeb, fixSilk, leaveSilk, recoverFlies, tickFlies, WEB_KEY} from './threads';
@@ -7,11 +7,12 @@ import {Soundscape} from './soundscape';
 import {AimGesture, silkMotion} from './aim-gesture';
 
 const get = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+const scene = get('scene');
 const canvas = get<HTMLCanvasElement>('world');
 const context = canvas.getContext('2d', {alpha:false})!;
 const message = get('message');
 const audioButton = get<HTMLButtonElement>('sound');
-const touch = matchMedia('(pointer: coarse)');
+const touch = matchMedia('(any-pointer: coarse)');
 const tuning = {...DEFAULT_TUNING};
 const tuningKeys = ['range', 'acceleration', 'reelSpeed'] as const;
 const keys = new Set<string>();
@@ -64,15 +65,16 @@ let padJump = false;
 
 let landedAt = -Infinity;
 let shot: {from:Point; to:Point; hit:boolean; until:number} | undefined;
-let camera: Point = {x:0,y:0};
+let traveledOffset = 0;
 
 function say(text: string) {
   if (message.textContent !== text) message.textContent = text;
 }
 
 function intro() {
-  return touch.matches || padIndex !== undefined
-    ? 'Inclina lo stick destro verso il rametto, poi lascialo al centro per tirare.'
+  if (padIndex !== undefined) return 'Inclina lo stick destro verso il rametto e rilascialo per tirare.';
+  return touch.matches || scene.dataset.touch === 'true'
+    ? 'Trascina a sinistra per muoverti. Trascina a destra verso il rametto e rilascia per tirare.'
     : 'Tieni Spazio, punta il rametto con le frecce e rilascia Spazio per agganciarti.';
 }
 say(intro());
@@ -124,7 +126,7 @@ function fire(target: Point) {
   if (distance < 1) return;
 
   audio.play('launch');
-  const bridge = buildBridge(web,spider,area.surfaces,target,tuning.range);
+  const bridge = buildBridge(web,spider,loopSurfaces,target,tuning.range);
   if (bridge) {
     shot = {from,to:bridge.to,hit:true,until:performance.now()+160};
     audio.play('attach',.075);
@@ -133,7 +135,7 @@ function fire(target: Point) {
     return;
   }
   const previousRope = spider.rope;
-  const hit = shoot(spider, area.surfaces, target, tuning);
+  const hit = shoot(spider, loopSurfaces, target, tuning);
   if (hit) {
     if (previousRope) leaveSilk(web,previousRope,ropeReach);
     ropeReach = tuning.range;
@@ -166,45 +168,50 @@ function releaseRope() {
 function analog(id: string, onMove?: (point: Point) => void, onEnd?: (released: boolean) => void) {
   const element = get(id);
   let pointer: number | undefined;
+  let origin = {x:0,y:0};
+  let radius = 1;
   let position = {x:0,y:0};
-  const paint = (x: number, y: number) => {
-    element.style.setProperty('--stick-x', x + 'px');
-    element.style.setProperty('--stick-y', y + 'px');
-  };
-  function read(event: PointerEvent) {
-    const rect = element.getBoundingClientRect();
-    const radius = rect.width * .32;
-    const x = (event.clientX - rect.left - rect.width / 2) / radius;
-    const y = (event.clientY - rect.top - rect.height / 2) / radius;
+
+  function start(event: PointerEvent, bounds: DOMRect) {
+    if (pointer !== undefined) return false;
+    pointer = event.pointerId;
+    origin = {x:event.clientX,y:event.clientY};
+    element.style.left = origin.x-bounds.left+'px';
+    element.style.top = origin.y-bounds.top+'px';
+    element.hidden = false;
+    radius = element.offsetWidth*.32;
+    return true;
+  }
+
+  function move(event: PointerEvent) {
+    if (event.pointerId !== pointer) return;
+    const x = (event.clientX-origin.x)/radius;
+    const y = (event.clientY-origin.y)/radius;
     const scale = Math.max(1,Math.hypot(x,y));
-    position = {x:x / scale,y:y / scale};
-    paint(position.x * radius,position.y * radius);
+    position = {x:x/scale,y:y/scale};
+    element.style.setProperty('--stick-x',position.x*radius+'px');
+    element.style.setProperty('--stick-y',position.y*radius+'px');
     onMove?.(position);
   }
+
   function reset() {
     pointer = undefined;
     position = {x:0,y:0};
-    paint(0,0);
+    element.hidden = true;
+    element.style.removeProperty('--stick-x');
+    element.style.removeProperty('--stick-y');
   }
-  element.addEventListener('pointerdown', event => {
-    if (event.button !== 0 || pointer !== undefined) return;
-    element.setPointerCapture(event.pointerId);
-    pointer = event.pointerId;
-    read(event);
-  });
-  element.addEventListener('pointermove', event => {
-    if (event.pointerId === pointer) read(event);
-  });
-  for (const type of ['pointerup','pointercancel','lostpointercapture'] as const) {
-    element.addEventListener(type,event => {
-      if (event.pointerId !== pointer) return;
-      onEnd?.(type === 'pointerup');
-      reset();
-    });
+
+  function end(event: PointerEvent, released: boolean) {
+    if (event.pointerId !== pointer) return;
+    if (released) move(event);
+    onEnd?.(released);
+    reset();
   }
-  element.addEventListener('contextmenu',event => event.preventDefault());
-  return {read:() => position,reset};
+
+  return {start,move,end,read:() => position,reset};
 }
+
 function setDirection(point: Point) {
   const radius = Math.min(tuning.range,75);
   aimOffset = {x:point.x*radius,y:point.y*radius};
@@ -225,6 +232,30 @@ const aimStick = analog('aim-stick', point => sampleAim(touchGesture,point,perfo
   // A new touch has its own pointer and no physical stick bounce.
   touchGesture.reset();
 });
+
+scene.addEventListener('pointerdown',event => {
+  if (event.button !== 0 || event.pointerType === 'mouse' ||
+    (event.target instanceof Element && event.target.closest('button,input,details'))) return;
+  const bounds = scene.getBoundingClientRect();
+  const analog = event.clientX-bounds.left < bounds.width/2 ? movementStick : aimStick;
+  if (!analog.start(event,bounds)) return;
+  scene.dataset.touch = 'true';
+  scene.setPointerCapture(event.pointerId);
+  event.preventDefault();
+});
+scene.addEventListener('pointermove',event => {
+  movementStick.move(event);
+  aimStick.move(event);
+});
+for (const type of ['pointerup','pointercancel','lostpointercapture'] as const) {
+  scene.addEventListener(type,event => {
+    movementStick.end(event,type === 'pointerup');
+    aimStick.end(event,type === 'pointerup');
+  });
+}
+for (const type of ['selectstart','dblclick','contextmenu'] as const) {
+  scene.addEventListener(type,event => event.preventDefault());
+}
 
 function resetPad() {
   padIndex = undefined;
@@ -349,7 +380,7 @@ function update(dt: number, time: number) {
   const wasGrounded = spider.grounded;
   const oldX = spider.x;
   const landingSpeed = spider.vy;
-  const jumped = tickSpider(spider, area.surfaces, {move,reel:reeling}, dt, tuning, web.strands);
+  const jumped = tickSpider(spider,loopSurfaces,{move,reel:reeling},dt,tuning,area.ramps.concat(web.strands));
   if (jumped) audio.play('jump');
   const lineTaut = spider.rope !== undefined &&
     Math.hypot(spider.x-spider.rope.x,spider.y-spider.rope.y) >= spider.rope.length - .6;
@@ -358,12 +389,22 @@ function update(dt: number, time: number) {
   if (wasGrounded && spider.grounded) {
     stride += Math.max(Math.abs(spider.x-oldX),Math.abs(move)*dt*20) * Math.PI/8;
   }
+  const shift = loopShift(spider.x);
+  if (shift) {
+    spider.x -= shift;
+    traveledOffset += shift;
+    if (spider.rope) spider.rope.x -= shift;
+    for (const end of web.loose) end.from.x -= shift;
+    const translate = (p: Point) => ({x:p.x-shift,y:p.y});
+    if (shot) shot = {...shot,from:translate(shot.from),to:translate(shot.to)};
+    if (catchLook) catchLook = {...catchLook,point:translate(catchLook.point)};
+  }
   if (lineTaut && (!taut || reeling) && time - lastTension > 510) {
     lastTension = time;
     audio.play('tension');
   }
   taut = lineTaut;
-  if (fixSilk(web,spider,area.surfaces)) {
+  if (fixSilk(web,spider,loopSurfaces)) {
     updateCount();
     audio.play('fix');
     say('Filo fissato. Le mosche possono restare nella trama.');
@@ -416,9 +457,8 @@ function update(dt: number, time: number) {
     if (landingSpeed > 30) audio.play('land');
   }
 
-  if (spider.y > area.bounds.bottom || spider.x < area.bounds.left - 20 || spider.x > area.bounds.right + 20) {
+  if (spider.y > area.bounds.bottom) {
     spider = createSpider(checkpoint ? area.checkpoints[checkpoint - 1] : area.spawn);
-    camera = locateCamera();
     shot = undefined;
     web.loose.length = 0;
     taut = false;
@@ -453,16 +493,9 @@ function update(dt: number, time: number) {
   }
 }
 
-function locateCamera() {
-  const maxX = Math.max(area.bounds.left, area.bounds.right - canvas.width);
-  const x = Math.max(area.bounds.left, Math.min(maxX, spider.x - canvas.width * .34));
-  const y = Math.max(area.bounds.top, Math.min(area.bounds.bottom - canvas.height, spider.y - canvas.height * .79));
-  return {x,y};
-}
 function resize() {
   canvas.height = 200;
   canvas.width = Math.max(1, Math.round(canvas.clientWidth * 200 / Math.max(1, canvas.clientHeight)));
-  camera = locateCamera();
 }
 window.addEventListener('resize', resize);
 resize();
@@ -480,19 +513,16 @@ function frame(time: number) {
     update(step,time);
     remainder -= step;
   }
-  const target = locateCamera();
-  const follow = 1-Math.exp(-elapsed*20);
-  camera.x += (target.x-camera.x)*follow;
-  camera.y += (target.y-camera.y)*follow;
+  const camera = {x:spider.x-Math.floor(canvas.width/2),y:spider.y-Math.floor(canvas.height/2)};
   const aim = worldAim();
-  const extended = bridgePreview(web,spider,area.surfaces,aim,tuning.range);
-  const hit = extended?.to ?? aimHit(spider,area.surfaces,aim,tuning);
-  const anchors = availableAnchors(web,spider,area.surfaces,tuning.range);
+  const extended = bridgePreview(web,spider,loopSurfaces,aim,tuning.range);
+  const hit = extended?.to ?? aimHit(spider,loopSurfaces,aim,tuning);
+  const anchors = availableAnchors(web,spider,loopSurfaces,tuning.range);
   const aiming = keys.has('Space') || Object.keys(aimKeys).some(key => keys.has(key)) ||
     touchGesture.aiming || padGesture.aiming;
   get('aim-stick').dataset.aiming = String(touchGesture.aiming);
   drawScene(context,area,spider,{
-    camera,time,aim,hit,aiming,shot,landedAt,discovered,web,catchLook,
+    camera,backgroundX:camera.x+traveledOffset,time,aim,hit,aiming,shot,landedAt,discovered,web,catchLook,
     stride,walkingInput,stepFace,taut,idlePose,anchors,extended:!!extended,
   });
   requestAnimationFrame(frame);

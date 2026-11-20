@@ -11,7 +11,7 @@
 <title>Tamago · Il sentiero di seta</title>
 </head>
 <body>
-<main class="scene">
+<main class="scene" id="scene">
   <canvas id="world" aria-label="Il ragno e il sottobosco"></canvas>
   <header class="hud">
     <div><span class="brand">TAMAGO</span><h1>Il sentiero di seta</h1></div>
@@ -35,15 +35,13 @@
     <p id="gamepad-guide" class="keys" hidden>Sinistro: muovi, ↑ risali, ↓ stacca · Destro: mira e lascia per tirare · A/×: salta</p>
   </footer>
   <div class="touch" aria-label="Comandi touch">
-    <div id="stick" role="group" aria-label="Analogico sinistro: muovi, su risali, giù stacca">
-      <span class="stick-nub" aria-hidden="true"></span>
+    <div id="stick" class="floating-stick" aria-hidden="true" hidden>
+      <span class="stick-nub"></span>
     </div>
-    <div class="right-controls">
-      <button id="jump" type="button" aria-label="Salto">↑ Salto</button>
-      <div id="aim-stick" role="group" aria-label="Analogico destro: inclina per mirare, rilascia per tirare">
-        <span class="stick-nub" aria-hidden="true"></span>
-      </div>
+    <div id="aim-stick" class="floating-stick" aria-hidden="true" hidden>
+      <span class="stick-nub"></span>
     </div>
+    <button id="jump" type="button" aria-label="Salto">↑ Salto</button>
   </div>
   <p class="rotate">Ruota il telefono per giocare in orizzontale.</p>
 </main>
