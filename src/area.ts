@@ -1,5 +1,10 @@
 import type {Point, Rect, WalkLine} from './spider.ts';
 
+export const ascent = [
+  {x:485,y:-112}, {x:354,y:-190}, {x:449,y:-268},
+  {x:354,y:-346}, {x:449,y:-424}, {x:354,y:-502},
+].map(point => ({...point,w:55,h:8,kind:'leaf' as const,grip:true}));
+
 export interface Area {
   surfaces: Array<Rect & {kind:'earth'|'twig'|'leaf'|'root'}>;
   ramps: WalkLine[];
@@ -19,10 +24,13 @@ export const area: Area = {
     {x:129,y:156},
     {x:172,y:105},
     {x:285,y:158},
+    {x:449,y:8},
+    {x:381,y:-198},
+    {x:476,y:-432},
   ],
   discovery: {x:449,y:1},
   bridgeDiscovery: {x:308,y:55},
-  finish: {x:483,y:158},
+  finish: {x:403,y:-474},
   surfaces: [
     // The rametto spans the first gap; the opposite leaf is a second grip.
     {x:-144,y:166,w:79,h:95,kind:'earth'},
@@ -43,6 +51,7 @@ export const area: Area = {
     {x:232,y:43,w:28,h:8,kind:'twig',grip:true},
     {x:381,y:-34,w:36,h:8,kind:'twig',grip:true},
     {x:428,y:16,w:55,h:8,kind:'leaf',grip:true},
+    ...ascent,
   ],
 };
 

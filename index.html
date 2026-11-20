@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#c5cf91">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="manifest" href="./manifest.webmanifest">
@@ -11,12 +11,13 @@
 <title>Tamago · Il sentiero di seta</title>
 </head>
 <body>
-<main class="scene" id="scene">
+<main class="scene">
   <canvas id="world" aria-label="Il ragno e il sottobosco"></canvas>
   <header class="hud">
     <div><span class="brand">TAMAGO</span><h1>Il sentiero di seta</h1></div>
     <div class="tools">
       <output id="web-count" aria-label="Ragnatela">0 fili · 0 mosche</output>
+      <span id="altitude" aria-hidden="true">Quota 0</span>
       <button id="sound" type="button" aria-pressed="true">Audio On</button>
       <details id="tuning">
         <summary>Fisica</summary>
@@ -24,7 +25,6 @@
           <label>Portata <output id="range-value"></output><input id="range" type="range" min="100" max="220" step="1"></label>
           <label>Accelerazione <output id="acceleration-value"></output><input id="acceleration" type="range" min="180" max="720" step="10"></label>
           <label>Risalita <output id="reelSpeed-value"></output><input id="reelSpeed" type="range" min="30" max="120" step="1"></label>
-          <button id="fullscreen" type="button" hidden>Blocca in orizzontale</button>
           <button id="reset-tuning" type="button">Valori iniziali</button>
         </div>
       </details>
@@ -32,27 +32,11 @@
   </header>
   <footer class="controls">
     <p id="message" role="status"></p>
-    <p class="keys"><kbd>A</kbd><kbd>D</kbd> Muovi <kbd>W</kbd> Risali <kbd>S</kbd> Stacca <kbd>J</kbd> Salta · Tieni <kbd>Spazio</kbd>, mira con le frecce e rilascia per tirare</p>
-    <p id="gamepad-guide" class="keys" hidden>Sinistro: muovi, ↑ risali, ↓ stacca · Destro: mira e lascia per tirare · A/×: salta</p>
+    <p id="gamepad-guide" class="keys" hidden>
+      Sinistro: muovi, ↑ risali, ↓ stacca · Destro: mira · <kbd>R1</kbd> Tela · <kbd>L1</kbd> Salto
+    </p>
   </footer>
-  <div class="touch" aria-label="Comandi touch">
-    <div id="stick" class="floating-stick" aria-hidden="true" hidden>
-      <span class="stick-nub"></span>
-    </div>
-    <div id="aim-stick" class="floating-stick" aria-hidden="true" hidden>
-      <span class="stick-nub"></span>
-    </div>
-    <button id="jump" type="button" aria-label="Salto">↑ Salto</button>
-  </div>
 </main>
-<section id="orientation-cover" class="orientation-cover" aria-labelledby="orientation-title">
-  <div class="rotate-card">
-    <span class="brand">TAMAGO</span>
-    <h1 id="orientation-title">Ruota il telefono</h1>
-    <p id="orientation-copy">Il gioco si apre solo in orizzontale.</p>
-    <button id="portrait-fullscreen" type="button" hidden>Blocca in orizzontale</button>
-  </div>
-</section>
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

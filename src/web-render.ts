@@ -22,6 +22,7 @@ interface View {
   shot?: { from: Point; to: Point; hit: boolean; until: number };
   landedAt: number;
   discovered: boolean;
+  finished: boolean;
 }
 
 const color = {
@@ -108,7 +109,10 @@ const relic = [
 
 function background(ctx: CanvasRenderingContext2D, camera: Point, time: number) {
   const { width, height } = ctx.canvas;
-  block(ctx, 0, 0, width, height, color.sky);
+  const canopy = Math.max(0,Math.min(1,-camera.y/620));
+  const sky = canopy ? 'rgb('+Math.round(179+canopy*23)+','+Math.round(191+canopy*24)+','+Math.round(133+canopy*23)+')' : color.sky;
+  block(ctx,0,0,width,height,sky);
+  const vertical = (y: number, speed: number, period: number) => ((y-camera.y*speed)%period+period)%period;
   const glowX = Math.round(width*(.48+Math.sin(camera.x/280)*.10));
   for (let row = -18; row <= 18; row += 2) {
     const radius = Math.floor(Math.sqrt(19 * 19 - row * row));
@@ -119,25 +123,27 @@ function background(ctx: CanvasRenderingContext2D, camera: Point, time: number) 
   for (let cell = Math.floor(scroll / 45) - 1; cell < (scroll + width) / 45 + 2; cell++) {
     const x = Math.round(cell * 45 - scroll);
     const variant = Math.abs(cell * 53 % 17);
-    block(ctx, x, 30 - variant, 4 + variant % 5, height, color.far);
-    block(ctx, x - 12, 26 - variant, 27, 11, color.far);
-    block(ctx, x - 5, 19 - variant, 17, 7, color.far);
-    block(ctx, x + 4, 49 + variant, 15, 3, color.far);
-    block(ctx, x - 8, 62 + variant, 11, 2, color.far);
+    block(ctx,x,0,4+variant%5,height,color.far);
+    for (let y=vertical(26-variant,.17,109)-109; y<height; y+=109) {
+      block(ctx,x-12,y,27,11,color.far);
+      block(ctx,x-5,y-7,17,7,color.far);
+      block(ctx,x+4,y+24+variant,15,3,color.far);
+      block(ctx,x-8,y+37,11,2,color.far);
+    }
   }
 
   const nearScroll = camera.x * 0.48;
   for (let cell = Math.floor(nearScroll / 78) - 1; cell < (nearScroll + width) / 78 + 2; cell++) {
     const x = Math.round(cell * 78 - nearScroll);
     const variant = Math.abs(cell * 29 % 23);
-    block(ctx, x, 0, 7 + variant % 7, height, color.mist);
-    block(ctx, x - 13, 23 + variant, 23, 4, color.mist);
-    block(ctx, x - 17, 21 + variant, 12, 2, color.mist);
-    block(ctx, x + 7, 44 + variant, 17, 3, color.mist);
-    block(ctx, x + 17, 39 + variant, 12, 5, color.mist);
-    block(ctx, x + 4, 143 + variant, 12, 8, color.mist);
-    block(ctx, x - 13, 155 + variant, 33, 9, color.mist);
-    block(ctx, x - 24, 162 + variant, 55, 8, color.mist);
+    block(ctx,x,0,7+variant%7,height,color.mist);
+    for (let y=vertical(23+variant,.35,131)-131; y<height; y+=131) {
+      block(ctx,x-13,y,23,4,color.mist);
+      block(ctx,x-17,y-2,12,2,color.mist);
+      block(ctx,x+7,y+21,17,3,color.mist);
+      block(ctx,x+17,y+16,12,5,color.mist);
+      block(ctx,x-13,y+57,33,5,color.mist);
+    }
   }
 
   for (let speck = 0; speck < 18; speck++) {
@@ -288,6 +294,17 @@ function reticle(ctx: CanvasRenderingContext2D, p: Point, inRange: boolean) {
   block(ctx, p.x, p.y, 1, 1, fill);
 }
 
+const sprout = [
+  '.***....***.',
+  '**o**..**o**',
+  '*ooo**o**oo*',
+  '.*ooooooo**.',
+  '..**ooo***..',
+  '....#o#.....',
+  '.....o......',
+  '....***.....',
+];
+
 function drawSection(ctx: CanvasRenderingContext2D, area: Area, view: View, camera: Point) {
   const local = (p: Point): Point => ({x:Math.round(p.x-camera.x),y:Math.round(p.y-camera.y)});
   for (const item of area.surfaces) surface(ctx,item,camera);
@@ -315,6 +332,15 @@ function drawSection(ctx: CanvasRenderingContext2D, area: Area, view: View, came
     const seed = local(area.bridgeDiscovery);
     const glimmer = Math.floor(view.time/290) % 2;
     pixelSprite(ctx,relic,seed.x-6,seed.y-5-glimmer);
+  }
+  if (!view.finished) {
+    const summit = local(area.finish);
+    if (summit.x>-20 && summit.x<ctx.canvas.width+20 && summit.y>-20 && summit.y<ctx.canvas.height+20) {
+      const bob = Math.floor(view.time/250)%3;
+      pixelSprite(ctx,sprout,summit.x-6,summit.y-4-bob);
+      block(ctx,summit.x-9,summit.y-4,2,1,color.silk);
+      block(ctx,summit.x+8,summit.y-8,1,2,color.silk);
+    }
   }
   for (const thread of view.web.strands) {
     const from = local(thread.from);

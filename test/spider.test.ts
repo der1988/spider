@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { area } from '../src/area.ts';
+import { area, ascent, loopSurfaces } from '../src/area.ts';
 import {
   aimHit,
   createSpider,
@@ -76,7 +76,7 @@ test('walking off the opening ledge drops into the gap without a line', () => {
   assert.equal(spider.grounded, false);
 });
 
-test('swinging and releasing crosses the opening gap and reaches the finish through each checkpoint', () => {
+test('swinging and releasing crosses the opening gap and reaches the ground trail through the lower checkpoints', () => {
   const surfaces = area.surfaces;
   const spider = createSpider(area.spawn);
   runFrames(spider, surfaces, 1, 0);
@@ -101,7 +101,7 @@ test('swinging and releasing crosses the opening gap and reaches the finish thro
 
   runFrames(spider, surfaces, 245, 1);
   assert.equal(spider.grounded, true);
-  assert.ok(Math.hypot(spider.x - area.finish.x, spider.y - area.finish.y) < 17);
+  assert.ok(spider.x > 465 && spider.y === area.checkpoints[2].y);
 });
 
 test('the optional canopy discovery is reachable by transferring between two grips', () => {
@@ -162,4 +162,24 @@ test('jump pressed just before landing is buffered and does not unhook an active
   queueJump(spider);
   assert.equal(tickSpider(spider,surfaces,{move:0,reel:false},halfStep),false);
   assert.equal(spider.rope,line);
+});
+
+test('alternating handholds carry the spider from the dew leaf to the summit', () => {
+  const spider = createSpider(area.checkpoints[3]);
+  const step = (move: number, reel = false) =>
+    tickSpider(spider,loopSurfaces,{move,reel},1/120,undefined,area.ramps);
+  step(0);
+  for (const leaf of ascent) {
+    const x = spider.x >= leaf.x+leaf.w ? leaf.x+leaf.w-3 : leaf.x+3;
+    const target = {x,y:leaf.y+7};
+    const hasGrip = () => {
+      const hit = aimHit(spider,loopSurfaces,target);
+      return hit && Math.abs(hit.y-leaf.y)<=8;
+    };
+    for (let i=0; i<300 && !hasGrip(); i++) step(Math.sign(x-spider.x),true);
+    assert.ok(hasGrip(),'cannot reach leaf at height '+leaf.y);
+    assert.ok(shoot(spider,loopSurfaces,target));
+    for (let i=0; i<240 && (spider.rope?.length ?? 0)>15.1; i++) step(0,true);
+  }
+  assert.ok(Math.hypot(spider.x-area.finish.x,spider.y-area.finish.y)<17);
 });

@@ -2,14 +2,13 @@
 
 **Il sentiero di seta** è la prima area di Tamago, un gioco LCD in cui un piccolo ragno attraversa il sottobosco.
 
-- Muoviti con **A/D** e salta con **J**. Punta un rametto con le **frecce** e premi e rilascia **Spazio** per agganciarti.
-- Una volta appeso, usa **A/D** per darti slancio, **W** per risalire e **S** per staccarti mantenendo la velocità. Puoi lanciare un altro filo mentre sei in aria.
-- Su telefono il gioco funziona solo in orizzontale. In verticale si mette in pausa. Usa **Blocca in orizzontale** nei browser che lo offrono. Tocca e trascina in qualsiasi punto della metà sinistra per far comparire lo stick del movimento. Quando sei appeso, spingilo di lato per darti slancio, in alto per risalire o decisamente in basso per staccarti. Tocca e trascina nella metà destra per mirare, poi rilascia per tirare. I due tocchi possono convivere. Il pulsante **Salto** è nell’angolo in basso a destra.
-- Con un gamepad riconosciuto dal browser, usa lo stick sinistro per muoverti e quello destro per mirare e tirare al ritorno al centro. Con lo stick sinistro, **su** fa risalire e **giù** stacca. Usa **A/×** per saltare. Puoi usare anche **LB/L1** e **B/○** per risalire e staccarti.
-- Osserva le mosche al primo vuoto. Prova a tirare al rametto e a staccarti dal bordo di partenza per tendere il primo filo. Puoi anche dondolare fino alla sponda opposta e tendere un filo lungo quella rotta.
-- Cammina su un filo fissato per recuperare una mosca e guadagnare **1 seta**. Torna sul bordo marcato di partenza e mira al rombo sulla foglia alta. Il lancio lungo consuma 1 seta solo se crea un ponte valido. Attraversalo per trovare il **seme d’ambra**. Puoi usare il ponte in entrambi i sensi. Fili, riserva e scoperte restano fino a fine partita. Ricarica o apri di nuovo la pagina per ripartire con il sottobosco vuoto.
-- La visuale segue il ragno al centro in orizzontale e lo tiene più in basso per mostrare la salita. Le piattaforme rialzate sono tutte appigli della seta. La mappa gira in entrambe le direzioni: continuando sul sentiero oltre l’uscita torni vicino alla partenza.
-- Attraversa il primo vuoto e cerca la rugiada sul percorso alto. Se cadi, riparti dall’ultimo punto sicuro. **Fisica** permette di regolare portata, accelerazione e risalita.
+Collega un DualShock 4 o DualSense al PC, apri il gioco e premi un tasto sul controller. Se il browser blocca l’audio all’avvio, fai clic nella pagina una volta.
+
+- **Stick sinistro** per muoverti e dondolare. Quando sei appeso, spingi su per risalire e giù per staccarti.
+- **Stick destro** per mirare. **R1** lancia la seta nella direzione indicata, anche se hai già lasciato lo stick.
+- **L1** salta. Il gioco si controlla con il joypad e si adatta alla finestra.
+- Sopra la foglia della rugiada inizia la salita a zig zag. Da sotto le foglie, cerca l’estremità libera verso il prossimo appiglio. In cima trovi il **germoglio della chioma**. Ai bordi laterali il sentiero fa il giro e continua dal lato opposto.
+- Al primo vuoto puoi tendere fili sulla rotta delle mosche. Cammina su un filo per recuperare una mosca e guadagnare seta per un ponte. Ricarica la pagina per iniziare una nuova partita.
 
 ## Sviluppo
 
@@ -26,13 +25,8 @@ npm run preview
 
 Il service worker è attivo nel build di produzione. Per verificarlo in locale usa il server di preview, attendi l'attivazione del worker, poi passa offline e ricarica. I punti sicuri della prima area valgono per la sessione di gioco.
 
-## Vercel e iPhone 13
+## Pubblicazione
 
-1. Pubblica i commit nel repository GitHub e importalo in Vercel con il piano Hobby, se idoneo. Il preset Vite usa `npm run build` e la cartella `dist`.
-2. Apri l'URL HTTPS del deploy in Safari. Attendi il primo caricamento con connessione attiva.
-3. Dal menu di condivisione scegli **Aggiungi alla schermata Home**. Se presente, abilita **Apri come app web**, quindi tocca **Aggiungi**.
-4. Apri Tamago dalla schermata Home mentre sei ancora online per inizializzare la cache nell'app installata. Poi puoi giocare offline sullo stesso dispositivo.
+Il preset Vite per Vercel usa `npm run build` e la cartella `dist`. Dopo il primo caricamento via HTTPS, il service worker rende disponibile anche l’avvio offline. La preferenza audio resta salvata nel browser.
 
-La preferenza audio è locale al browser o all’app installata.
-
-Le decisioni sulla simulazione, i comandi e il lavoro con Codex sono in [docs/architettura.md](docs/architettura.md).
+[Note su fisica e comandi](docs/architettura.md)
