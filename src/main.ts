@@ -1,6 +1,6 @@
 import './style.css';
-import type {Point} from './spider';
-import {castCrawler,closeCrawlerRopes,createCrawler,jumpCrawler,tickCrawler} from './crawler';
+import {DEFAULT_TUNING,type Point} from './spider';
+import {anchorCrawlerRope,castCrawler,closeCrawlerRopes,createCrawler,jumpCrawler,tickCrawler} from './crawler';
 import {capStrands,createHunt,LIMIT,platforms,spawn,tickHunt,WEB_SECONDS} from './hunt';
 import {fixSilk,leaveSilk,WEB_KEY} from './threads';
 import {renderHunt} from './hunt-render';
@@ -22,7 +22,7 @@ const sound = get<HTMLButtonElement>('sound');
 const start = get<HTMLButtonElement>('start');
 const pause = get<HTMLButtonElement>('pause');
 const lyric = get('lyric');
-const intro = 'Osserva i due corridoi. Aggancia una piattaforma e staccati vicino a una seconda superficie per tendere un filo.';
+const intro = 'Osserva i due corridoi. Spara da una superficie per tendere un filo. Salta prima di sparare per dondolare.';
 const waiting = 'Collega il joypad PlayStation e premi un tasto.';
 let audioOn = true;
 try {
@@ -115,16 +115,26 @@ function shootSilk() {
   audio.play('launch');
   if (castCrawler(spider,platforms,worldAim())) {
     audio.play('attach',.06);
-    if (spider.firstAnchor) say('Doppio filo. Dondoli sull’ultimo appiglio.');
+    const before=hunt.strands.length;
+    if (anchorCrawlerRope(spider,platforms,hunt.strands)) finishWebs(before);
+    else if (spider.firstAnchor) say('Doppio filo. Dondoli sull’ultimo appiglio.');
   } else audio.play('miss',.06);
 }
+function finishWebs(before: number) {
+  if (hunt.strands.length===before) return;
+  for (const strand of hunt.strands.slice(before)) strand.expiresAt=hunt.clock+WEB_SECONDS;
+  const evicted=capStrands(hunt);
+  audio.play('fix');
+  say(evicted ? 'Nuovo filo: il più vecchio si dissolve.' : 'Filo fissato. Avvicinati alla mosca per spingerla verso la rete.');
+}
+
 function step(dt: number,input: ReturnType<typeof samplePlayStation>) {
   const m=input.movement;
   const motion=silkMotion(m,down);
   down=motion.down;
   if (motion.detach && spider.rope) {
     const old=closeCrawlerRopes(spider);
-    if (old) leaveSilk(hunt,old,155);
+    if (old) leaveSilk(hunt,old,DEFAULT_TUNING.range);
     audio.play('release');
   }
   const deadzone=.12;
@@ -132,12 +142,9 @@ function step(dt: number,input: ReturnType<typeof samplePlayStation>) {
   const active=hunt.strands.filter(s=>(s.expiresAt??Infinity)>hunt.clock+dt);
   tickCrawler(spider,platforms,{x:axis(m.x),y:axis(m.y)},motion.reel,dt,active);
   const before=hunt.strands.length;
-  if(fixSilk(hunt,spider,platforms)) {
-    for (const strand of hunt.strands.slice(before)) strand.expiresAt=hunt.clock+WEB_SECONDS;
-    const evicted=capStrands(hunt);
-    audio.play('fix');
-    say(evicted ? 'Nuovo filo: il più vecchio si dissolve.' : 'Filo fissato. Avvicinati alla mosca per spingerla verso la rete.');
-  }
+  anchorCrawlerRope(spider,platforms,hunt.strands);
+  fixSilk(hunt,spider,platforms);
+  finishWebs(before);
   const result=tickHunt(hunt,spider,dt);
   if(result==='catch') {
     audio.play('catch');

@@ -1,7 +1,8 @@
 import {
-  createSpider, detach, moveAxis, shoot, SPIDER_HALF_HEIGHT, SPIDER_HALF_WIDTH, tickSpider,
+  createSpider, DEFAULT_TUNING, detach, moveAxis, shoot, SPIDER_HALF_HEIGHT, SPIDER_HALF_WIDTH, tickSpider,
   type Point, type Rect, type Spider, type WalkLine,
 } from './spider.ts';
+import {anchorSilk,type Strand} from './threads.ts';
 
 export const normals = {
   floor:{x:0,y:-1}, ceiling:{x:0,y:1}, left:{x:1,y:0}, right:{x:-1,y:0},
@@ -66,6 +67,16 @@ export function closeCrawlerRopes(spider: Crawler) {
   detach(spider);
   spider.firstAnchor=undefined;
   return old;
+}
+
+export function anchorCrawlerRope(spider: Crawler,surfaces: readonly Rect[],strands: Strand[]) {
+  const rope=spider.rope;
+  if (!rope) return false;
+  const face=supports(spider,surfaces)[0];
+  if (!face || !anchorSilk(strands,rope,DEFAULT_TUNING.range+SPIDER_HALF_HEIGHT,spider,surfaces)) return false;
+  closeCrawlerRopes(spider);
+  grip(spider,face);
+  return true;
 }
 
 export function jumpCrawler(spider: Crawler) {

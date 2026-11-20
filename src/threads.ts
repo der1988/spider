@@ -113,24 +113,30 @@ export function leaveSilk(web: Pick<Web,'loose'>, from: Point, reach: number) {
   if (web.loose.length > 8) web.loose.shift();
 }
 
+function anchorAt(strands: Strand[],from: Point,reach: number,points: Point[],surfaces: readonly Rect[]) {
+  const to = points.find(point => distance(point,from) >= 9 &&
+    distance(point,from) <= reach && !surfaces.some(r => crossesSolid(from,point,r)));
+  if (!to) return false;
+  const duplicate = strands.some(strand =>
+    (distance(strand.from,from) < 2 && distance(strand.to,to) < 2) ||
+    (distance(strand.to,from) < 2 && distance(strand.from,to) < 2));
+  if (!duplicate && strands.length < MAX_STRANDS) {
+    strands.push({from:{x:from.x,y:from.y},to,shakeUntil:0});
+  }
+  return true;
+}
+
+export function anchorSilk(strands: Strand[],from: Point,reach: number,body: Point,surfaces: readonly Rect[]) {
+  return anchorAt(strands,from,reach,contacts(body,surfaces),surfaces);
+}
+
 export function fixSilk(web: Pick<Web,'loose'|'strands'>, body: Point, surfaces: readonly Rect[]) {
   if (!web.loose.length) return 0;
   const available = contacts(body,surfaces);
-  let fixed = 0;
-  web.loose = web.loose.filter(({from,reach}) => {
-    const to = available.find(point => distance(point,from) >= 9 &&
-      distance(point,from) <= reach && !surfaces.some(r => crossesSolid(from,point,r)));
-    if (!to) return distance(body,from) <= reach + SPIDER_HALF_HEIGHT;
-    const duplicate = web.strands.some(strand =>
-      (distance(strand.from,from) < 2 && distance(strand.to,to) < 2) ||
-      (distance(strand.to,from) < 2 && distance(strand.from,to) < 2));
-    if (!duplicate && web.strands.length < MAX_STRANDS) {
-      web.strands.push({from,to,shakeUntil:0});
-      fixed++;
-    }
-    return false;
-  });
-  return fixed;
+  const before = web.strands.length;
+  web.loose = web.loose.filter(({from,reach}) =>
+    !anchorAt(web.strands,from,reach,available,surfaces) && distance(body,from) <= reach + SPIDER_HALF_HEIGHT);
+  return web.strands.length-before;
 }
 
 export function tickFlies(web: Web, seconds: number, time: number) {

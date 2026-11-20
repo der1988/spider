@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {castCrawler,closeCrawlerRopes,createCrawler,jumpCrawler,tickCrawler} from '../src/crawler.ts';
+import {anchorCrawlerRope,castCrawler,closeCrawlerRopes,createCrawler,jumpCrawler,tickCrawler} from '../src/crawler.ts';
 import {platforms,spawn} from '../src/hunt.ts';
+import type {Strand} from "../src/threads.ts";
 
 const dt=1/120;
 const still={x:0,y:0};
@@ -58,4 +59,32 @@ test('only a successful second shot creates a second line, and closing or jumpin
   assert.ok(spider.vy<0);
   assert.equal(spider.rope,undefined);
   assert.equal(spider.firstAnchor,undefined);
+});
+
+test('a solid contact anchors the latest shot, while a shot in flight stays mobile until landing',()=>{
+  const strands: Strand[]=[];
+  const spider=createCrawler(spawn,platforms);
+  const target={x:95,y:60};
+  assert.ok(castCrawler(spider,platforms,target));
+  assert.ok(anchorCrawlerRope(spider,platforms,strands));
+  assert.equal(spider.rope,undefined);
+  assert.equal(spider.support,'floor');
+  assert.deepEqual(strands[0].to,{x:spawn.x,y:197});
+
+  assert.ok(jumpCrawler(spider));
+  assert.ok(castCrawler(spider,platforms,target));
+  assert.equal(anchorCrawlerRope(spider,platforms,strands),false);
+  for (let i=0;i<5;i++) tickCrawler(spider,platforms,still,false,dt,[]);
+  assert.ok(spider.rope);
+  assert.equal(anchorCrawlerRope(spider,platforms,strands),false);
+  assert.ok(castCrawler(spider,platforms,{x:0,y:spider.y}));
+  assert.ok(spider.firstAnchor);
+  for (let i=0;i<240 && spider.rope;i++) {
+    tickCrawler(spider,platforms,{x:-1,y:0},false,dt,[]);
+    anchorCrawlerRope(spider,platforms,strands);
+  }
+  assert.equal(spider.rope,undefined);
+  assert.equal(spider.firstAnchor,undefined);
+  assert.equal(strands.length,2);
+  assert.equal(strands[1].from.x,7);
 });
