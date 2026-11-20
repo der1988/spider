@@ -2,8 +2,8 @@
 
 **Il sentiero di seta** è la prima area di Tamago, un gioco LCD in cui un piccolo ragno attraversa il sottobosco.
 
-- Muoviti con **← →**. Tieni premuto **S**, punta un rametto col mouse e rilascia **S** per agganciarti.
-- Una volta appeso, usa **← →** per darti slancio, **↑** per risalire e **Spazio** per staccarti mantenendo la velocità. Puoi lanciare un altro filo mentre sei in aria.
+- Muoviti con **A/D**. Tieni premuto **Spazio**, punta un rametto con le **frecce** e rilascia **Spazio** per agganciarti.
+- Una volta appeso, usa **A/D** per darti slancio, **W** per risalire e **S** per staccarti mantenendo la velocità. Puoi lanciare un altro filo mentre sei in aria.
 - Su touch, trascina sul paesaggio e rilascia sul bersaglio per tirare. I pulsanti sul display controllano camminata, risalita e sgancio.
 - Attraversa il primo vuoto e cerca la rugiada sul percorso alto. Se cadi, riparti dall’ultimo punto sicuro. **Fisica** permette di regolare portata, accelerazione e risalita.
 

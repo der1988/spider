@@ -22,9 +22,10 @@ let checkpoint = 0;
 let spider = createSpider(area.spawn);
 let discovered = false;
 let finished = false;
-let aiming = false;
+const initialAim = {x:40,y:-63};
+let keyboardAim = {...initialAim};
 let touchAim: number | undefined;
-let aimScreen: Point | undefined;
+let touchPoint: Point | undefined;
 let landedAt = -Infinity;
 let shot: {from:Point; to:Point; hit:boolean; until:number} | undefined;
 let camera: Point = {x:0,y:0};
@@ -36,7 +37,7 @@ function say(text: string) {
 function intro() {
   return touch.matches
     ? 'Trascina sul paesaggio verso il rametto e rilascia per lanciare la seta.'
-    : 'Tieni S, punta il rametto sopra il vuoto e rilascia S per agganciarti.';
+    : 'Tieni Spazio, punta il rametto con le frecce e rilascia Spazio per agganciarti.';
 }
 say(intro());
 
@@ -110,12 +111,12 @@ function screenPoint(event: PointerEvent): Point {
     y:(event.clientY - rect.top) * canvas.height / rect.height};
 }
 function worldAim() {
-  const point = aimScreen;
-  return point ? {x:camera.x + point.x,y:camera.y + point.y} : undefined;
+  if (touchAim !== undefined && touchPoint) {
+    return {x:camera.x + touchPoint.x,y:camera.y + touchPoint.y};
+  }
+  return {x:spider.x + keyboardAim.x,y:spider.y + keyboardAim.y};
 }
-function fire() {
-  const target = worldAim();
-  if (!target) return;
+function fire(target: Point) {
   const from = {x:spider.x,y:spider.y};
   const dx = target.x - from.x;
   const dy = target.y - from.y;
@@ -132,63 +133,69 @@ function fire() {
   const firstCrossing = checkpoint === 0 && from.x < area.checkpoints[0].x;
   const instructions = firstCrossing
     ? (touch.matches ? 'Tieni ▶, poi tocca Stacca sopra la foglia.'
-      : 'Tieni → per dondolare, poi premi Spazio sopra la foglia.')
+      : 'Tieni D per dondolare, poi premi S sopra la foglia.')
     : touch.matches
     ? 'Dai slancio con le frecce. Tocca Risali o Stacca.'
-    : 'Dai slancio con ← →. Risali con ↑ o staccati con Spazio.';
-  say(hit ? instructions : 'Nessun appiglio. Punta i rametti o il bordo di una foglia.');
+    : 'Dai slancio con A/D. Risali con W o staccati con S.';
+  say(hit ? instructions : 'Nessun appiglio. Punta un rametto.');
 }
 function releaseRope() {
   if (!spider.rope) return;
   detach(spider);
   play('release');
-  say(touch.matches ? 'Puoi mirare di nuovo mentre sei in aria.' : 'Puoi mirare con S anche mentre sei in aria.');
+  say(touch.matches ? 'Puoi mirare di nuovo mentre sei in aria.' : 'Puoi mirare con Spazio anche mentre sei in aria.');
 }
 
 window.addEventListener('pointermove', event => {
-  if (event.pointerType === 'mouse' || event.pointerId === touchAim) aimScreen = screenPoint(event);
+  if (event.pointerId === touchAim) touchPoint = screenPoint(event);
 });
 canvas.addEventListener('pointerdown', event => {
-  aimScreen = screenPoint(event);
   if (event.pointerType === 'mouse' || touchAim !== undefined) return;
+  touchPoint = screenPoint(event);
   canvas.setPointerCapture(event.pointerId);
   touchAim = event.pointerId;
-  aiming = true;
 });
 canvas.addEventListener('pointerup', event => {
   if (event.pointerId !== touchAim) return;
-  aimScreen = screenPoint(event);
+  touchPoint = screenPoint(event);
+  const target = worldAim();
   touchAim = undefined;
-  aiming = false;
-  fire();
+  fire(target);
 });
 function cancelAim(event: PointerEvent) {
   if (event.pointerId !== touchAim) return;
   touchAim = undefined;
-  aiming = false;
 }
 canvas.addEventListener('pointercancel', cancelAim);
 canvas.addEventListener('lostpointercapture', cancelAim);
 
-const commands = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'Space', 'KeyS']);
+const aimKeys: Record<string, Point> = {
+  ArrowLeft:{x:-1,y:0}, ArrowRight:{x:1,y:0}, ArrowUp:{x:0,y:-1}, ArrowDown:{x:0,y:1},
+};
+const commands = new Set([...Object.keys(aimKeys), 'Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD']);
+
+function moveAim(dx: number, dy: number) {
+  const x = keyboardAim.x + dx;
+  const y = keyboardAim.y + dy;
+  const scale = Math.max(1, Math.hypot(x, y) / tuning.range);
+  keyboardAim = {x:x / scale,y:y / scale};
+}
 window.addEventListener('keydown', event => {
   if (!commands.has(event.code) || event.ctrlKey || event.metaKey || event.altKey) return;
   if (event.target instanceof HTMLElement && (event.target.closest('input') ||
     (event.code === 'Space' && event.target.closest('button, summary')))) return;
   event.preventDefault();
-  if (event.code === 'Space' && !event.repeat) releaseRope();
-  if (event.code === 'KeyS') aiming = true;
+  if (event.code === 'KeyS' && !event.repeat) releaseRope();
+  const direction = aimKeys[event.code];
+  if (direction && keys.has('Space') && !keys.has(event.code)) moveAim(direction.x * 4, direction.y * 4);
   keys.add(event.code);
 });
 window.addEventListener('keyup', event => {
   if (!keys.delete(event.code)) return;
   event.preventDefault();
-  if (event.code === 'KeyS') {
-    aiming = false;
-    fire();
-  }
+  if (event.code === 'Space' && touchAim === undefined) fire(worldAim());
 });
-for (const [id, key] of [['left','ArrowLeft'], ['right','ArrowRight'], ['reel','ArrowUp']]) {
+for (const [id, key] of [['left','KeyA'], ['right','KeyD'], ['reel','KeyW']]) {
   const button = get(id);
   button.addEventListener('pointerdown', event => {
     if (event.button !== 0) return;
@@ -204,7 +211,6 @@ function clearInput() {
   keys.clear();
   held.clear();
   touchAim = undefined;
-  aiming = false;
 }
 window.addEventListener('blur', clearInput);
 document.addEventListener('visibilitychange', () => {
@@ -216,10 +222,18 @@ function goal(check: Point, radius: number) {
 }
 function update(dt: number, time: number) {
   const isHeld = (key: string) => keys.has(key) || [...held.values()].includes(key);
-  const move = (Number(isHeld('ArrowRight')) - Number(isHeld('ArrowLeft'))) as -1 | 0 | 1;
+  const move = (Number(isHeld('KeyD')) - Number(isHeld('KeyA'))) as -1 | 0 | 1;
+  if (keys.has('Space')) {
+    const dx = Number(keys.has('ArrowRight')) - Number(keys.has('ArrowLeft'));
+    const dy = Number(keys.has('ArrowDown')) - Number(keys.has('ArrowUp'));
+    if (dx || dy) {
+      const speed = 112 * dt / Math.hypot(dx, dy);
+      moveAim(dx * speed, dy * speed);
+    }
+  }
   const wasGrounded = spider.grounded;
   const landingSpeed = spider.vy;
-  tickSpider(spider, area.surfaces, {move,reel:isHeld('ArrowUp')}, dt, tuning);
+  tickSpider(spider, area.surfaces, {move,reel:isHeld('KeyW')}, dt, tuning);
   if (spider.grounded && !wasGrounded) {
     landedAt = time;
     if (landingSpeed > 30) play('land');
@@ -228,6 +242,7 @@ function update(dt: number, time: number) {
   if (spider.y > area.bounds.bottom || spider.x < area.bounds.left - 20 || spider.x > area.bounds.right + 20) {
     spider = createSpider(checkpoint ? area.checkpoints[checkpoint - 1] : area.spawn);
     shot = undefined;
+    keyboardAim = {...initialAim};
     say('Riprova dal punto sicuro. ' + (checkpoint ? 'Cerca il prossimo appiglio sopra di te.' : intro()));
     return;
   }
@@ -276,7 +291,7 @@ function frame(time: number) {
     remainder -= step;
   }
   camera = locateCamera();
-  const aim = aiming ? worldAim() : undefined;
+  const aim = keys.has('Space') || touchAim !== undefined ? worldAim() : undefined;
   const hit = aim ? aimHit(spider, area.surfaces, aim, tuning) : undefined;
   drawScene(context, area, spider, {camera,time,aim,hit,shot,landedAt,discovered});
   requestAnimationFrame(frame);

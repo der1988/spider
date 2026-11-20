@@ -6,3 +6,4 @@
 - Pianifica per risultati verificabili. Se deleghi, assegna file distinti e fai rivedere l'integrazione a un agente che non li ha implementati.
 - Prima di integrare esegui npm run lint, npm test e npm run build. Per modifiche alla PWA verifica anche il build servito da npm run preview, ricarica e offline.
 - Aggiorna README e documentazione tecnica quando cambia il flusso di gioco o di verifica. Mantieni commit piccoli.
+- Dopo ogni aggiornamento verificato, crea un commit e pubblicalo su GitHub sul branch main con un push normale. Verifica il commit remoto.
