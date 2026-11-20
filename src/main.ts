@@ -10,6 +10,7 @@ import {Soundscape} from './soundscape';
 const get = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const context = get<HTMLCanvasElement>('world').getContext('2d',{alpha:false})!;
 const message = get('message');
+const levelLabel = get('level');
 const timeLabel = get('time');
 const scoreLabel = get('score');
 const strandsLabel = get('strands');
@@ -91,12 +92,12 @@ function step(dt: number,input: ReturnType<typeof samplePlayStation>) {
   const result=tickHunt(hunt,spider,dt);
   if(result==='catch') {
     audio.play('catch');
-    say('Mosca catturata!');
+    say('Livello '+hunt.score+' · Mosca catturata!');
   } else if(result==='new') {
     audio.resetMusic();
-    say('Nuova mosca, 60 secondi e arena pulita.');
+    say('Livello '+(hunt.score+1)+' · Nuova mosca, 60 secondi e arena pulita.');
   } else if(result==='over') {
-    say('Tempo scaduto · '+hunt.score+' catture. Premi × per ricominciare.');
+    say('Tempo scaduto al livello '+(hunt.score+1)+' · '+hunt.score+' catture. Premi × per ricominciare.');
     audio.play('miss');
   }
   return result==='over';
@@ -152,7 +153,8 @@ function frame(time: number) {
     down=false;
   }
   const seconds=Math.ceil(hunt.time);
-  const labels = [[timeLabel,seconds+' s'],[scoreLabel,hunt.score+(hunt.score===1 ? ' cattura' : ' catture')],
+  const level=hunt.score+Number(hunt.phase!=='caught');
+  const labels = [[levelLabel,'Livello '+level],[timeLabel,seconds+' s'],[scoreLabel,hunt.score+(hunt.score===1 ? ' cattura' : ' catture')],
     [strandsLabel,hunt.strands.length+' / '+LIMIT+' fili']] as const;
   for (const [element,text] of labels) if (element.textContent!==text) element.textContent=text;
   timeLabel.dataset.urgent=String(seconds<=5 && hunt.phase!=='caught');

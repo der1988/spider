@@ -16,10 +16,11 @@ body { margin: 0; overflow: hidden; }
 header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; }
 h1 { font-size: clamp(16px, 3vw, 24px); margin: 0; }
 .scores, .tools { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
-output, button, kbd {
+.level, output, button, kbd {
   border: 1px solid var(--border); background: var(--panel);
   padding: 4px 7px; color: inherit; font: inherit; font-size: 12px;
 }
+.level { background: #d7e4a1; color: #203025; font-size: 14px; font-weight: bold; }
 #time { font-weight: bold; min-width: 53px; text-align: center; }
 #time[data-urgent=true] { background: #e1e7b6; color: #203025; outline: 1px solid #e1e7b6; }
 button { cursor: pointer; }
