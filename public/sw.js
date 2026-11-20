@@ -7,7 +7,7 @@ const activeCache = prefix + build; // build is injected by Vite.
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const response = await fetch(shell, {cache: 'reload'});
-    if (!response.ok) throw new Error('Shell non disponibile');
+    if (!response.ok) throw new Error('Game shell unavailable');
     const html = await response.clone().text();
     const assets = [...html.matchAll(/(?:src|href)="([^"]*assets\/[^"]+)"/g)].map(match => match[1]);
     const cache = await caches.open(activeCache);

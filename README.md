@@ -1,6 +1,6 @@
-# Tamago 2.0 · La caccia
+# Spider and Fly
 
-Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e seleziona **Avvia** per sbloccare la musica nel browser. Il timer e i comandi si attivano appena finisce «Start the clock».
+Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e seleziona **Start** per sbloccare la musica nel browser. Il timer e i comandi si attivano appena finisce «Start the clock».
 
 - **Stick sinistro** per correre sul pavimento, sulle pareti e sul soffitto o per dondolare. Sul filo attivo, spingi **su** per risalire e **giù** per staccarti. Con **su** puoi anche aggrapparti a un filo già fissato.
 - **Stick destro** per mirare in ogni direzione. **R1** lancia verso il primo appiglio entro la portata. Pareti, soffitto, pavimento e piattaforme accettano la seta. Se sei su una superficie, il tiro tende subito una ragnatela. Salta prima di sparare per dondolare: il filo si fissa quando tocchi una superficie valida. In aria puoi lanciare un secondo filo per spostare il dondolio sul nuovo appiglio.
@@ -10,7 +10,7 @@ Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e selezi
 
 ## Classifica
 
-A fine partita inserisci cinque lettere da **A** a **Z**. Con il joypad usa la croce direzionale o lo stick sinistro. Su e giù cambiano lettera, sinistra e destra spostano il cursore, **×** avanza o conferma l’ultima lettera, **○** chiude o salta. Con la tastiera puoi digitare o incollare le lettere, usare le frecce e premere Invio per salvare. Dopo aver chiuso la finestra, premi **×** per ricominciare. Il pulsante **Classifica** o **△** apre i primi 50 punteggi.
+A fine partita inserisci cinque lettere da **A** a **Z**. Con il joypad usa la croce direzionale o lo stick sinistro. Su e giù cambiano lettera, sinistra e destra spostano il cursore, **×** avanza o conferma l’ultima lettera, **○** chiude o salta. Con la tastiera puoi digitare o incollare le lettere, usare le frecce e premere Invio per salvare. Dopo aver chiuso la finestra, premi **×** per ricominciare. Il pulsante **Leaderboard** o **△** apre i primi 50 punteggi.
 
 Le catture maggiori vengono prima. A parità di catture precede il punteggio registrato prima. Se la connessione cade, puoi riprovare con gli stessi dati della partita. Dopo il primo caricamento da un sito, la caccia è disponibile offline. La classifica condivisa richiede la connessione e un server configurato.
 
@@ -24,9 +24,7 @@ In locale, applica lo stesso SQL a un database PostgreSQL e avvia `npm run score
 
 ## Colonna sonora
 
-**The Fly Has A** accompagna l’introduzione e la caccia. La musica prosegue durante le catture e i nuovi tentativi. **Options** sul joypad e il pulsante **Pausa** fermano insieme musica e partita. **Audio Off** silenzia il gioco conservando la sincronizzazione.
-
-Con **Sincronizza**, scegli una riga, ascolta il brano e premi **Segna** quando comincia la frase. Il pannello passa alla riga successiva. **Vai alla riga** porta la riproduzione poco prima del tempo corrente. Segnando «Left stick moves» cambi anche l’inizio del loop. **Salva** conserva i tempi su quel browser. **Tempi originali** ripristina la sincronizzazione inclusa nel gioco dopo il salvataggio.
+**The Fly Has A** accompagna l’introduzione e la caccia. La musica prosegue durante le catture e i nuovi tentativi. **Options** sul joypad e il pulsante **Pause** fermano insieme musica e partita. **Audio Off** silenzia il gioco conservando la sincronizzazione.
 
 ## Sviluppo
 

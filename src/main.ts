@@ -8,7 +8,6 @@ import {samplePlayStation,silkMotion} from './pad-controls';
 import {Soundscape} from './soundscape';
 import {Soundtrack} from './soundtrack';
 import {beatAt, huntStart, loadTiming, lyricAt, openingShot} from './song-cues';
-import {bindCalibration} from './song-calibration';
 import {difficultyChanges} from './difficulty';
 import {bindLeaderboard,newRunId} from './leaderboard';
 
@@ -25,10 +24,12 @@ const scoreLabel = get('score');
 const strandsLabel = get('strands');
 const sound = get<HTMLButtonElement>('sound');
 const start = get<HTMLButtonElement>('start');
+const startStatus = get('start-status');
+const shell = get('shell');
 const pause = get<HTMLButtonElement>('pause');
 const lyric = get('lyric');
-const intro = 'Osserva i due corridoi. Spara da una superficie per tendere un filo. Salta prima di sparare per dondolare.';
-const waiting = 'Collega il joypad PlayStation e premi un tasto.';
+const intro = 'Shoot from a surface to place a web. Jump before shooting to swing.';
+const waiting = 'Connect your PlayStation controller and press a button.';
 let audioOn = true;
 try {
   audioOn = localStorage.getItem('tamago.audio')!=='off';
@@ -38,9 +39,8 @@ const audio = new Soundscape(audioOn);
 const asset = document.querySelector<HTMLMetaElement>('meta[name=tamago-soundtrack]')!.content;
 const musicBytes = fetch(asset).then(response => response.ok ? response.arrayBuffer() : undefined)
   .catch(() => undefined);
-let timing = loadTiming();
+const timing = loadTiming();
 const song = new Soundtrack(musicBytes,timing.loopStart);
-const calibration = get<HTMLDialogElement>('calibration');
 const leaderboard = bindLeaderboard();
 song.setMuted(!audioOn);
 let contextAudio: AudioContext|undefined;
@@ -57,11 +57,11 @@ function requestStart() {
 start.onclick = requestStart;
 
 function syncPause() {
-  const frozen = paused || calibration.open || document.hidden;
+  const frozen = paused || document.hidden;
   song.setPaused(frozen);
   audio.setPaused(frozen);
   remainder = 0;
-  pause.textContent = paused ? 'Riprendi' : 'Pausa';
+  pause.textContent = paused ? 'Resume' : 'Pause';
   pause.setAttribute('aria-pressed',String(paused));
   if (!frozen && audioOn) audio.unlock();
 }
@@ -71,10 +71,6 @@ function togglePause() {
   syncPause();
 }
 pause.onclick = togglePause;
-bindCalibration(calibration,musicBytes,() => timing,next => {
-  timing=next;
-  song.setLoopStart(timing.loopStart);
-},syncPause);
 function syncAudio() {
   sound.textContent = audioOn ? 'Audio On' : 'Audio Off';
   sound.setAttribute('aria-pressed',String(audioOn));
@@ -89,7 +85,7 @@ sound.onclick = () => {
 };
 syncAudio();
 window.addEventListener('keydown',event => {
-  if (event.code==='Escape' && !event.repeat && !calibration.open && !leaderboard.open) togglePause();
+  if (event.code==='Escape' && !event.repeat && !leaderboard.open) togglePause();
 });
 document.addEventListener('visibilitychange',syncPause);
 
@@ -105,7 +101,7 @@ let down = false;
 let lastFrame=0;
 let remainder=0;
 let lastSound=0;
-const catchesText = (count: number) => count+(count===1 ? ' cattura' : ' catture');
+const catchesText = (count: number) => count+(count===1 ? ' catch' : ' catches');
 function say(text: string) { if(message.textContent!==text) message.textContent=text; }
 const worldAim = () => ({x:spider.x+aimDirection.x*70,y:spider.y+aimDirection.y*70});
 
@@ -126,7 +122,7 @@ function shootSilk() {
     audio.play('attach',.06);
     const before=hunt.strands.length;
     if (anchorCrawlerRope(spider,platforms,hunt.strands)) finishWebs(before);
-    else if (spider.firstAnchor) say('Doppio filo. Dondoli sull’ultimo appiglio.');
+    else if (spider.firstAnchor) say('Double tether. Swinging from the latest anchor.');
   } else audio.play('miss',.06);
 }
 function finishWebs(before: number) {
@@ -134,7 +130,7 @@ function finishWebs(before: number) {
   for (const strand of hunt.strands.slice(before)) strand.expiresAt=hunt.clock+WEB_SECONDS;
   const evicted=capStrands(hunt);
   audio.play('fix');
-  say(evicted ? 'Nuovo filo: il più vecchio si dissolve.' : 'Filo fissato. Avvicinati alla mosca per spingerla verso la rete.');
+  say(evicted ? 'New web placed. The oldest web is fading.' : 'Web placed. Get close to steer the fly toward it.');
 }
 
 function step(dt: number,input: ReturnType<typeof samplePlayStation>) {
@@ -157,16 +153,16 @@ function step(dt: number,input: ReturnType<typeof samplePlayStation>) {
   const result=tickHunt(hunt,spider,dt);
   if(result==='catch') {
     audio.play('catch');
-    say('Livello '+hunt.score+' · Mosca catturata!');
+    say('Level '+hunt.score+' · Fly caught!');
   } else if(result==='new') {
-    const base = 'Livello '+(hunt.score+1)+' · Nuova mosca, '+hunt.difficulty.duration+' secondi.';
+    const base = 'Level '+(hunt.score+1)+' · New fly, '+hunt.difficulty.duration+' seconds.';
     const changes = difficultyChanges(hunt.score);
     if (changes.length) {
-      difficultyNotice = {text:base+' Mosca '+changes.join(', ')+'.',until:hunt.clock+3};
+      difficultyNotice = {text:base+' The fly is '+changes.join(', ')+'.',until:hunt.clock+3};
       say(difficultyNotice.text);
     } else say(base);
   } else if(result==='over') {
-    say('Tempo scaduto al livello '+(hunt.score+1)+' · '+catchesText(hunt.score)+'. Premi × per ricominciare.');
+    say('Time ran out on level '+(hunt.score+1)+' · '+catchesText(hunt.score)+'. Press × to play again.');
     audio.play('miss');
     leaderboard.show({id:runId,catches:hunt.score});
   }
@@ -186,22 +182,24 @@ function frame(time: number) {
   let input: ReturnType<typeof samplePlayStation>|undefined;
   let retry=false;
   const boardWasOpen=leaderboard.open;
-  if (!calibration.open) leaderboard.handlePad(gamepad,time);
+  leaderboard.handlePad(gamepad,time);
   if (gamepad) {
     const cross=!!gamepad.buttons[0]?.pressed;
     const options=!!gamepad.buttons[9]?.pressed;
+    if (!song.started && cross && (!crossHeld || activePad!==gamepad.index) && !boardWasOpen && !leaderboard.open) {
+      requestStart();
+    }
     if (activePad!==gamepad.index) {
       activePad=gamepad.index;
       previous=undefined;
       crossHeld=cross;
       optionsHeld=options;
-      if (!requestedStart) requestStart();
-      if (song.started && !opening) say(hunt.phase==='over' ? 'Premi × per ricominciare.' : intro);
+      if (song.started && !opening) say(hunt.phase==='over' ? 'Press × to play again.' : intro);
     }
     input=samplePlayStation(gamepad,previous);
     previous=input.shoulders;
     retry=cross && !crossHeld;
-    if (options && !optionsHeld && !calibration.open && !leaderboard.open) togglePause();
+    if (options && !optionsHeld && !leaderboard.open) togglePause();
     crossHeld=cross;
     optionsHeld=options;
   } else {
@@ -212,16 +210,16 @@ function frame(time: number) {
     down=false;
   }
 
-  if (requestedStart && !song.started && !calibration.open) {
+  if (requestedStart && !song.started) {
     if (!audioOn || song.failed || song.canPlay(contextAudio)) {
       song.start();
-      start.hidden=true;
+      shell.dataset.screen='game';
       pause.disabled=false;
-      say(song.failed ? 'Brano non disponibile. L’introduzione continua con i sottotitoli.' : 'Introduzione');
+      say(song.failed ? 'Soundtrack unavailable. The intro will play with subtitles.' : 'Intro');
     } else if (contextAudio?.state!=='running') {
-      say('Seleziona Avvia per attivare la musica.');
+      startStatus.textContent='Select Start to enable audio.';
     } else {
-      say('Caricamento della colonna sonora…');
+      startStatus.textContent='Loading soundtrack…';
     }
   }
   song.connect(contextAudio);
@@ -231,7 +229,7 @@ function frame(time: number) {
     say(gamepad ? intro : waiting);
   }
 
-  if (input && !opening && !paused && !calibration.open && !boardWasOpen && !leaderboard.open && !document.hidden) {
+  if (input && !opening && !paused && !boardWasOpen && !leaderboard.open && !document.hidden) {
     if (input.aim) aimDirection=input.aim;
     if (hunt.phase==='over' && retry) {
       hunt=createHunt();
@@ -262,8 +260,8 @@ function frame(time: number) {
   if (lyric.textContent!==caption) lyric.textContent=caption;
   const seconds=Math.ceil(hunt.time);
   const level=hunt.score+Number(hunt.phase!=='caught');
-  const labels = [[levelLabel,'Livello '+level],[timeLabel,seconds+' s'],[roundLabel,hunt.difficulty.duration+' s'],[scoreLabel,catchesText(hunt.score)],
-    [strandsLabel,hunt.strands.length+' / '+LIMIT+' fili']] as const;
+  const labels = [[levelLabel,'Level '+level],[timeLabel,seconds+' s'],[roundLabel,hunt.difficulty.duration+' s'],[scoreLabel,catchesText(hunt.score)],
+    [strandsLabel,hunt.strands.length+' / '+LIMIT+' webs']] as const;
   for (const [element,text] of labels) if (element.textContent!==text) element.textContent=text;
   const beat = reduceMotion.matches ? 0 : beatAt(position);
   const pulse = beat.toFixed(2);

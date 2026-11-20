@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,78 +8,69 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./touch.png">
 <link rel="icon" href="./icon-192.png">
-<title>Tamago 2.0 · La caccia</title>
+<title>Spider and Fly</title>
 </head>
 <body>
-<main class="shell">
+<main id="shell" class="shell" data-screen="start">
+  <section class="launch" aria-labelledby="launch-title">
+    <div class="launch-copy">
+      <h1 id="launch-title">Spider and Fly</h1>
+      <p>Use your controller</p>
+    </div>
+    <button id="start" type="button">Start</button>
+    <p id="start-status" role="status"></p>
+  </section>
   <header>
     <div class="hunt-info">
-      <h1>Tamago 2.0</h1>
+      <h1>Spider and Fly</h1>
       <div class="scores">
-        <span id="level" class="level">Livello 1</span>
-        <output id="score" aria-label="Catture">0 catture</output>
-        <output id="strands" aria-label="Fili fissati">0 / 6 fili</output>
+        <span id="level" class="level">Level 1</span>
+        <output id="score" aria-label="Catches">0 catches</output>
+        <output id="strands" aria-label="Placed webs">0 / 6 webs</output>
       </div>
     </div>
     <div id="clock" class="clock" data-phase="ready">
-      <span class="clock-caption">Tempo · <span id="round-time">60 s</span></span>
+      <span class="clock-caption">Time · <span id="round-time">60 s</span></span>
       <span class="clock-rhythm" aria-hidden="true"></span>
-      <output id="time" aria-label="Secondi rimanenti" aria-live="off">60 s</output>
+      <output id="time" aria-label="Seconds remaining" aria-live="off">60 s</output>
       <span class="clock-rhythm" aria-hidden="true"></span>
       <div class="clock-track" aria-hidden="true"><span id="clock-meter"></span></div>
     </div>
     <div class="tools">
-      <button id="start" type="button">Avvia</button>
-      <button id="pause" type="button" aria-pressed="false" disabled>Pausa</button>
-      <button id="calibrate" type="button">Sincronizza</button>
-      <button id="show-board" type="button">Classifica</button>
+      <button id="pause" type="button" aria-pressed="false" disabled>Pause</button>
+      <button id="show-board" type="button">Leaderboard</button>
       <button id="sound" type="button" aria-pressed="true">Audio On</button>
     </div>
   </header>
-  <section class="stage" aria-label="Arena di caccia">
-    <canvas id="world" width="360" height="204" aria-label="Ragno, mosca e ragnatele"></canvas>
+  <section class="stage" aria-label="Hunting arena">
+    <canvas id="world" width="360" height="204" aria-label="Spider, fly and webs"></canvas>
   </section>
   <footer>
     <p id="lyric" class="lyric" lang="en"></p>
-    <p id="message" role="status">Collega il joypad PlayStation e seleziona Avvia.</p>
-    <p>Sinistro: corri sulle superfici, ↑ risali, ↓ stacca dal filo · Destro: mira · <kbd>R1</kbd> Tela · <kbd>L1</kbd> Salto / doppio salto · <kbd>Options</kbd> Pausa</p>
+    <p id="message" role="status"></p>
+    <p>Left stick: move, ↑ reel in, ↓ detach · Right stick: aim · <kbd>R1</kbd> Shoot web · <kbd>L1</kbd> Jump / double jump · <kbd>Options</kbd> Pause</p>
   </footer>
 </main>
-<dialog id="calibration" aria-labelledby="calibration-title">
-  <h2 id="calibration-title">Sincronizza il brano</h2>
-  <p>Scegli una riga e premi Segna al suo inizio. Il pannello passa alla riga successiva. Segnando «Left stick moves» aggiorni anche il punto del loop.</p>
-  <audio controls preload="metadata" id="calibration-audio"></audio>
-  <label for="calibration-line">Riga da segnare</label>
-  <select id="calibration-line"></select>
-  <p id="calibration-time" role="status"></p>
-  <div class="calibration-actions">
-    <button type="button" id="calibration-seek">Vai alla riga</button>
-    <button type="button" id="calibration-mark">Segna</button>
-    <button type="button" id="calibration-reset">Tempi originali</button>
-    <button type="button" id="calibration-save">Salva</button>
-    <button type="button" id="calibration-close">Chiudi</button>
-  </div>
-</dialog>
 <dialog id="scoreboard" aria-labelledby="board-title">
   <div class="board-header">
-    <h2 id="board-title">Classifica online</h2>
-    <button id="board-close" type="button">Chiudi</button>
+    <h2 id="board-title">Leaderboard</h2>
+    <button id="board-close" type="button">Close</button>
   </div>
   <form id="score-form" hidden>
     <p id="score-result"></p>
     <fieldset>
-      <legend>Nome · cinque lettere A–Z</legend>
+      <legend>Name · five letters A–Z</legend>
       <div id="score-letters" class="score-letters"></div>
     </fieldset>
-    <p><kbd>↑</kbd> <kbd>↓</kbd> Cambia lettera · <kbd>←</kbd> <kbd>→</kbd> Spostati · <kbd>×</kbd> Conferma · <kbd>○</kbd> Salta</p>
+    <p><kbd>↑</kbd> <kbd>↓</kbd> Change letter · <kbd>←</kbd> <kbd>→</kbd> Move cursor · <kbd>×</kbd> Confirm · <kbd>○</kbd> Skip</p>
     <div class="board-actions">
-      <button id="score-save" type="submit">Salva punteggio</button>
-      <button id="score-skip" type="button">Salta</button>
+      <button id="score-save" type="submit">Save score</button>
+      <button id="score-skip" type="button">Skip</button>
     </div>
   </form>
   <p id="board-status" role="status"></p>
-  <button id="board-reload" type="button" hidden>Riprova</button>
-  <ol id="board-entries" aria-label="Classifica per numero di catture"></ol>
+  <button id="board-reload" type="button" hidden>Try again</button>
+  <ol id="board-entries" aria-label="Leaderboard by catches"></ol>
 </dialog>
 <script type="module" src="/src/main.ts"></script>
 </body>

@@ -14,7 +14,7 @@ export function loadTiming(): SongTiming {
   return defaultTiming();
 }
 
-export function defaultTiming(): SongTiming {
+function defaultTiming(): SongTiming {
   return {starts:captions.map(([start])=>start),loopStart:defaultLoopStart};
 }
 
@@ -25,12 +25,6 @@ function validTiming(value: unknown): value is SongTiming {
     starts.every((time,i)=>Number.isFinite(time) && time>=0 && time<loopEnd && (!i || time>starts[i-1])) &&
     Number.isFinite(loopStart) && loopStart>starts[clockCue] &&
     loopStart<=starts[loopCue] && starts[loopCue]-loopStart<=.54;
-}
-
-export function saveTiming(timing: SongTiming) {
-  if (!validTiming(timing)) return false;
-  try { localStorage.setItem(timingKey,JSON.stringify(timing)); } catch { /* Session calibration. */ }
-  return true;
 }
 
 function lastCue(times: readonly number[],time: number) {

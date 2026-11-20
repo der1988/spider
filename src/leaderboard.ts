@@ -18,7 +18,7 @@ export function bindLeaderboard() {
   const status=byId('board-status');
   const entries=byId<HTMLOListElement>('board-entries');
   const title=byId('board-title');
-  const countText=(n: number)=>n===1 ? '1 mosca catturata' : n+' mosche catturate';
+  const countText=(n: number)=>n===1 ? '1 fly caught' : n+' flies caught';
   let result: Result|undefined;
   let submittedName: string|undefined;
   let saving=false;
@@ -44,7 +44,7 @@ export function bindLeaderboard() {
     letter.maxLength=1;
     letter.autocomplete='off';
     letter.spellcheck=false;
-    letter.setAttribute('aria-label','Lettera '+(index+1));
+    letter.setAttribute('aria-label','Letter '+(index+1));
     letter.onfocus=()=>{ selected=index; letter.select(); };
     letter.oninput=()=>{
       letter.value=clean(letter.value);
@@ -67,8 +67,8 @@ export function bindLeaderboard() {
   });
 
   async function request<T>(body?: Entry & {runId:string}): Promise<T> {
-    if (!/^https?:$/.test(location.protocol)) throw new Error('Apri la versione online per consultare o salvare la classifica.');
-    if (!navigator.onLine) throw new Error('Connessione assente. Riconnettiti e riprova.');
+    if (!/^https?:$/.test(location.protocol)) throw new Error('Open the hosted game to view the leaderboard or save a score.');
+    if (!navigator.onLine) throw new Error('No connection. Reconnect and try again.');
     let response: Response;
     try {
       response=await fetch(new URL('api/scores',document.baseURI),{
@@ -76,10 +76,10 @@ export function bindLeaderboard() {
         ...(body ? {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)} : {}),
       });
     } catch {
-      throw new Error('Classifica irraggiungibile. Controlla la connessione e riprova.');
+      throw new Error('Could not reach the leaderboard. Check your connection and try again.');
     }
     const data=await response.json().catch(()=>null);
-    if (!response.ok || !data) throw new Error(data?.error??'Classifica irraggiungibile. Riprova.');
+    if (!response.ok || !data) throw new Error(data?.error??'Leaderboard unavailable. Try again.');
     return data;
   }
 
@@ -87,7 +87,7 @@ export function bindLeaderboard() {
     const version=++requestVersion;
     reload.hidden=true;
     entries.replaceChildren();
-    status.textContent=prefix+'Caricamento classifica…';
+    status.textContent=prefix+'Loading leaderboard…';
     try {
       const board=await request<{entries:Entry[]}>();
       if (version!==requestVersion) return;
@@ -103,7 +103,7 @@ export function bindLeaderboard() {
         item.append(row);
         entries.append(item);
       }
-      status.textContent=prefix+(board.entries.length ? '' : 'La classifica è vuota.');
+      status.textContent=prefix+(board.entries.length ? '' : 'No scores yet.');
     } catch (error) {
       if (version!==requestVersion) return;
       status.textContent=prefix+(error as Error).message;
@@ -115,7 +115,7 @@ export function bindLeaderboard() {
     if (!result || saving) return;
     const name=submittedName??letters.map(letter=>letter.value).join('');
     if (!/^[A-Z]{5}$/.test(name)) {
-      status.textContent='Inserisci esattamente cinque lettere A–Z.';
+      status.textContent='Enter exactly five letters from A to Z.';
       selectLetter(letters.findIndex(letter=>!letter.value));
       return;
     }
@@ -125,19 +125,19 @@ export function bindLeaderboard() {
     saving=true;
     save.disabled=true;
     for (const letter of letters) letter.readOnly=true;
-    status.textContent='Salvataggio…';
+    status.textContent='Saving…';
     try {
       await request<Entry>({name,catches:score.catches,runId:score.id});
       if (version!==requestVersion) return;
       result=undefined;
       form.hidden=true;
-      title.textContent='Classifica online';
+      title.textContent='Leaderboard';
       byId('board-close').focus();
-      void load('Punteggio salvato · '+name+' · '+countText(score.catches)+'. ');
+      void load('Score saved · '+name+' · '+countText(score.catches)+'. ');
     } catch (error) {
       if (version!==requestVersion) return;
       status.textContent=(error as Error).message;
-      save.textContent='Riprova';
+      save.textContent='Try again';
       save.focus();
     } finally {
       if (result===score) {
@@ -153,15 +153,15 @@ export function bindLeaderboard() {
     submittedName=undefined;
     saving=false;
     save.disabled=false;
-    save.textContent='Salva punteggio';
+    save.textContent='Save score';
     form.hidden=!score;
     reload.hidden=true;
     entries.replaceChildren();
     status.textContent='';
-    title.textContent=score ? 'Fine partita' : 'Classifica online';
+    title.textContent=score ? 'Game over' : 'Leaderboard';
     dialog.showModal();
     if (score) {
-      byId('score-result').textContent=countText(score.catches)+'. Registra il punteggio o salta.';
+      byId('score-result').textContent=countText(score.catches)+'. Save your score or skip.';
       for (const letter of letters) {
         letter.readOnly=false;
         letter.value='A';

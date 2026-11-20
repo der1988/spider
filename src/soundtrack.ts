@@ -4,7 +4,6 @@ const blendSeconds = .24;
 
 export class Soundtrack {
   private buffer?: AudioBuffer;
-  private originalTail: Float32Array[] = [];
   private output?: GainNode;
   private source?: AudioBufferSourceNode;
   private offset = 0;
@@ -15,7 +14,7 @@ export class Soundtrack {
   failed = false;
   started = false;
 
-  constructor(private readonly bytes: Promise<ArrayBuffer | undefined>,private loopStart: number) {}
+  constructor(private readonly bytes: Promise<ArrayBuffer | undefined>,private readonly loopStart: number) {}
 
   prepare(context: AudioContext | undefined) {
     if (this.loading) return;
@@ -25,14 +24,10 @@ export class Soundtrack {
       return;
     }
     void this.bytes.then(async bytes => {
-      if (!bytes) throw new Error('Colonna sonora non disponibile');
+      if (!bytes) throw new Error('Soundtrack unavailable');
       const buffer = await context.decodeAudioData(bytes.slice(0));
       this.buffer = buffer;
-      const end = Math.round(loopEnd*buffer.sampleRate);
-      const blend = Math.round(blendSeconds*buffer.sampleRate);
-      this.originalTail = Array.from({length:buffer.numberOfChannels},(_,channel) =>
-        buffer.getChannelData(channel).slice(end-blend,end));
-      this.splice();
+      this.splice(buffer);
       this.output = context.createGain();
       this.output.gain.value = this.muted ? 0 : .76;
       this.output.connect(context.destination);
@@ -74,23 +69,16 @@ export class Soundtrack {
     this.epoch = launch;
   }
 
-  setLoopStart(start: number) {
-    // The calibration dialog pauses playback before changing the splice.
-    if (this.loopStart===start) return;
-    this.loopStart = start;
-    this.splice();
-  }
-
-  private splice() {
-    const buffer = this.buffer;
-    if (!buffer) return;
+  private splice(buffer: AudioBuffer) {
     const end = Math.round(loopEnd*buffer.sampleRate);
     const head = Math.round(this.loopStart*buffer.sampleRate);
-    for (const [channel,tail] of this.originalTail.entries()) {
+    const blend = Math.round(blendSeconds*buffer.sampleRate);
+    for (let channel=0;channel<buffer.numberOfChannels;channel++) {
       const samples = buffer.getChannelData(channel);
-      for (let i=0;i<tail.length;i++) {
-        const weight = .5-.5*Math.cos(Math.PI*i/(tail.length-1));
-        samples[end-tail.length+i] = tail[i]*(1-weight)+samples[head-tail.length+i]*weight;
+      for (let i=0;i<blend;i++) {
+        const weight = .5-.5*Math.cos(Math.PI*i/(blend-1));
+        const tail = end-blend+i;
+        samples[tail] = samples[tail]*(1-weight)+samples[head-blend+i]*weight;
       }
     }
   }

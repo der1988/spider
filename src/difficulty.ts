@@ -24,8 +24,8 @@ export function difficultyChanges(catches: number) {
   const current=difficultyAt(catches);
   const previous=difficultyAt(Math.max(0,catches-1));
   return [
-    ...(current.cruiseSpeed>previous.cruiseSpeed ? ['più veloce'] : []),
-    ...(current.reactionTime<previous.reactionTime ? ['più pronta a schivare'] : []),
-    ...(current.alertRadius>previous.alertRadius ? ['ti sente da più lontano'] : []),
+    ...(current.cruiseSpeed>previous.cruiseSpeed ? ['faster'] : []),
+    ...(current.reactionTime<previous.reactionTime ? ['quicker to dodge webs'] : []),
+    ...(current.alertRadius>previous.alertRadius ? ['more alert to the spider'] : []),
   ];
 }

@@ -1,4 +1,4 @@
-// Seconds in the decoded MP3. Edit these cues or adjust them in Sincronizza.
+// Seconds in the decoded MP3. Edit these cues to adjust the shipped alignment.
 export const defaultLoopStart = 15.330;
 export const loopEnd = 240.566;
 export const clockCue = 4;
