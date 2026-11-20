@@ -1,3 +1,4 @@
+import {roomBeats,roomCaptions} from './room-timing';
 import type {SongPosition} from './playlist';
 import {upgradeBeats,upgradeCaptions} from './upgrade-timing';
 import {beats,captions,clockCue,defaultLoopStart,firstTrackEnd,loopCue} from './song-timing';
@@ -40,11 +41,17 @@ function lastCue(times: readonly number[],time: number) {
   return lo-1;
 }
 
+const roomStarts = roomCaptions.map(([start])=>start);
 const upgradeStarts = upgradeCaptions.map(([start])=>start);
+const tracks = {
+  first:{captions,beats},
+  upgrade:{captions:upgradeCaptions,beats:upgradeBeats},
+  room:{captions:roomCaptions,beats:roomBeats},
+};
 
 export function lyricAt({track,time}: SongPosition,timing: SongTiming) {
-  const starts=track==='first' ? timing.starts : upgradeStarts;
-  const lines=track==='first' ? captions : upgradeCaptions;
+  const starts=track==='first' ? timing.starts : track==='upgrade' ? upgradeStarts : roomStarts;
+  const lines=tracks[track].captions;
   const i=lastCue(starts,time);
   if (i<0) return '';
   const [start,end,text]=lines[i];
@@ -58,7 +65,7 @@ export function huntStart(timing: SongTiming) {
 }
 
 export function beatAt({track,time}: SongPosition) {
-  const accents=track==='first' ? beats : upgradeBeats;
+  const accents=tracks[track].beats;
   const i=lastCue(accents,time);
   return i<0 ? 0 : Math.max(0,1-(time-accents[i])/.22)**2;
 }

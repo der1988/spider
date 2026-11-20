@@ -24,7 +24,7 @@ In locale, applica lo stesso SQL a un database PostgreSQL e avvia `npm run score
 
 ## Colonna sonora
 
-**The Fly Has A** accompagna l’introduzione e la caccia. A **240,330 s** parte **The Fly Has an Upgrade** dall’inizio. Dopo **119,580 s** la playlist torna al primo brano a **15,330 s** e alterna i due brani. La musica prosegue durante le catture e i nuovi tentativi. **Options** sul joypad e il pulsante **Pause** fermano insieme musica e partita. **Audio Off** silenzia il gioco conservando la sincronizzazione.
+**The Fly Has A** accompagna l’introduzione e la caccia. A **240,330 s** parte **The Fly Has an Upgrade** dall’inizio. Dopo **119,580 s** parte **The Room Has a Space Bar**. Durante il terzo brano, una nuova pressione di **Space** ferma la partita, fissando lo stato dell’arena. Se il terzo brano arriva alla fine, la playlist torna al primo a **15,330 s**. La musica prosegue durante le catture e i nuovi tentativi. **Options** sul joypad e il pulsante **Pause** fermano insieme musica e partita. **Audio Off** silenzia il gioco conservando la sincronizzazione.
 
 ## Sviluppo
 

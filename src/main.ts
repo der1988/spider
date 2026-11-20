@@ -41,13 +41,17 @@ function fetchTrack(name: string) {
   return fetch(url).then(response=>response.ok ? response.arrayBuffer() : undefined).catch(()=>undefined);
 }
 const timing = loadTiming();
-const song = new Soundtrack([fetchTrack('tamago-soundtrack'),fetchTrack('tamago-upgrade')],timing.loopStart);
+const song = new Soundtrack([
+  fetchTrack('tamago-soundtrack'),fetchTrack('tamago-upgrade'),fetchTrack('tamago-room'),
+],timing.loopStart);
 const leaderboard = bindLeaderboard();
 song.setMuted(!audioOn);
 let contextAudio: AudioContext|undefined;
 let requestedStart = false;
 let opening = true;
 let paused = false;
+let interrupted = false;
+let spaceHeld = false;
 
 function requestStart() {
   requestedStart = true;
@@ -58,16 +62,16 @@ function requestStart() {
 start.onclick = requestStart;
 
 function syncPause() {
-  const frozen = paused || document.hidden;
+  const frozen = paused || interrupted || document.hidden;
   song.setPaused(frozen);
   audio.setPaused(frozen);
   remainder = 0;
-  pause.textContent = paused ? 'Resume' : 'Pause';
-  pause.setAttribute('aria-pressed',String(paused));
+  pause.textContent = interrupted ? 'Stopped' : paused ? 'Resume' : 'Pause';
+  pause.setAttribute('aria-pressed',String(paused || interrupted));
   if (!frozen && audioOn) audio.unlock();
 }
 function togglePause() {
-  if (!song.started) return;
+  if (!song.started || interrupted) return;
   paused = !paused;
   syncPause();
 }
@@ -87,7 +91,21 @@ sound.onclick = () => {
 syncAudio();
 window.addEventListener('keydown',event => {
   if (event.code==='Escape' && !event.repeat && !leaderboard.open) togglePause();
+  if (event.code!=='Space') return;
+  const freshPress=!spaceHeld && !event.repeat;
+  spaceHeld=true;
+  if (!song.started || opening || leaderboard.open || hunt.phase==='over') return;
+  event.preventDefault();
+  if (!freshPress || interrupted || song.position.track!=='room') return;
+  interrupted=true;
+  pause.disabled=true;
+  syncPause();
+  say('Hunt stopped.');
 });
+window.addEventListener('keyup',event => {
+  if (event.code==='Space') spaceHeld=false;
+});
+window.addEventListener('blur',()=>{ spaceHeld=false; });
 document.addEventListener('visibilitychange',syncPause);
 
 let hunt = createHunt();
@@ -177,6 +195,7 @@ function step(dt: number,input: ReturnType<typeof samplePlayStation>) {
 let crossHeld=false;
 let optionsHeld=false;
 function frame(time: number) {
+  if (interrupted) return;
   const elapsed=Math.min(.05,(time-(lastFrame||time))/1000);
   lastFrame=time;
   const gamepad=pad();
@@ -258,7 +277,10 @@ function frame(time: number) {
     audio.nearby(d,time);
   }
   const caption=song.started ? lyricAt(position,timing) : '';
-  if (lyric.textContent!==caption) lyric.textContent=caption;
+  if (lyric.textContent!==caption) {
+    lyric.textContent=caption;
+    lyric.dataset.prompt=String(position.track==='room' && /^Press Space\b/i.test(caption));
+  }
   const seconds=Math.ceil(hunt.time);
   const level=hunt.score+Number(hunt.phase!=='caught');
   const labels = [[levelLabel,'Level '+level],[timeLabel,seconds+' s'],[roundLabel,hunt.difficulty.duration+' s'],[scoreLabel,catchesText(hunt.score)],

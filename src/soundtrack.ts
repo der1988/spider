@@ -1,5 +1,6 @@
-import {firstTrackEnd} from './song-timing';
-import {locateTrack,playlistEnd,wrapPlaylist} from './playlist';
+import {locateTrack,playlistEnd,trackStarts,wrapPlaylist} from './playlist';
+
+type TrackBytes = Promise<ArrayBuffer | undefined>;
 
 const boundaryFade = .012;
 const returnBlend = .14;
@@ -7,7 +8,8 @@ const ease = (t: number) => .5-.5*Math.cos(Math.PI*t);
 
 export class Soundtrack {
   private buffer?: AudioBuffer;
-  private boundary = firstTrackEnd;
+  private upgradeStart: number = trackStarts[1];
+  private roomStart = trackStarts[2];
   private output?: GainNode;
   private source?: AudioBufferSourceNode;
   private offset = 0;
@@ -19,7 +21,7 @@ export class Soundtrack {
   started = false;
 
   constructor(
-    private readonly bytes: readonly [Promise<ArrayBuffer | undefined>,Promise<ArrayBuffer | undefined>],
+    private readonly bytes: readonly [TrackBytes,TrackBytes,TrackBytes],
     private readonly returnAt: number,
   ) {}
 
@@ -30,40 +32,46 @@ export class Soundtrack {
       this.failed = true;
       return;
     }
-    const decode = async (track: Promise<ArrayBuffer | undefined>) => {
-      const data=await track;
-      return data ? context.decodeAudioData(data).catch(()=>undefined) : undefined;
-    };
-    void Promise.all(this.bytes.map(decode)).then(([first,upgrade]) => {
-      if (!first && !upgrade) {
-        this.failed=true;
-        return;
-      }
-      this.buffer=this.join(context,first,upgrade);
+    void this.join(context).then(buffer => {
+      this.buffer=buffer;
       this.output=context.createGain();
       this.output.gain.value=this.muted ? 0 : .76;
       this.output.connect(context.destination);
     }).catch(()=>{this.failed=true;});
   }
 
-  private join(context: AudioContext,first?: AudioBuffer,upgrade?: AudioBuffer) {
+  private async join(context: AudioContext) {
     const rate=context.sampleRate;
-    const cut=Math.round(firstTrackEnd*rate);
-    const end=Math.round(playlistEnd*rate);
+    const [start,upgrade,room,end]=[...trackStarts,playlistEnd].map(seconds=>Math.round(seconds*rate));
+    const playlist=context.createBuffer(2,end,rate);
+    this.upgradeStart=upgrade/rate;
+    this.roomStart=room/rate;
+    const boundaries=[start,upgrade,room,end];
+    let decoded=false;
+    // Decode one original at a time while assembling the shared playback buffer.
+    for (const [index,bytes] of this.bytes.entries()) {
+      const data=await bytes;
+      if (!data) continue;
+      const track=await context.decodeAudioData(data).catch(()=>undefined);
+      if (!track) continue;
+      decoded=true;
+      for (let channel=0;channel<playlist.numberOfChannels;channel++) {
+        const samples=track.getChannelData(channel%track.numberOfChannels);
+        playlist.copyToChannel(samples.subarray(0,boundaries[index+1]-boundaries[index]),channel,boundaries[index]);
+      }
+    }
+    if (!decoded) throw new Error('Soundtrack unavailable');
     const fade=Math.round(boundaryFade*rate);
     const blend=Math.round(returnBlend*rate);
     const head=Math.round(this.returnAt*rate);
-    const channels=Math.max(first?.numberOfChannels??0,upgrade?.numberOfChannels??0);
-    const playlist=context.createBuffer(channels,end,rate);
-    this.boundary=cut/rate;
-    for (let channel=0;channel<channels;channel++) {
+    for (let channel=0;channel<playlist.numberOfChannels;channel++) {
       const samples=playlist.getChannelData(channel);
-      if (first) samples.set(first.getChannelData(channel%first.numberOfChannels).subarray(0,cut));
-      if (upgrade) samples.set(upgrade.getChannelData(channel%upgrade.numberOfChannels).subarray(0,end-cut),cut);
-      for (let i=0;i<fade;i++) {
-        const gain=ease(i/(fade-1));
-        samples[cut-fade+i]*=1-gain;
-        samples[cut+i]*=gain;
+      for (const cut of [upgrade,room]) {
+        for (let i=0;i<fade;i++) {
+          const gain=ease(i/(fade-1));
+          samples[cut-fade+i]*=1-gain;
+          samples[cut+i]*=gain;
+        }
       }
       // Blend the decay into the pre-roll so the return begins with an uncut first syllable.
       for (let i=0;i<blend;i++) {
@@ -86,7 +94,7 @@ export class Soundtrack {
   }
 
   get position() {
-    return locateTrack(this.currentOffset(),this.boundary);
+    return locateTrack(this.currentOffset(),this.upgradeStart,this.roomStart);
   }
 
   start() {

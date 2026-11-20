@@ -83,6 +83,9 @@ kbd { padding: 1px 3px; font-size: inherit; }
   padding-inline: 5px; background: #1a2b21; color: #f0f3d2;
   font-size: clamp(11px, 2vw, 14px);
 }
+.lyric[data-prompt=true] {
+  background: #d7e4a1; color: #192c20; font-weight: 800;
+}
 .lyric:empty { background: transparent; }
 button:disabled { opacity: .55; cursor: default; }
 
