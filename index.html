@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1a1d17">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./touch.png">
+<link rel="icon" href="./icon-192.png">
+<title>Tamago</title>
+</head>
+<body>
+<main class="device">
+  <header><p class="eyebrow">VIRTUAL PET</p><h1>TAMAGO</h1><span class="lamp" aria-hidden="true"></span></header>
+  <section class="bezel" aria-label="Display LCD">
+    <div class="lcd">
+      <div class="display-top"><span id="stage">UOVO</span><span id="clock"></span></div>
+      <canvas width="160" height="88" aria-label="Creatura Tamago"></canvas>
+      <div class="meter"><label for="fullness">SAZIETÀ</label><progress id="fullness" max="100" value="100"></progress></div>
+      <p id="message" role="status">L’uovo si muove…</p>
+    </div>
+  </section>
+  <div class="menu" id="actions" aria-label="Azioni"></div>
+  <div class="controls">
+    <button id="select" type="button"><b aria-hidden="true">›</b>Seleziona</button>
+    <button id="confirm" type="button"><b aria-hidden="true">●</b>Conferma</button>
+    <button id="back" type="button"><b aria-hidden="true">↶</b>Indietro</button>
+  </div>
+  <footer><button id="sound" type="button" aria-pressed="false">Audio spento</button><button id="stats" type="button" aria-expanded="false" aria-controls="details">Bisogni</button></footer>
+  <dl id="details" hidden></dl>
+</main>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
