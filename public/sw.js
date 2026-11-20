@@ -13,6 +13,7 @@ self.addEventListener('install', event => {
     const cache = await caches.open(activeCache);
     await cache.addAll([...staticFiles, ...assets].map(path => new Request(new URL(path, scope), {cache:'reload'})));
     await cache.put(shell, response);
+    await self.skipWaiting();
   })());
 });
 
@@ -27,7 +28,18 @@ self.addEventListener('fetch', event => {
   const {request} = event;
   if (request.method !== 'GET' || !request.url.startsWith(scope)) return;
   event.respondWith((async () => {
-    const key = request.mode === 'navigate' ? shell : request;
-    return (await (await caches.open(activeCache)).match(key)) ?? fetch(request);
+    const cache = await caches.open(activeCache);
+    if (request.mode === 'navigate') {
+      try {
+        const fresh = await fetch(request, {cache: 'no-cache'});
+        if (fresh.ok) return fresh;
+        return (await cache.match(shell)) ?? fresh;
+      } catch (error) {
+        const saved = await cache.match(shell);
+        if (saved) return saved;
+        throw error;
+      }
+    }
+    return (await cache.match(request)) ?? fetch(request);
   })());
 });
