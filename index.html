@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="tamago-soundtrack" content="./the-fly-has-ai.mp3">
 <meta name="theme-color" content="#202f24">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./touch.png">
@@ -20,6 +21,9 @@
       <output id="strands" aria-label="Fili fissati">0 / 6 fili</output>
     </div>
     <div class="tools">
+      <button id="start" type="button">Avvia</button>
+      <button id="pause" type="button" aria-pressed="false" disabled>Pausa</button>
+      <button id="calibrate" type="button">Sincronizza</button>
       <button id="sound" type="button" aria-pressed="true">Audio On</button>
     </div>
   </header>
@@ -27,10 +31,26 @@
     <canvas id="world" width="360" height="204" aria-label="Ragno, mosca e ragnatele"></canvas>
   </section>
   <footer>
-    <p id="message" role="status">Collega il joypad PlayStation e premi un tasto.</p>
-    <p>Sinistro: corri sulle superfici, ↑ risali, ↓ stacca dal filo · Destro: mira · <kbd>R1</kbd> Tela · <kbd>L1</kbd> Salto / doppio salto</p>
+    <p id="lyric" class="lyric" lang="en"></p>
+    <p id="message" role="status">Collega il joypad PlayStation e seleziona Avvia.</p>
+    <p>Sinistro: corri sulle superfici, ↑ risali, ↓ stacca dal filo · Destro: mira · <kbd>R1</kbd> Tela · <kbd>L1</kbd> Salto / doppio salto · <kbd>Options</kbd> Pausa</p>
   </footer>
 </main>
+<dialog id="calibration" aria-labelledby="calibration-title">
+  <h2 id="calibration-title">Sincronizza il brano</h2>
+  <p>Scegli una riga e premi Segna al suo inizio. Il pannello passa alla riga successiva. Segnando «Left stick moves» aggiorni anche il punto del loop.</p>
+  <audio controls preload="metadata" id="calibration-audio"></audio>
+  <label for="calibration-line">Riga da segnare</label>
+  <select id="calibration-line"></select>
+  <p id="calibration-time" role="status"></p>
+  <div class="calibration-actions">
+    <button type="button" id="calibration-seek">Vai alla riga</button>
+    <button type="button" id="calibration-mark">Segna</button>
+    <button type="button" id="calibration-reset">Tempi originali</button>
+    <button type="button" id="calibration-save">Salva</button>
+    <button type="button" id="calibration-close">Chiudi</button>
+  </div>
+</dialog>
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

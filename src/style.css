@@ -29,3 +29,21 @@ canvas { display: block; width: 100%; height: 100%; object-fit: contain; image-r
 footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 5px 16px; }
 footer p { margin: 0; font-size: clamp(9px, 1.4vw, 12px); line-height: 1.5; }
 kbd { padding: 1px 3px; font-size: inherit; }
+
+.lyric {
+  flex: 0 0 100%; min-height: 1.55em; text-align: center;
+  padding-inline: 5px; background: #1a2b21; color: #f0f3d2;
+  font-size: clamp(11px, 2vw, 14px);
+}
+.lyric:empty { background: transparent; }
+button:disabled { opacity: .55; cursor: default; }
+
+dialog {
+  width: min(540px, calc(100% - 24px)); border: 1px solid var(--border);
+  background: var(--panel); color: inherit; padding: 16px; font-size: 13px;
+}
+dialog::backdrop { background: #102119c9; }
+dialog h2 { margin: 0; font-size: 16px; }
+dialog audio, dialog select { width: 100%; margin: 5px 0; }
+dialog select { font: inherit; padding: 5px; }
+.calibration-actions { display: flex; flex-wrap: wrap; gap: 6px; }

@@ -10,10 +10,7 @@ export class Soundscape {
   private master?: GainNode;
   private buzzing?: GainNode;
   private flyTone?: OscillatorNode;
-  private announced = false;
   private paused = false;
-  private nextBeat = 0;
-  private beat = 0;
   private pending: {effect:Sound; delay:number; at:number}[] = [];
 
   constructor(private enabled: boolean) {}
@@ -36,25 +33,22 @@ export class Soundscape {
     }
   }
 
-  unlock() {
-    if (!this.enabled || this.paused) return;
+  audioContext() {
     try {
       if (!this.context) this.setup();
-      const ctx = this.context;
-      if (!ctx) return;
-      const announce = () => {
-        if (ctx.state !== 'running' || !this.enabled || this.paused) return;
-        if (!this.announced) {
-          this.announced = true;
-          this.play('start');
-        }
-        for (const {effect,delay,at} of this.pending.splice(0)) {
-          if (performance.now()-at < 400) this.play(effect,delay);
-        }
-      };
-      if (ctx.state === 'running') announce();
-      else void ctx.resume().then(announce).catch(() => {});
-    } catch { /* Unsupported audio leaves the game playable. */ }
+      return this.context;
+    } catch { /* The silent timeline remains available without Web Audio. */ }
+  }
+
+  unlock() {
+    const ctx = this.audioContext();
+    if (!ctx || ctx.state === 'running') return;
+    void ctx.resume().then(() => {
+      if (!this.enabled || this.paused) return;
+      for (const {effect,delay,at} of this.pending.splice(0)) {
+        if (performance.now()-at < 400) this.play(effect,delay);
+      }
+    }).catch(() => {});
   }
 
   private setup() {
@@ -64,7 +58,7 @@ export class Soundscape {
     const ctx = new Type();
     this.context = ctx;
     const master = ctx.createGain();
-    master.gain.value = .72;
+    master.gain.value = this.enabled && !this.paused ? .72 : 0;
     master.connect(ctx.destination);
     this.master = master;
 
@@ -79,7 +73,7 @@ export class Soundscape {
     filter.frequency.value = 350;
     filter.Q.value = .65;
     const wind = ctx.createGain();
-    wind.gain.value = .17;
+    wind.gain.value = .04;
     rustle.connect(filter).connect(wind).connect(master);
     rustle.start();
 
@@ -103,32 +97,6 @@ export class Soundscape {
     const strength = Math.max(0,1 - distance / 85);
     this.buzzing.gain.setTargetAtTime(strength * .027,ctx.currentTime,.075);
     this.flyTone.frequency.setTargetAtTime(122 + Math.sin(time * .014) * 15,ctx.currentTime,.075);
-  }
-
-  resetMusic() {
-    this.nextBeat = 0;
-    this.beat = 0;
-  }
-
-  music(remaining: number) {
-    const ctx = this.context;
-    if (!this.enabled || this.paused || !ctx || ctx.state !== 'running' || !this.master ||
-      ctx.currentTime < this.nextBeat) return;
-    const stress = 1-Math.min(1,remaining/20);
-    const time = ctx.currentTime;
-    const melody = [196,0,247,294,0,247,220,0];
-    const frequency = melody[this.beat++ % melody.length] || (stress>.28 ? 147 : 0);
-    this.nextBeat = time + .62-stress*.36;
-    if (!frequency) return;
-    const tone = ctx.createOscillator();
-    const envelope = ctx.createGain();
-    tone.frequency.value = frequency;
-    envelope.gain.setValueAtTime(.001,time);
-    envelope.gain.linearRampToValueAtTime(.035+stress*.024,time+.022);
-    envelope.gain.exponentialRampToValueAtTime(.001,time+.22);
-    tone.connect(envelope).connect(this.master);
-    tone.start(time);
-    tone.stop(time+.23);
   }
 
   play(effect: Sound, delay = 0) {
