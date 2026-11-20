@@ -16,6 +16,7 @@
   <header class="hud">
     <div><span class="brand">TAMAGO</span><h1>Il sentiero di seta</h1></div>
     <div class="tools">
+      <output id="web-count" aria-label="Ragnatela">0 fili · 0 mosche</output>
       <button id="sound" type="button" aria-pressed="true">Audio On</button>
       <details id="tuning">
         <summary>Fisica</summary>
@@ -36,7 +37,12 @@
     <div id="stick" role="group" aria-label="Analogico: sposta, mira, risali o stacca">
       <span class="stick-nub" aria-hidden="true"></span>
     </div>
-    <button id="silk" type="button" aria-label="Tela: tieni per mirare, rilascia per tirare">Tela</button>
+    <div class="aim-controls">
+      <button id="silk" type="button" aria-label="Tela: rilascia per tirare nella direzione del mirino">Tela</button>
+      <div id="aim-stick" role="group" aria-label="Analogico destro: orienta il mirino">
+        <span class="stick-nub" aria-hidden="true"></span>
+      </div>
+    </div>
   </div>
   <p class="rotate">Ruota il telefono per giocare in orizzontale.</p>
 </main>
