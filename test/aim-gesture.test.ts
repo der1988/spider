@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {AimGesture} from '../src/aim-gesture.ts';
+import {AimGesture, silkMotion} from '../src/aim-gesture.ts';
 
 test('the gesture ignores center noise and fires on release using the last valid angle', () => {
   const gesture = new AimGesture();
@@ -29,4 +29,12 @@ test('stick bounce cannot fire twice, a neutral pause allows a second air launch
   gesture.reset(true);
   gesture.sample({x:.95,y:0},300);
   assert.equal(gesture.sample({x:0,y:0},320),undefined);
+});
+
+test('a swing diagonal does not detach, straight down detaches once and up reels', () => {
+  assert.deepEqual(silkMotion({x:.71,y:.71},false),{down:false,detach:false,reel:false});
+  assert.deepEqual(silkMotion({x:.3,y:.9},false),{down:true,detach:true,reel:false});
+  assert.deepEqual(silkMotion({x:0,y:.64},true),{down:true,detach:false,reel:false});
+  assert.equal(silkMotion({x:0,y:.4},true).down,false);
+  assert.deepEqual(silkMotion({x:0,y:-.8},false),{down:false,detach:false,reel:true});
 });

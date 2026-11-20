@@ -6,6 +6,8 @@ interface View {
   camera: Point;
   time: number;
   aim: Point;
+  anchors: Point[];
+  extended: boolean;
   aiming: boolean;
   stride: number;
   walkingInput: boolean;
@@ -157,6 +159,11 @@ function surface(ctx: CanvasRenderingContext2D, item: Surface, camera: Point) {
   block(ctx, x, y, width, 2, color.dark);
   block(ctx, x + 1, y + 2, Math.max(1, width - 2), 1, color.moss);
 
+  if (item.bridge) {
+    const mark = x + (item.kind === 'earth' ? width-17 : 5);
+    block(ctx,mark,y-3,7,2,color.silk);
+    block(ctx,mark+3,y-5,1,5,color.silk);
+  }
   if (item.grip) {
     const middle = x + Math.round(width / 2);
     block(ctx, middle - 4, y + 3, 9, 1, color.glow);
@@ -294,6 +301,19 @@ export function drawScene(ctx: CanvasRenderingContext2D, area: Area, spider: Spi
     block(ctx, find.x + 10, find.y - 4, 1, 2, color.silk);
   }
 
+  if (!view.web.reward) {
+    const seed = local(area.bridgeDiscovery);
+    const glimmer = Math.floor(view.time/290) % 2;
+    pixelSprite(ctx,relic,seed.x-6,seed.y-5-glimmer);
+  }
+  for (const anchor of view.anchors) {
+    const p = local(anchor);
+    for (const [x,y] of [[0,-8],[8,0],[0,8],[-8,0]]) {
+      const q = {x:p.x+x,y:p.y+y};
+      line(ctx,q,{x:p.x-y,y:p.y+x},color.dark);
+    }
+    block(ctx,p.x-1,p.y-1,3,3,color.silk);
+  }
   const p = local(spider);
   for (const thread of view.web.strands) {
     const from = local(thread.from);
@@ -305,7 +325,8 @@ export function drawScene(ctx: CanvasRenderingContext2D, area: Area, spider: Spi
       line(ctx,from,middle,color.leaf);
       line(ctx,middle,to,color.leaf);
     } else {
-      line(ctx,from,to,color.moss);
+      if (thread.bearing) line(ctx,{x:from.x,y:from.y+1},{x:to.x,y:to.y+1},color.dark);
+      line(ctx,from,to,thread.bearing ? color.silk : color.moss);
     }
     for (const end of [from,to]) block(ctx,end.x-1,end.y-1,3,3,color.middle);
   }
@@ -315,7 +336,9 @@ export function drawScene(ctx: CanvasRenderingContext2D, area: Area, spider: Spi
     line(ctx,anchor,middle,color.middle);
     line(ctx,middle,p,color.middle);
   }
-  for (const fly of view.web.flies) drawFly(ctx,local(fly.position),view.time,fly.caughtAt);
+  for (const fly of view.web.flies) {
+    if (fly.returnsAt === undefined) drawFly(ctx,local(fly.position),view.time,fly.caughtAt);
+  }
   if (spider.rope) {
     const anchor = local(spider.rope);
     line(ctx, p, anchor, color.silk);
@@ -329,7 +352,12 @@ export function drawScene(ctx: CanvasRenderingContext2D, area: Area, spider: Spi
     if (view.shot.hit) reticle(ctx, tip, true);
   }
   if (view.aiming) {
-    reticle(ctx,local(view.hit ?? view.aim),Boolean(view.hit));
+    const target = local(view.hit ?? view.aim);
+    reticle(ctx,target,Boolean(view.hit));
+    if (view.extended) {
+      block(ctx,target.x-7,target.y-7,2,2,color.dark);
+      block(ctx,target.x+6,target.y+6,2,2,color.dark);
+    }
   } else {
     const aim = local(view.hit ?? view.aim);
     block(ctx,aim.x-1,aim.y,3,1,view.hit ? color.silk : color.bark);

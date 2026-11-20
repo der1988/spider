@@ -7,6 +7,13 @@ export interface Rect extends Point {
   w: number
   h: number
   grip?: boolean
+  bridge?: boolean
+}
+
+export interface WalkLine {
+  from: Point
+  to: Point
+  bearing?: true
 }
 
 interface Rope extends Point {
@@ -19,6 +26,7 @@ export interface Spider extends Point {
   grounded: boolean
   facing: -1 | 1
   rope?: Rope
+  thread?: WalkLine
 }
 
 interface Input {
@@ -179,7 +187,37 @@ function constrainRope(spider: Spider, surfaces: readonly Rect[], rope: Rope) {
   spider.vy -= outward * ny
 }
 
-function step(spider: Spider, surfaces: readonly Rect[], input: Input, dt: number, tuning: Tuning) {
+export function threadFloor(line: WalkLine, x: number, margin = 0): number | undefined {
+  const {from,to} = line
+  if (Math.abs(to.x-from.x) < 4 || x < Math.min(from.x,to.x)-margin || x > Math.max(from.x,to.x)+margin) return
+  const low = from.y >= to.y ? from : to
+  const high = low === from ? to : from
+  const width = Math.abs(high.x-low.x)
+  const progress = Math.max(0,(x-low.x)*Math.sign(high.x-low.x))
+  // Lead with the front feet so the body clears the lip of an uphill landing.
+  const lead = Math.min(SPIDER_HALF_WIDTH+1,4*width/Math.max(1,Math.abs(high.y-low.y)))
+  const t = Math.min(1,(progress+Math.min(progress*.5,lead))/width)
+  return low.y + (high.y-low.y)*t
+}
+
+function walkThread(spider: Spider, surfaces: readonly Rect[], threads: readonly WalkLine[], dx: number) {
+  if (!spider.grounded || spider.rope) return
+  const feet = spider.y+SPIDER_HALF_HEIGHT
+  const nextX = spider.x+dx
+  let support: {line: WalkLine; height:number} | undefined
+  for (const line of threads) {
+    const old = threadFloor(line,spider.x,.75)
+    const height = threadFloor(line,nextX)
+    if (old === undefined || height === undefined || Math.abs(feet-old)>1.1) continue
+    if (!support || (line.bearing && !support.line.bearing) ||
+      line.bearing === support.line.bearing && height < support.height) support = {line,height}
+  }
+  if (!support) return
+  moveAxis(spider,surfaces,'y',Math.min(0,support.height-feet))
+  return support.line
+}
+
+function step(spider: Spider, surfaces: readonly Rect[], input: Input, dt: number, tuning: Tuning, threads: readonly WalkLine[]) {
   const move = Math.max(-1, Math.min(1, input.move))
   const direction = move < 0 ? -1 : 1
   if (move) spider.facing = direction
@@ -192,9 +230,26 @@ function step(spider: Spider, surfaces: readonly Rect[], input: Input, dt: numbe
   }
 
   spider.vy = Math.min(320, spider.vy + tuning.gravity * dt)
-  moveAxis(spider, surfaces, 'x', spider.vx * dt)
-  const floor = spider.vy > 0 && moveAxis(spider, surfaces, 'y', spider.vy * dt)
-  if (spider.vy < 0) moveAxis(spider, surfaces, 'y', spider.vy * dt)
+  const dx = spider.vx * dt
+  const follow = walkThread(spider,surfaces,threads,dx)
+  moveAxis(spider,surfaces,'x',dx)
+  const feet = spider.y+SPIDER_HALF_HEIGHT
+  let thread: WalkLine | undefined
+  let travel = spider.vy * dt
+  if (!spider.rope && travel >= 0) {
+    for (const line of threads) {
+      const y = threadFloor(line,spider.x)
+      if (y === undefined || y < feet-EPSILON || (line !== follow && y > feet+travel)) continue
+      if (!thread || y-feet < travel) {
+        thread = line
+        travel = Math.max(0,y-feet)
+      }
+    }
+  }
+  const floor = travel > 0 && moveAxis(spider,surfaces,'y',travel)
+  if (travel < 0) moveAxis(spider,surfaces,'y',travel)
+  if (thread && !floor) spider.vy = 0
+  spider.thread = floor ? undefined : thread
 
   const rope = spider.rope
   if (rope) {
@@ -208,7 +263,7 @@ function step(spider: Spider, surfaces: readonly Rect[], input: Input, dt: numbe
     }
   }
 
-  spider.grounded = floor && surfaces.some(surface =>
+  spider.grounded = !!spider.thread || floor && surfaces.some(surface =>
     Math.abs(spider.y + SPIDER_HALF_HEIGHT - surface.y) < EPSILON &&
     spider.x + SPIDER_HALF_WIDTH > surface.x + EPSILON &&
     spider.x - SPIDER_HALF_WIDTH < surface.x + surface.w - EPSILON,
@@ -221,10 +276,11 @@ export function tickSpider(
   input: Input,
   dtSeconds: number,
   overrides?: Partial<Tuning>,
+  threads: readonly WalkLine[] = [],
 ) {
   if (!Number.isFinite(dtSeconds) || dtSeconds <= 0) return
   const tuning = overrides ? {...DEFAULT_TUNING, ...overrides} : DEFAULT_TUNING
   const elapsed = Math.min(dtSeconds, 0.05)
   const steps = Math.ceil(elapsed / STEP)
-  for (let index = 0; index < steps; index++) step(spider, surfaces, input, elapsed / steps, tuning)
+  for (let index = 0; index < steps; index++) step(spider, surfaces, input, elapsed / steps, tuning, threads)
 }

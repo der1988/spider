@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {area} from '../src/area.ts';
 import {createSpider, detach, shoot, tickSpider, DEFAULT_TUNING} from '../src/spider.ts';
-import {createWeb, fixSilk, leaveSilk, tickFlies} from '../src/threads.ts';
+import {availableAnchors, buildBridge, createWeb, fixSilk, leaveSilk, recoverFlies, saveWeb, tickFlies} from '../src/threads.ts';
 
 test('one crossing can fix two strands in world coordinates and the gap flies hit a strand', () => {
   const web = createWeb();
@@ -55,4 +55,44 @@ test('loose silk cannot attach out of range or through a solid obstruction', () 
   const obstacle = {x:-10,y:30,w:40,h:20};
   assert.equal(fixSilk(web,{x:10,y:72},[floor,obstacle]),0);
   assert.equal(web.strands.length,0);
+});
+
+test('a fly collected on a strand funds a durable bridge that can be walked both ways', () => {
+  let web = createWeb();
+  let spider = createSpider(area.spawn);
+  const step = (move: number) =>
+    tickSpider(spider,area.surfaces,{move,reel:false},1/120,undefined,web.strands);
+  step(0);
+  assert.ok(shoot(spider,area.surfaces,{x:79,y:80}));
+  assert.ok(spider.rope);
+  leaveSilk(web,spider.rope,DEFAULT_TUNING.range);
+  detach(spider);
+  assert.equal(fixSilk(web,spider,area.surfaces),1);
+  for (let i=1; i<=600; i++) tickFlies(web,i/120,i*1000/120);
+  assert.equal(recoverFlies(web,spider,5000),0);
+  for (let i=0; i<150 && web.silk===0; i++) {
+    step(1);
+    recoverFlies(web,spider,5000+i*1000/120);
+  }
+  assert.equal(web.silk,1);
+  assert.ok(spider.thread);
+  assert.equal(recoverFlies(web,spider,6000),0);
+  for (let i=0; i<80 && (spider.x>45 || spider.y!==143); i++) step(-1);
+  for (let i=0; i<30; i++) step(0);
+  assert.equal(buildBridge(web,spider,area.surfaces,{x:79,y:80},DEFAULT_TUNING.range),undefined);
+  assert.equal(web.silk,1);
+  web = createWeb(saveWeb(web));
+  assert.equal(web.silk,1);
+  const [target] = availableAnchors(web,spider,area.surfaces,DEFAULT_TUNING.range);
+  assert.ok(target);
+  const bridge = buildBridge(web,spider,area.surfaces,target,DEFAULT_TUNING.range);
+  assert.ok(bridge?.bearing);
+  assert.equal(web.silk,0);
+
+  web = createWeb(saveWeb(web));
+  spider = createSpider({x:bridge.from.x,y:bridge.from.y-8});
+  for (let i=0; i<850 && spider.x<area.bridgeDiscovery.x; i++) step(1);
+  assert.ok(spider.grounded && Math.hypot(spider.x-area.bridgeDiscovery.x,spider.y-area.bridgeDiscovery.y)<15);
+  for (let i=0; i<850 && spider.x>bridge.from.x+2; i++) step(-1);
+  assert.ok(spider.grounded && spider.x<bridge.from.x+2 && spider.y>135);
 });

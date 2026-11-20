@@ -38,3 +38,8 @@ export class AimGesture {
     this.direction = undefined;
   }
 }
+
+export function silkMotion({x,y}: Point, wasDown: boolean) {
+  const down = wasDown ? y > .55 : y > .65 && y > Math.abs(x)+.17;
+  return {down,detach:down && !wasDown,reel:y < -.5};
+}

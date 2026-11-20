@@ -50,9 +50,6 @@ kbd { background: #c6d29a; border: 1px solid var(--rule); padding: 0 3px; }
     background: #aab974; pointer-events: none;
     transform: translate(var(--stick-x, 0px), var(--stick-y, 0px));
   }
-  .move-controls { display: grid; gap: 5px; }
-  .rope-controls { display: flex; gap: 4px; pointer-events: auto; }
-  .rope-controls button { min-height: 44px; touch-action: none; user-select: none; padding-inline: 5px; }
   #aim-stick[data-aiming=true] { border-color: var(--ink); }
   .controls { inset-inline: max(108px, calc(env(safe-area-inset-left) + 108px)) max(98px, calc(env(safe-area-inset-right) + 98px)); }
 }

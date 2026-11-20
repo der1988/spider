@@ -32,17 +32,11 @@
   <footer class="controls">
     <p id="message" role="status"></p>
     <p class="keys"><kbd>A</kbd><kbd>D</kbd> Muovi <kbd>W</kbd> Risali <kbd>S</kbd> Stacca · Tieni <kbd>Spazio</kbd>, mira con le frecce e rilascia per tirare</p>
-    <p id="gamepad-guide" class="keys" hidden>Stick sinistro: muovi · Stick destro: mira e lascia per tirare · LB/L1: risali · B/○: stacca</p>
+    <p id="gamepad-guide" class="keys" hidden>Sinistro: muovi, ↑ risali, ↓ stacca · Destro: mira e lascia per tirare</p>
   </footer>
   <div class="touch" aria-label="Comandi touch">
-    <div class="move-controls">
-      <div class="rope-controls">
-        <button id="reel" type="button">Risali</button>
-        <button id="unhook" type="button">Stacca</button>
-      </div>
-      <div id="stick" role="group" aria-label="Analogico sinistro: muovi e dai slancio">
-        <span class="stick-nub" aria-hidden="true"></span>
-      </div>
+    <div id="stick" role="group" aria-label="Analogico sinistro: muovi, su risali, giù stacca">
+      <span class="stick-nub" aria-hidden="true"></span>
     </div>
     <div id="aim-stick" role="group" aria-label="Analogico destro: inclina per mirare, rilascia per tirare">
       <span class="stick-nub" aria-hidden="true"></span>

@@ -3,6 +3,7 @@ import type {Point, Rect} from './spider.ts';
 export interface Area {
   surfaces: Array<Rect & {kind:'earth'|'twig'|'leaf'|'root'}>;
   discovery: Point;
+  bridgeDiscovery: Point;
   spawn: Point;
   checkpoints: Point[];
   bounds: {left:number; right:number; bottom:number; top:number};
@@ -18,11 +19,12 @@ export const area: Area = {
     {x:285,y:158},
   ],
   discovery: {x:449,y:1},
+  bridgeDiscovery: {x:308,y:55},
   finish: {x:483,y:158},
   surfaces: [
     // The rametto is the only support above the first gap.
     {x:-65,y:52,w:18,h:104,kind:'root'},
-    {x:-65,y:151,w:121,h:110,kind:'earth'},
+    {x:-65,y:151,w:121,h:110,kind:'earth',bridge:true},
     {x:64,y:76,w:29,h:8,kind:'twig',grip:true},
     {x:101,y:164,w:52,h:8,kind:'leaf'},
     {x:106,y:172,w:46,h:89,kind:'earth'},
@@ -32,6 +34,9 @@ export const area: Area = {
     {x:146,y:113,w:63,h:148,kind:'root'},
     {x:209,y:166,w:319,h:95,kind:'earth'},
     {x:510,y:-85,w:18,h:251,kind:'root'},
+
+    // The elevated landing is beyond a normal cast from the marked starting ledge.
+    {x:274,y:67,w:58,h:8,kind:'leaf',bridge:true},
 
     // Optional high route: transfer from the first grip to the distant canopy.
     {x:232,y:43,w:28,h:8,kind:'twig',grip:true},

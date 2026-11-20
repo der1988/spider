@@ -1,9 +1,10 @@
-import {SPIDER_HALF_HEIGHT, SPIDER_HALF_WIDTH, type Point, type Rect} from './spider.ts';
+import {aimHit, threadFloor, SPIDER_HALF_HEIGHT, SPIDER_HALF_WIDTH, type Point, type Rect, type Spider} from './spider.ts';
 
 export interface Strand {
   from: Point;
   to: Point;
   shakeUntil: number;
+  bearing?: true;
 }
 
 interface LooseEnd {
@@ -16,16 +17,19 @@ interface Fly {
   phase: number;
   position: Point;
   caughtAt?: number;
+  returnsAt?: number;
 }
 
 export interface Web {
   strands: Strand[];
+  silk: number;
+  reward: boolean;
   loose: LooseEnd[];
   flies: Fly[];
 }
 
 const habitats = [
-  {x:99,y:115}, {x:106,y:128}, {x:88,y:103}, {x:121,y:107},
+  {x:66,y:119}, {x:99,y:115}, {x:106,y:128}, {x:88,y:103}, {x:121,y:107},
   {x:244,y:125}, {x:307,y:91}, {x:418,y:50},
 ];
 export const WEB_KEY = 'tamago.web.1';
@@ -45,9 +49,14 @@ export function flyPosition(center: Point, phase: number, time: number): Point {
 
 export function createWeb(serialized?: string | null): Web {
   let strands: Strand[] = [];
+  let silk = 0;
+  let reward = false;
   if (serialized) {
     try {
-      const entries: unknown = JSON.parse(serialized);
+      const record = JSON.parse(serialized);
+      const entries: unknown = Array.isArray(record) ? record : record?.strands;
+      if (Number.isSafeInteger(record?.silk)) silk = clamp(record.silk,0,999);
+      reward = record?.reward === true;
       const point = (p: unknown): p is Point => {
         if (!p || typeof p !== 'object') return false;
         const {x,y} = p as Point;
@@ -56,8 +65,8 @@ export function createWeb(serialized?: string | null): Web {
       if (Array.isArray(entries)) {
         strands = entries.slice(-MAX_STRANDS).flatMap((entry: unknown) => {
           if (!entry || typeof entry !== 'object') return [];
-          const {from,to} = entry as Strand;
-          return point(from) && point(to) && distance(from,to) >= 9 ? [{from,to,shakeUntil:0}] : [];
+          const {from,to,bearing} = entry as Strand;
+          return point(from) && point(to) && distance(from,to) >= 9 ? [{from,to,shakeUntil:0,...(bearing === true ? {bearing:true as const} : {})}] : [];
         });
       }
     } catch { /* An invalid local record starts with an empty web. */ }
@@ -66,7 +75,7 @@ export function createWeb(serialized?: string | null): Web {
     const phase = index * 1.39;
     return {center,phase,position:flyPosition(center,phase,0)};
   });
-  return {strands,flies,loose:[]};
+  return {strands,flies,loose:[],silk,reward};
 }
 
 function sweptHit(from: Point, to: Point, strand: Strand) {
@@ -149,6 +158,12 @@ export function fixSilk(web: Web, body: Point, surfaces: readonly Rect[]) {
 export function tickFlies(web: Web, seconds: number, time: number) {
   const caught: Point[] = [];
   for (const fly of web.flies) {
+    if (fly.returnsAt !== undefined) {
+      if (fly.returnsAt > time) continue;
+      fly.returnsAt = undefined;
+      fly.caughtAt = undefined;
+      fly.position = flyPosition(fly.center,fly.phase,seconds);
+    }
     if (fly.caughtAt !== undefined) continue;
     const next = flyPosition(fly.center,fly.phase,seconds);
     let first: { t:number; point:Point; strand:Strand } | undefined;
@@ -164,4 +179,111 @@ export function tickFlies(web: Web, seconds: number, time: number) {
     }
   }
   return caught;
+}
+
+export function saveWeb(web: Web) {
+  return JSON.stringify({
+    strands:web.strands.map(({from,to,bearing}) => ({from,to,bearing})),
+    silk:web.silk,reward:web.reward,
+  });
+}
+
+export function recoverFlies(web: Web, spider: Spider, time: number) {
+  let recovered = 0;
+  for (const fly of web.flies) {
+    if (fly.caughtAt === undefined || fly.returnsAt !== undefined) continue;
+    const feet = {x:spider.x,y:spider.y+SPIDER_HALF_HEIGHT};
+    if (distance(fly.position,feet) > 10 && distance(fly.position,spider) > 9) continue;
+    fly.returnsAt = time + 8000;
+    recovered++;
+  }
+  web.silk = Math.min(999,web.silk+recovered);
+  return recovered;
+}
+
+const EXTENSION = 125;
+
+function bridgeOrigin(spider: Spider, surfaces: readonly Rect[]) {
+  if (!spider.grounded || spider.rope) return;
+  return surfaces.find(r => r.bridge && Math.abs(spider.y+SPIDER_HALF_HEIGHT-r.y) < 1 &&
+    spider.x >= r.x && spider.x <= r.x+r.w);
+}
+
+function tryBridge(spider: Spider, source: Rect, surfaces: readonly Rect[], target: Point, range: number) {
+  const hit = aimHit(spider,surfaces.map(r => ({...r,grip:r.bridge || r.grip})),target,{range:range+EXTENSION});
+  if (!hit || distance(spider,hit) <= range) return;
+  const destination = surfaces.find(r => r !== source && r.bridge &&
+    hit.x >= r.x-.01 && hit.x <= r.x+r.w+.01 && hit.y >= r.y-.01 && hit.y <= r.y+r.h+.01);
+  if (!destination) return;
+  const from = {x:spider.x,y:source.y};
+  const to = {x:spider.x < destination.x ? destination.x : destination.x+destination.w,y:destination.y};
+  if (distance(from,to) <= range || distance(from,to) > range+EXTENSION ||
+    Math.abs(from.x-to.x) < 32 || surfaces.some(r => crossesSolid(from,to,r))) return;
+  const strand = {from,to,bearing:true as const,shakeUntil:0};
+  const minX = Math.min(from.x,to.x);
+  const maxX = Math.max(from.x,to.x);
+  for (let x=minX; x<=maxX; x+=.5) {
+    const feet = threadFloor(strand,x)!;
+    if (surfaces.some(r => x+SPIDER_HALF_WIDTH > r.x+.15 && x-SPIDER_HALF_WIDTH < r.x+r.w-.15 &&
+      feet > r.y+.15 && feet-2*SPIDER_HALF_HEIGHT < r.y+r.h-.15)) return;
+  }
+  return strand;
+}
+
+function freshBridge(web: Web, candidate: Strand | undefined) {
+  if (!candidate || web.strands.some(strand => strand.bearing &&
+    ((distance(strand.from,candidate.from)<3 && distance(strand.to,candidate.to)<3) ||
+     (distance(strand.to,candidate.from)<3 && distance(strand.from,candidate.to)<3)))) return;
+  return candidate;
+}
+
+function bridgeOptions(web: Web, spider: Spider, source: Rect, surfaces: readonly Rect[], range: number) {
+  return surfaces.filter(r => r.bridge && r !== source).flatMap(r => {
+    const left = spider.x < r.x;
+    const nearX = left ? r.x : r.x+r.w;
+    for (const inward of [1,6,14,25]) {
+      const point = {x:nearX+(left ? inward : -inward),y:r.y+r.h/2};
+      const candidate = freshBridge(web,tryBridge(spider,source,surfaces,point,range));
+      if (candidate) return [{point,candidate}];
+    }
+    return [];
+  });
+}
+
+export function bridgePreview(web: Web, spider: Spider, surfaces: readonly Rect[], target: Point, range: number) {
+  if (!web.silk || web.strands.length >= MAX_STRANDS) return;
+  const source = bridgeOrigin(spider,surfaces);
+  if (!source || aimHit(spider,surfaces,target,{range})) return;
+  const direct = freshBridge(web,tryBridge(spider,source,surfaces,target,range));
+  if (direct) return direct;
+  // A remote leaf is only a few degrees tall. Snap inside its visible marker.
+  const aim = difference(target,spider);
+  const length = Math.hypot(aim.x,aim.y);
+  if (length < 1) return;
+  let best = Math.cos(Math.PI/30);
+  let chosen: Strand | undefined;
+  for (const {point,candidate} of bridgeOptions(web,spider,source,surfaces,range)) {
+    const offset = difference(point,spider);
+    const score = (offset.x*aim.x+offset.y*aim.y)/(length*Math.hypot(offset.x,offset.y));
+    if (score > best) {
+      best = score;
+      chosen = candidate;
+    }
+  }
+  return chosen;
+}
+
+export function availableAnchors(web: Web, spider: Spider, surfaces: readonly Rect[], range: number) {
+  if (!web.silk || web.strands.length >= MAX_STRANDS) return [];
+  const source = bridgeOrigin(spider,surfaces);
+  if (!source) return [];
+  return bridgeOptions(web,spider,source,surfaces,range).map(option => option.point);
+}
+
+export function buildBridge(web: Web, spider: Spider, surfaces: readonly Rect[], target: Point, range: number) {
+  const strand = bridgePreview(web,spider,surfaces,target,range);
+  if (!strand) return;
+  web.strands.push(strand);
+  web.silk--;
+  return strand;
 }
