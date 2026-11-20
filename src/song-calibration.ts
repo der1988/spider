@@ -1,5 +1,5 @@
 import {defaultTiming,saveTiming,type SongTiming} from './song-cues';
-import {captions,controlsCue} from './song-timing';
+import {captions,loopCue} from './song-timing';
 
 export function bindCalibration(
   dialog: HTMLDialogElement, bytes: Promise<ArrayBuffer|undefined>, current: () => SongTiming,
@@ -44,7 +44,7 @@ export function bindCalibration(
     const index=selected();
     const time=Math.round(player.currentTime*1000)/1000;
     draft.starts[index]=time;
-    if (index===controlsCue) draft.loopStart=time;
+    if (index===loopCue) draft.loopStart=time;
     line.selectedIndex=Math.min(index+1,captions.length-1);
     message.textContent='Riga '+(index+1)+' segnata a '+time.toFixed(3)+' s.';
   };

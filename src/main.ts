@@ -1,14 +1,13 @@
 import './style.css';
 import {DEFAULT_TUNING,type Point} from './spider';
 import {anchorCrawlerRope,castCrawler,closeCrawlerRopes,createCrawler,jumpCrawler,tickCrawler} from './crawler';
-import {capStrands,createHunt,LIMIT,platforms,spawn,tickHunt,WEB_SECONDS} from './hunt';
+import {capStrands,createHunt,LIMIT,platforms,ROUND,spawn,tickHunt,WEB_SECONDS} from './hunt';
 import {fixSilk,leaveSilk,WEB_KEY} from './threads';
 import {renderHunt} from './hunt-render';
 import {samplePlayStation,silkMotion} from './pad-controls';
 import {Soundscape} from './soundscape';
 import {Soundtrack} from './soundtrack';
-import {beatAt, loadTiming, lyricAt, openingShot} from './song-cues';
-import {controlsCue} from './song-timing';
+import {beatAt, huntStart, loadTiming, lyricAt, openingShot} from './song-cues';
 import {bindCalibration} from './song-calibration';
 
 const get = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -16,6 +15,9 @@ const context = get<HTMLCanvasElement>('world').getContext('2d',{alpha:false})!;
 const message = get('message');
 const levelLabel = get('level');
 const timeLabel = get('time');
+const clock = get('clock');
+const clockMeter = get('clock-meter');
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const scoreLabel = get('score');
 const strandsLabel = get('strands');
 const sound = get<HTMLButtonElement>('sound');
@@ -205,7 +207,7 @@ function frame(time: number) {
   }
   song.connect(contextAudio);
   const position = song.time;
-  if (opening && song.started && position>=timing.starts[controlsCue]) {
+  if (opening && song.started && position>=huntStart(timing)) {
     opening=false;
     say(gamepad ? intro : waiting);
   }
@@ -242,9 +244,16 @@ function frame(time: number) {
   const labels = [[levelLabel,'Livello '+level],[timeLabel,seconds+' s'],[scoreLabel,hunt.score+(hunt.score===1 ? ' cattura' : ' catture')],
     [strandsLabel,hunt.strands.length+' / '+LIMIT+' fili']] as const;
   for (const [element,text] of labels) if (element.textContent!==text) element.textContent=text;
-  timeLabel.dataset.urgent=String(seconds<=5 && hunt.phase!=='caught');
+  const beat = reduceMotion.matches ? 0 : beatAt(position);
+  const pulse = beat.toFixed(2);
+  if (clock.style.getPropertyValue('--pulse')!==pulse) clock.style.setProperty('--pulse',pulse);
+  const phase = opening ? 'ready' : hunt.phase==='caught' ? 'running' :
+    seconds<=5 ? 'urgent' : hunt.time<20 ? 'low' : 'running';
+  if (clock.dataset.phase!==phase) clock.dataset.phase=phase;
+  const remaining = (hunt.time/ROUND).toFixed(3);
+  if (clockMeter.style.getPropertyValue('--remaining')!==remaining) clockMeter.style.setProperty('--remaining',remaining);
   renderHunt(context,hunt,spider,aimDirection,{
-    time:position, beat:beatAt(position), shot:opening && song.started ? openingShot(position,timing) : undefined,
+    time:position, beat, shot:opening && song.started ? openingShot(position,timing) : undefined,
   });
   requestAnimationFrame(frame);
 }

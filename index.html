@@ -13,12 +13,20 @@
 <body>
 <main class="shell">
   <header>
-    <h1>Tamago</h1>
-    <div class="scores">
-      <span id="level" class="level">Livello 1</span>
-      <output id="time" aria-label="Secondi rimanenti">60 s</output>
-      <output id="score" aria-label="Catture">0 catture</output>
-      <output id="strands" aria-label="Fili fissati">0 / 6 fili</output>
+    <div class="hunt-info">
+      <h1>Tamago</h1>
+      <div class="scores">
+        <span id="level" class="level">Livello 1</span>
+        <output id="score" aria-label="Catture">0 catture</output>
+        <output id="strands" aria-label="Fili fissati">0 / 6 fili</output>
+      </div>
+    </div>
+    <div id="clock" class="clock" data-phase="ready">
+      <span class="clock-caption" aria-hidden="true">Tempo</span>
+      <span class="clock-rhythm" aria-hidden="true"></span>
+      <output id="time" aria-label="Secondi rimanenti" aria-live="off">60 s</output>
+      <span class="clock-rhythm" aria-hidden="true"></span>
+      <div class="clock-track" aria-hidden="true"><span id="clock-meter"></span></div>
     </div>
     <div class="tools">
       <button id="start" type="button">Avvia</button>

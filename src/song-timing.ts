@@ -1,7 +1,8 @@
 // Seconds in the decoded MP3. Edit these cues or adjust them in Sincronizza.
 export const defaultLoopStart = 15.330;
 export const loopEnd = 240.566;
-export const controlsCue = 5;
+export const clockCue = 4;
+export const loopCue = 5;
 export const captions: readonly (readonly [start: number,end: number,text: string])[] = [
   [3.492, 4.412, "This is the spider."],
   [5.632, 6.512, "This is the fly."],

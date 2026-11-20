@@ -18,6 +18,32 @@ function line(ctx: CanvasRenderingContext2D,a: Point,b: Point,color: string,dott
     block(ctx,a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,1,1,color);
   }
 }
+const canopy = [25,72,115,161,207,255,300,338];
+const spores = [
+  [31,57],[56,108],[81,32],[114,124],[136,84],[164,42],[185,163],
+  [202,66],[224,126],[251,34],[277,103],[307,58],[332,131],
+];
+
+function rhythmDetails(ctx: CanvasRenderingContext2D,beat: number) {
+  canopy.forEach((x,i) => {
+    const side = i%2 ? 1 : -1;
+    const length = 10+i%3*3;
+    const tip = x+side*(7+Math.round(beat*3));
+    line(ctx,{x,y:7},{x:tip,y:length+6},'#92a76c');
+    block(ctx,tip-2,length+4,5,2,'#92a76c');
+    block(ctx,tip+side*2-1,length+6,3,2,'#a6b976');
+  });
+  spores.forEach(([x,y],i) => {
+    const rise = Math.round(beat*(2+i%2));
+    const shade = beat>.3 ? '#cfdca0' : '#aebf82';
+    block(ctx,x,y-rise,1,1,shade);
+    if (beat>.55 && i%3===0) {
+      block(ctx,x-1,y-rise+1,3,1,shade);
+      block(ctx,x,y-rise+2,1,1,shade);
+    }
+  });
+}
+
 interface MusicFrame { time: number; beat: number; shot?: OpeningShot }
 
 export function renderHunt(ctx: CanvasRenderingContext2D,hunt: Hunt,spider: Crawler,direction: Point,music: MusicFrame) {
@@ -42,10 +68,18 @@ export function renderHunt(ctx: CanvasRenderingContext2D,hunt: Hunt,spider: Craw
   for (const y of [79,129]) {
     for (let x=14; x<WIDTH-10; x+=9) block(ctx,x,y,2,1,'#b2c189');
   }
+  rhythmDetails(ctx,beat);
   for (const r of platforms) {
     block(ctx,r.x,r.y,r.w,r.h,ink);
     block(ctx,r.x+1,r.y+2,r.w-2,2,'#638155');
     for (let n=8;n<r.w-4;n+=13) block(ctx,r.x+n,r.y+2,3,1,beat>.38 ? cream : '#d6e3ab');
+    if (r.w>40 && r.w<WIDTH) {
+      for (let dx=6;dx<r.w-5;dx+=12) {
+        const lift=beat>.42 ? 2 : 0;
+        block(ctx,r.x+dx,r.y-2-lift,1,2+lift,'#638155');
+        block(ctx,r.x+dx+1,r.y-3-lift,2,1,'#82945f');
+      }
+    }
   }
   hunt.strands.forEach((strand,index) => {
     const shake = Math.max(0,strand.shakeUntil-hunt.clock);

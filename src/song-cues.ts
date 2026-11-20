@@ -1,4 +1,4 @@
-import {beats,captions,controlsCue,defaultLoopStart,loopEnd} from './song-timing';
+import {beats,captions,clockCue,defaultLoopStart,loopCue,loopEnd} from './song-timing';
 
 const timingKey = 'tamago.soundtrack.cues.v1';
 export interface SongTiming {
@@ -23,8 +23,8 @@ function validTiming(value: unknown): value is SongTiming {
   const {starts,loopStart}=value as SongTiming;
   return Array.isArray(starts) && starts.length===captions.length &&
     starts.every((time,i)=>Number.isFinite(time) && time>=0 && time<loopEnd && (!i || time>starts[i-1])) &&
-    Number.isFinite(loopStart) && loopStart>starts[controlsCue-1] &&
-    loopStart<=starts[controlsCue] && starts[controlsCue]-loopStart<=.54;
+    Number.isFinite(loopStart) && loopStart>starts[clockCue] &&
+    loopStart<=starts[loopCue] && starts[loopCue]-loopStart<=.54;
 }
 
 export function saveTiming(timing: SongTiming) {
@@ -50,6 +50,11 @@ export function lyricAt(time: number,timing: SongTiming) {
   const [start,end,text]=captions[i];
   const duration=Math.max(.55,end-start+.23);
   return time<timing.starts[i]+duration ? text : '';
+}
+
+export function huntStart(timing: SongTiming) {
+  const [start,end]=captions[clockCue];
+  return Math.min(timing.starts[clockCue]+end-start,timing.starts[loopCue]);
 }
 
 export function beatAt(time: number) {
