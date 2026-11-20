@@ -1,6 +1,6 @@
 # Architettura e sviluppo
 
-`src/spider.ts` contiene la simulazione indipendente dal DOM. Il corpo avanza a passi da 1/120 s. Le superfici sono rettangoli solidi, con `grip` per gli appigli. Il tiro si ferma al primo solido e aggancia se è marcato. La seta limita il moto verso l’esterno e conserva la velocità tangenziale. Risalendo si riduce la lunghezza massima; lo sgancio lascia intatta la velocità.
+`src/spider.ts` contiene la simulazione indipendente dal DOM. Il corpo avanza a passi da 1/120 s. Le superfici sono rettangoli solidi, con `grip` per gli appigli. Tutti i rametti, le foglie e la radice rialzata sono agganciabili. Il tiro si ferma al primo solido e aggancia se è marcato. La seta limita il moto verso l’esterno e conserva la velocità tangenziale. Risalendo si riduce la lunghezza massima; lo sgancio lascia intatta la velocità.
 
 `src/area.ts` definisce la scena disegnata a mano. Il rametto iniziale permette di raggiungere la prima foglia con uno slancio. Una seconda salita porta sopra la radice, da cui si può scendere verso l’uscita o cercare la rugiada in alto con due agganci. I punti sicuri sono attivi per la sessione. Ricaricare ricrea la scena alla partenza e azzera i punti sicuri.
 
@@ -14,6 +14,8 @@ La silhouette usa appoggi alternati ricavati dallo spostamento reale e un corpo 
 
 I fili fissati funzionano come appoggi a senso unico dal basso verso l’alto: il ragno può camminare in entrambi i sensi sopra il filo e attraversarlo dal basso. Recuperare una mosca fa ritornare la mosca sulla sua rotta dopo una pausa e aumenta la riserva. Un ponte richiede due appigli marcati, una traiettoria libera e spazio per il corpo lungo tutto il percorso. La riserva viene spesa solo dopo aver validato il collegamento. Trama, riserva e seme d’ambra vengono azzerati alla riapertura. All’avvio viene eliminato il vecchio salvataggio della trama. La preferenza audio rimane separata.
 
-Il salto accetta una pressione nei 130 ms prima dell’appoggio e nei 90 ms dopo aver lasciato un bordo. Il salto non interviene sul filo attivo. Lo stick di movimento ha una zona morta del 12%, e la camera tiene il ragno al centro, con il disegno allineato alla griglia dei pixel.
+Il salto accetta una pressione nei 130 ms prima dell’appoggio e nei 90 ms dopo aver lasciato un bordo. Il salto non interviene sul filo attivo. Lo stick di movimento ha una zona morta del 12%, e la camera tiene il ragno al centro in orizzontale e più in basso in verticale, con il disegno allineato alla griglia dei pixel.
 
 Il terreno si collega ai confini orizzontali e la fisica usa le copie vicine per i contatti al confine. Il renderer ripete la stessa area sotto la camera. A ogni giro si riportano le coordinate del ragno nell’intervallo della mappa mantenendo velocità e riferimento della seta attiva. Lo sfondo conserva lo scorrimento accumulato.
+
+In verticale la simulazione si ferma e i comandi risultano inattivi. Nei browser compatibili si può chiedere il blocco orizzontale a schermo intero. Negli altri si ruota il dispositivo a mano. La viewport e gli eventi di tocco bloccano lo zoom da doppio tap.

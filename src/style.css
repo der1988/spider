@@ -7,7 +7,10 @@
   --rule: #677c4d;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; overflow: hidden; overscroll-behavior: none; }
+html, body {
+  margin: 0; overflow: hidden; overscroll-behavior: none; touch-action: none;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
 .scene {
   width: 100%; height: 100vh; height: 100dvh; position: relative; overflow: hidden; isolation: isolate;
   touch-action: none; user-select: none; -webkit-user-select: none;
@@ -30,7 +33,7 @@ button:focus-visible, summary:focus-visible, input:focus-visible { outline: 2px 
 .controls { bottom: max(10px, env(safe-area-inset-bottom)); display: grid; justify-items: center; gap: 8px; }
 #message, .keys { font-size: 11px; line-height: 1.45; margin: 0; text-align: center; }
 kbd { background: #c6d29a; border: 1px solid var(--rule); padding: 0 3px; }
-.rotate, #jump { display: none; }
+#jump { display: none; }
 .touch { position: absolute; inset: 0; pointer-events: none; }
 .floating-stick {
   position: absolute; transform: translate(-50%,-50%); display: grid; place-items: center;
@@ -59,13 +62,18 @@ kbd { background: #c6d29a; border: 1px solid var(--rule); padding: 0 3px; }
   .hud { inset-inline: max(8px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-right)); }
   .controls { inset-inline: 12px max(98px, calc(env(safe-area-inset-right) + 90px)); }
 }
-@media (orientation: portrait) and (any-pointer: coarse) {
-  .rotate {
-    display: block; position: absolute; top: max(65px, calc(env(safe-area-inset-top) + 48px));
-    left: 8px; margin: 0; font-size: 10px; background: var(--paper);
-    padding: 4px 6px; pointer-events: none;
+.orientation-cover { display: none; }
+.rotate-card {
+  display: grid; justify-items: center; gap: 10px; text-align: center; padding: 22px;
+  background: var(--paper); border: 1px solid var(--rule); box-shadow: 3px 3px var(--rule);
+}
+.rotate-card p { margin: 0; font-size: 13px; }
+@media (orientation: portrait) {
+  .scene { visibility: hidden; }
+  .orientation-cover:not([hidden]) {
+    position: absolute; inset: 0; display: grid; place-items: center; padding: 20px;
+    background: #b3bf85;
   }
-  .controls { inset-inline: 10px; bottom: max(68px, calc(env(safe-area-inset-bottom) + 60px)); }
 }
 
 #web-count { white-space: nowrap; align-self: center; font-size: 10px; padding: 5px; background: var(--paper); border: 1px solid var(--rule); }

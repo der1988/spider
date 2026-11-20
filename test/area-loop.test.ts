@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {area, loopShift, loopSurfaces, loopWidth, visibleCopies} from '../src/area.ts';
-import {createSpider, tickSpider} from '../src/spider.ts';
+import {createSpider, shoot, tickSpider} from '../src/spider.ts';
 
 test('walking across the join in either direction keeps ground contact and velocity', () => {
   for (const direction of [-1,1]) {
@@ -31,4 +31,14 @@ test('the join leads back to the first ledge without jumping', () => {
   assert.ok(spider.x>=area.spawn.x && spider.grounded);
   assert.equal(spider.y,area.spawn.y);
   assert.deepEqual(visibleCopies(area.bounds.left-20,area.bounds.right+20),[-loopWidth,0,loopWidth]);
+});
+
+test('every elevated platform in the first area accepts a silk shot', () => {
+  for (const platform of area.surfaces.filter(surface => surface.kind !== 'earth')) {
+    const x = platform.x+platform.w/2;
+    const spider = createSpider({x,y:platform.y-26});
+    assert.ok(shoot(spider,loopSurfaces,{x,y:platform.y+1}));
+    assert.equal(spider.rope?.x,x);
+    assert.equal(spider.rope?.y,platform.y);
+  }
 });

@@ -24,25 +24,25 @@ export const area: Area = {
   bridgeDiscovery: {x:308,y:55},
   finish: {x:483,y:158},
   surfaces: [
-    // The rametto is the only support above the first gap.
+    // The rametto spans the first gap; the opposite leaf is a second grip.
     {x:-144,y:166,w:79,h:95,kind:'earth'},
     {x:-65,y:151,w:121,h:110,kind:'earth',bridge:true},
     {x:64,y:76,w:29,h:8,kind:'twig',grip:true},
-    {x:101,y:164,w:52,h:8,kind:'leaf'},
+    {x:101,y:164,w:52,h:8,kind:'leaf',grip:true},
     {x:106,y:172,w:46,h:89,kind:'earth'},
 
     // The next branch is left of the root face so the player can climb beside it.
     {x:130,y:61,w:28,h:8,kind:'twig',grip:true},
-    {x:146,y:113,w:63,h:148,kind:'root'},
+    {x:146,y:113,w:63,h:148,kind:'root',grip:true},
     {x:209,y:166,w:367,h:95,kind:'earth'},
 
     // The elevated landing is beyond a normal cast from the marked starting ledge.
-    {x:274,y:67,w:58,h:8,kind:'leaf',bridge:true},
+    {x:274,y:67,w:58,h:8,kind:'leaf',grip:true,bridge:true},
 
     // Optional high route: transfer from the first grip to the distant canopy.
     {x:232,y:43,w:28,h:8,kind:'twig',grip:true},
     {x:381,y:-34,w:36,h:8,kind:'twig',grip:true},
-    {x:428,y:16,w:55,h:8,kind:'leaf'},
+    {x:428,y:16,w:55,h:8,kind:'leaf',grip:true},
   ],
 };
 

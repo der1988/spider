@@ -11,6 +11,7 @@ export class Soundscape {
   private buzzing?: GainNode;
   private flyTone?: OscillatorNode;
   private announced = false;
+  private paused = false;
   private pending: {effect:Sound; delay:number; at:number}[] = [];
 
   constructor(private enabled: boolean) {}
@@ -18,20 +19,29 @@ export class Soundscape {
   setEnabled(enabled: boolean) {
     this.enabled = enabled;
     if (!enabled) this.pending.length = 0;
-    if (this.master && this.context) {
-      this.master.gain.setTargetAtTime(enabled ? .72 : 0,this.context.currentTime,.025);
-    }
+    this.updateVolume();
     if (enabled) this.unlock();
   }
 
+  setPaused(paused: boolean) {
+    this.paused = paused;
+    this.updateVolume();
+  }
+
+  private updateVolume() {
+    if (this.master && this.context) {
+      this.master.gain.setTargetAtTime(this.enabled && !this.paused ? .72 : 0,this.context.currentTime,.025);
+    }
+  }
+
   unlock() {
-    if (!this.enabled) return;
+    if (!this.enabled || this.paused) return;
     try {
       if (!this.context) this.setup();
       const ctx = this.context;
       if (!ctx) return;
       const announce = () => {
-        if (ctx.state !== 'running' || !this.enabled) return;
+        if (ctx.state !== 'running' || !this.enabled || this.paused) return;
         if (!this.announced) {
           this.announced = true;
           this.play('start');
@@ -95,7 +105,7 @@ export class Soundscape {
 
   play(effect: Sound, delay = 0) {
     const ctx = this.context;
-    if (!this.enabled || !ctx || !this.master) return;
+    if (!this.enabled || this.paused || !ctx || !this.master) return;
     if (ctx.state !== 'running') {
       if (this.pending.length < 8) this.pending.push({effect,delay,at:performance.now()});
       return;

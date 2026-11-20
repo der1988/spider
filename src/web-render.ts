@@ -4,6 +4,7 @@ import type {Web} from './threads';
 
 interface View {
   camera: Point;
+  playerScreen: Point;
   backgroundX: number;
   time: number;
   aim: Point;
@@ -351,7 +352,7 @@ export function drawScene(ctx: CanvasRenderingContext2D, area: Area, spider: Spi
     }
     block(ctx,p.x-1,p.y-1,3,3,color.silk);
   }
-  const p = {x:Math.floor(ctx.canvas.width/2),y:Math.floor(ctx.canvas.height/2)};
+  const p = view.playerScreen;
   for (const end of view.web.loose) {
     const anchor = local(end.from);
     const middle = {x:(anchor.x+p.x)/2,y:(anchor.y+p.y)/2+7};

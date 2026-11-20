@@ -5,6 +5,7 @@ import {drawScene} from './web-render';
 import {availableAnchors, bridgePreview, buildBridge, createWeb, fixSilk, leaveSilk, recoverFlies, tickFlies, WEB_KEY} from './threads';
 import {Soundscape} from './soundscape';
 import {AimGesture, silkMotion} from './aim-gesture';
+import {preventGameZoom} from './touch-zoom';
 
 const get = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const scene = get('scene');
@@ -13,6 +14,8 @@ const context = canvas.getContext('2d', {alpha:false})!;
 const message = get('message');
 const audioButton = get<HTMLButtonElement>('sound');
 const touch = matchMedia('(any-pointer: coarse)');
+const portrait = matchMedia('(orientation: portrait)');
+preventGameZoom();
 const tuning = {...DEFAULT_TUNING};
 const tuningKeys = ['range', 'acceleration', 'reelSpeed'] as const;
 const keys = new Set<string>();
@@ -234,7 +237,7 @@ const aimStick = analog('aim-stick', point => sampleAim(touchGesture,point,perfo
 });
 
 scene.addEventListener('pointerdown',event => {
-  if (event.button !== 0 || event.pointerType === 'mouse' ||
+  if (portrait.matches || event.button !== 0 || event.pointerType === 'mouse' ||
     (event.target instanceof Element && event.target.closest('button,input,details'))) return;
   const bounds = scene.getBoundingClientRect();
   const analog = event.clientX-bounds.left < bounds.width/2 ? movementStick : aimStick;
@@ -253,7 +256,7 @@ for (const type of ['pointerup','pointercancel','lostpointercapture'] as const) 
     aimStick.end(event,type === 'pointerup');
   });
 }
-for (const type of ['selectstart','dblclick','contextmenu'] as const) {
+for (const type of ['selectstart','contextmenu'] as const) {
   scene.addEventListener(type,event => event.preventDefault());
 }
 
@@ -327,7 +330,7 @@ function moveAim(dx: number, dy: number) {
   aimOffset = {x:x / scale,y:y / scale};
 }
 window.addEventListener('keydown', event => {
-  if (!commands.has(event.code) || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (portrait.matches || !commands.has(event.code) || event.ctrlKey || event.metaKey || event.altKey) return;
   if (event.target instanceof HTMLElement && (event.target.closest('input') ||
     (event.code === 'Space' && event.target.closest('button, summary')))) return;
   event.preventDefault();
@@ -338,7 +341,7 @@ window.addEventListener('keydown', event => {
   keys.add(event.code);
 });
 window.addEventListener('keyup', event => {
-  if (!keys.delete(event.code)) return;
+  if (portrait.matches || !keys.delete(event.code)) return;
   event.preventDefault();
   if (event.code === 'Space') fire(worldAim());
 });
@@ -355,6 +358,36 @@ window.addEventListener('blur', clearInput);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) clearInput();
 });
+
+const orientationCover = get('orientation-cover');
+function syncOrientation() {
+  scene.inert = portrait.matches;
+  orientationCover.hidden = !portrait.matches;
+  if (portrait.matches) clearInput();
+  audio.setPaused(portrait.matches);
+}
+portrait.addEventListener('change',syncOrientation);
+syncOrientation();
+
+const lockAvailable = touch.matches && document.fullscreenEnabled &&
+  typeof screen.orientation?.lock === 'function';
+for (const id of ['fullscreen','portrait-fullscreen']) {
+  const button = get<HTMLButtonElement>(id);
+  button.hidden = !lockAvailable;
+  button.onclick = async () => {
+    const wasFullscreen = !!document.fullscreenElement;
+    try {
+      if (!wasFullscreen) await document.documentElement.requestFullscreen();
+      await screen.orientation.lock('landscape');
+    } catch {
+      if (!wasFullscreen && document.fullscreenElement) {
+        await document.exitFullscreen().catch(() => {});
+      }
+      if (portrait.matches) get('orientation-copy').textContent = 'Ruota il telefono per continuare.';
+      else say('Il dispositivo non consente il blocco automatico.');
+    }
+  };
+}
 
 function goal(check: Point, radius: number) {
   return Math.hypot(spider.x - check.x, spider.y - check.y) < radius;
@@ -505,15 +538,21 @@ let remainder = 0;
 const step = 1 / 120;
 function frame(time: number) {
   const elapsed = Math.min(.05,(time-(lastFrame || time))/1000);
-  remainder += elapsed;
   lastFrame = time;
+  if (portrait.matches) {
+    remainder = 0;
+    requestAnimationFrame(frame);
+    return;
+  }
+  remainder += elapsed;
   pollPad(time);
   sampleAim(touchGesture,aimStick.read(),time);
   while (remainder >= step) {
     update(step,time);
     remainder -= step;
   }
-  const camera = {x:spider.x-Math.floor(canvas.width/2),y:spider.y-Math.floor(canvas.height/2)};
+  const playerScreen = {x:Math.floor(canvas.width/2),y:Math.floor(canvas.height*.74)};
+  const camera = {x:spider.x-playerScreen.x,y:spider.y-playerScreen.y};
   const aim = worldAim();
   const extended = bridgePreview(web,spider,loopSurfaces,aim,tuning.range);
   const hit = extended?.to ?? aimHit(spider,loopSurfaces,aim,tuning);
@@ -522,7 +561,7 @@ function frame(time: number) {
     touchGesture.aiming || padGesture.aiming;
   get('aim-stick').dataset.aiming = String(touchGesture.aiming);
   drawScene(context,area,spider,{
-    camera,backgroundX:camera.x+traveledOffset,time,aim,hit,aiming,shot,landedAt,discovered,web,catchLook,
+    camera,playerScreen,backgroundX:camera.x+traveledOffset,time,aim,hit,aiming,shot,landedAt,discovered,web,catchLook,
     stride,walkingInput,stepFace,taut,idlePose,anchors,extended:!!extended,
   });
   requestAnimationFrame(frame);

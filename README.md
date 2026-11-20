@@ -4,11 +4,11 @@
 
 - Muoviti con **A/D** e salta con **J**. Punta un rametto con le **frecce** e premi e rilascia **Spazio** per agganciarti.
 - Una volta appeso, usa **A/D** per darti slancio, **W** per risalire e **S** per staccarti mantenendo la velocità. Puoi lanciare un altro filo mentre sei in aria.
-- Su telefono gioca in orizzontale. Tocca e trascina in qualsiasi punto della metà sinistra per far comparire lo stick del movimento. Quando sei appeso, spingilo di lato per darti slancio, in alto per risalire o decisamente in basso per staccarti. Tocca e trascina nella metà destra per mirare, poi rilascia per tirare. I due tocchi possono convivere. Il pulsante **Salto** è nell’angolo in basso a destra.
+- Su telefono il gioco funziona solo in orizzontale. In verticale si mette in pausa. Usa **Blocca in orizzontale** nei browser che lo offrono. Tocca e trascina in qualsiasi punto della metà sinistra per far comparire lo stick del movimento. Quando sei appeso, spingilo di lato per darti slancio, in alto per risalire o decisamente in basso per staccarti. Tocca e trascina nella metà destra per mirare, poi rilascia per tirare. I due tocchi possono convivere. Il pulsante **Salto** è nell’angolo in basso a destra.
 - Con un gamepad riconosciuto dal browser, usa lo stick sinistro per muoverti e quello destro per mirare e tirare al ritorno al centro. Con lo stick sinistro, **su** fa risalire e **giù** stacca. Usa **A/×** per saltare. Puoi usare anche **LB/L1** e **B/○** per risalire e staccarti.
 - Osserva le mosche al primo vuoto. Prova a tirare al rametto e a staccarti dal bordo di partenza per tendere il primo filo. Puoi anche dondolare fino alla sponda opposta e tendere un filo lungo quella rotta.
 - Cammina su un filo fissato per recuperare una mosca e guadagnare **1 seta**. Torna sul bordo marcato di partenza e mira al rombo sulla foglia alta. Il lancio lungo consuma 1 seta solo se crea un ponte valido. Attraversalo per trovare il **seme d’ambra**. Puoi usare il ponte in entrambi i sensi. Fili, riserva e scoperte restano fino a fine partita. Ricarica o apri di nuovo la pagina per ripartire con il sottobosco vuoto.
-- Il ragno resta al centro della visuale. La mappa gira in entrambe le direzioni: continuando sul sentiero oltre l’uscita torni vicino alla partenza.
+- La visuale segue il ragno al centro in orizzontale e lo tiene più in basso per mostrare la salita. Le piattaforme rialzate sono tutte appigli della seta. La mappa gira in entrambe le direzioni: continuando sul sentiero oltre l’uscita torni vicino alla partenza.
 - Attraversa il primo vuoto e cerca la rugiada sul percorso alto. Se cadi, riparti dall’ultimo punto sicuro. **Fisica** permette di regolare portata, accelerazione e risalita.
 
 ## Sviluppo
