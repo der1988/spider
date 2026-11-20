@@ -4,16 +4,19 @@ import type {Point, Rect} from './spider.ts';
 export const WIDTH = 360;
 export const HEIGHT = 204;
 export const ROUND = 60;
+export const WEB_SECONDS = 10;
+export const CHARGE_SECONDS = .8;
 export const LIMIT = 6;
 export const spawn = {x:45,y:189};
 export const platforms: Rect[] = [
   {x:0,y:197,w:WIDTH,h:7,grip:true},
+  {x:0,y:0,w:WIDTH,h:7,grip:true},
+  {x:0,y:7,w:7,h:190,grip:true},
+  {x:WIDTH-7,y:7,w:7,h:190,grip:true},
   {x:89,y:53,w:51,h:7,grip:true}, {x:220,y:53,w:51,h:7,grip:true},
   {x:145,y:101,w:70,h:10,grip:true},
   {x:89,y:150,w:51,h:8,grip:true}, {x:220,y:150,w:51,h:8,grip:true},
 ];
-export const solids = [-WIDTH,0,WIDTH].flatMap(offset =>
-  platforms.map(rect => ({...rect,x:rect.x+offset})));
 const lanes = [
   {x:49,y:79}, {x:114,y:79}, {x:180,y:79}, {x:246,y:79}, {x:311,y:79},
   {x:311,y:129}, {x:246,y:129}, {x:180,y:129}, {x:114,y:129}, {x:49,y:129},
@@ -59,24 +62,10 @@ export interface Hunt extends Pick<Web,'loose'|'strands'> {
   entropy: number;
 }
 
-function gapFromThread(p: Point,strand: Strand) {
-  const dx = strand.to.x-strand.from.x;
-  const dy = strand.to.y-strand.from.y;
-  return Math.min(...[-WIDTH,0,WIDTH].map(offset => {
-    const x = p.x+offset-strand.from.x;
-    const y = p.y-strand.from.y;
-    const t = within((x*dx+y*dy)/Math.max(1,dx*dx+dy*dy),0,1);
-    return Math.hypot(x-t*dx,y-t*dy);
-  }));
-}
-
-function makeFly(score: number,seed: number,strands: Strand[] = []): Fly {
-  const options = entrances.map((_,i)=>entrances[(score+i)%entrances.length]);
-  const preferred = options.find(index => strands.every(s => gapFromThread(lanes[index],s)>9));
-  const entry = preferred ?? 10;
+function makeFly(score: number,seed: number): Fly {
+  const entry = entrances[score%entrances.length];
   return {
-    p:preferred === undefined ? {x:16,y:29} : {...lanes[entry]},v:{x:0,y:0},
-    target:preferred === undefined ? entry : (entry+1)%10,last:entry,
+    p:{...lanes[entry]},v:{x:0,y:0},target:(entry+1)%10,last:entry,
     notice:.18,locked:.24,turn:0,bias:(seed+score)%2 ? 1 : -1,age:0,alert:false,visits:lanes.map(()=>0),
   };
 }
@@ -85,30 +74,15 @@ export function createHunt(seed = Math.floor(Math.random()*4294967296)): Hunt {
     strands:[],loose:[],clock:0,entropy:seed};
 }
 
-function loopHit(from: Point,to: Point,strand: Strand) {
-  for (const offset of [-WIDTH,0,WIDTH]) {
-    const left = Math.min(strand.from.x,strand.to.x)-offset;
-    const right = Math.max(strand.from.x,strand.to.x)-offset;
-    if (left>Math.max(from.x,to.x) || right<Math.min(from.x,to.x)) continue;
-    const hit = sweptHit({x:from.x+offset,y:from.y},{x:to.x+offset,y:to.y},strand);
-    if (hit) return {t:hit.t,point:{x:hit.point.x-offset,y:hit.point.y}};
-  }
-}
-
-export function walkableSilk(strands: Strand[]) {
-  return strands.flatMap(strand => [-WIDTH,0,WIDTH].flatMap(offset => {
-    if (Math.max(strand.from.x,strand.to.x)+offset<0 ||
-      Math.min(strand.from.x,strand.to.x)+offset>WIDTH) return [];
-    return [offset===0 ? strand : {...strand,
-      from:{x:strand.from.x+offset,y:strand.from.y},to:{x:strand.to.x+offset,y:strand.to.y}}];
-  }));
+export function expireStrands(hunt: Hunt) {
+  hunt.strands = hunt.strands.filter(strand => strand.expiresAt === undefined || hunt.clock < strand.expiresAt);
 }
 
 function threat(from: Point,to: Point,strands: Strand[]) {
   const d = direction(from,to);
   const length = Math.min(distance(from,to),48);
   const ahead = {x:from.x+d.x*length,y:from.y+d.y*length};
-  return strands.some(strand => loopHit(from,ahead,strand));
+  return strands.some(strand => sweptHit(from,ahead,strand));
 }
 
 function route(hunt: Hunt,spider: Point,arrived: boolean) {
@@ -149,11 +123,15 @@ export function capStrands(hunt: Hunt) {
 
 export function tickHunt(hunt: Hunt,spider: Point,dt: number) {
   hunt.clock += dt;
+  expireStrands(hunt);
   if (hunt.phase==='over') return;
   if (hunt.phase==='caught') {
     hunt.countdown-=dt;
     if (hunt.countdown<=0) {
-      hunt.fly = makeFly(hunt.score,hunt.entropy,hunt.strands);
+      hunt.strands.length = 0;
+      hunt.loose.length = 0;
+      hunt.retired = undefined;
+      hunt.fly = makeFly(hunt.score,hunt.entropy);
       hunt.time = ROUND;
       hunt.phase = 'hunting';
       return 'new';
@@ -176,15 +154,15 @@ export function tickHunt(hunt: Hunt,spider: Point,dt: number) {
   const easing = 1-Math.exp(-dt*(fly.turn>0 ? 13 : 8));
   fly.v.x += (d.x*speed-fly.v.x)*easing;
   fly.v.y += (d.y*speed-fly.v.y)*easing;
-  const next = {x:within(fly.p.x+fly.v.x*dt,12,WIDTH-12),y:within(fly.p.y+fly.v.y*dt,20,177)};
+  let next = {x:within(fly.p.x+fly.v.x*dt,12,WIDTH-12),y:within(fly.p.y+fly.v.y*dt,20,177)};
   if (!clear(fly.p,next)) {
     fly.v = {x:0,y:0};
     route(hunt,spider,false);
-    return;
+    next = fly.p;
   }
   let winner: {strand:Strand;point:Point;t:number}|undefined;
   for (const strand of hunt.strands) {
-    const hit = loopHit(fly.p,next,strand);
+    const hit = sweptHit(fly.p,next,strand);
     if (hit && (!winner || hit.t<winner.t)) winner = {...hit,strand};
   }
   if (winner) {

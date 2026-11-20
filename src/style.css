@@ -31,3 +31,12 @@ canvas { display: block; width: 100%; height: 100%; object-fit: contain; image-r
 footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 5px 16px; }
 footer p { margin: 0; font-size: clamp(9px, 1.4vw, 12px); line-height: 1.5; }
 kbd { padding: 1px 3px; font-size: inherit; }
+
+.stage { position: relative; }
+.charge {
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 1;
+  display: flex; gap: 7px; align-items: center; padding: 4px 8px; background: var(--panel);
+  border: 1px solid var(--border); font-size: 11px; pointer-events: none;
+}
+.charge[hidden] { display: none; }
+.charge progress { width: clamp(60px,16vw,150px); height: 9px; accent-color: #d7e4a1; }

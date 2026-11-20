@@ -21,16 +21,17 @@
     <div class="tools">
       <button id="sound" type="button" aria-pressed="true">Audio On</button>
       <details><summary>Salto</summary>
-        <label>Altezza massima <input id="jump" type="range" min="105" max="160" value="130"></label>
+        <label>Altezza massima <input id="jump" type="range" min="240" max="285" value="260"></label>
       </details>
     </div>
   </header>
   <section class="stage" aria-label="Arena di caccia">
+    <div id="charge" class="charge" hidden>Salto <progress id="power" max="1" value="0" aria-label="Potenza del salto"></progress></div>
     <canvas id="world" width="360" height="204" aria-label="Ragno, mosca e ragnatele"></canvas>
   </section>
   <footer>
     <p id="message" role="status">Collega il joypad PlayStation e premi un tasto.</p>
-    <p>Sinistro: muovi, ↑ risali, ↓ stacca · Destro: mira · <kbd>R1</kbd> Tela · <kbd>L1</kbd> Salto</p>
+    <p>Sinistro: muovi, ↑ risali, ↓ stacca · Destro: mira · <kbd>R1</kbd> Tela · <kbd>L1</kbd> Carica, rilascia per saltare</p>
   </footer>
 </main>
 <script type="module" src="/src/main.ts"></script>

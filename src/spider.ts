@@ -36,6 +36,7 @@ interface Input {
   move: number
   reel: boolean
   jumpHeld?: boolean
+  gripThread?: boolean
 }
 
 export interface Tuning {
@@ -278,6 +279,22 @@ function step(spider: Spider, surfaces: readonly Rect[], input: Input, dt: numbe
   }
   const floor = travel > 0 && moveAxis(spider,surfaces,'y',travel)
   if (travel < 0) moveAxis(spider,surfaces,'y',travel)
+  if (input.gripThread && !floor && !thread && !jumped && !spider.rope) {
+    const feetNow = spider.y+SPIDER_HALF_HEIGHT
+    for (const line of threads) {
+      const height = threadFloor(line,spider.x)
+      if (height !== undefined && Math.abs(feetNow-height)<=3) {
+        const desired = height-spider.y-SPIDER_HALF_HEIGHT
+        if (!moveAxis(spider,surfaces,'y',desired)) thread = line
+        if (thread) break
+      } else if (height === undefined && Math.abs(line.to.x-line.from.x)<4 &&
+        Math.abs(spider.x-line.from.x)<=3 && feetNow >= Math.min(line.from.y,line.to.y) &&
+        feetNow <= Math.max(line.from.y,line.to.y)) {
+        thread = line
+        break
+      }
+    }
+  }
   if (thread && !floor) spider.vy = 0
   spider.thread = floor ? undefined : thread
 
@@ -313,9 +330,10 @@ export function tickSpider(
   const tuning = overrides ? {...DEFAULT_TUNING, ...overrides} : DEFAULT_TUNING
   const elapsed = Math.min(dtSeconds, 0.05)
   const steps = Math.ceil(elapsed / STEP)
+  const usableThreads = input.gripThread===false ? [] : threads
   let jumped = false
   for (let index = 0; index < steps; index++) {
-    if (step(spider, surfaces, input, elapsed / steps, tuning, threads)) jumped = true
+    if (step(spider, surfaces, input, elapsed / steps, tuning, usableThreads)) jumped = true
   }
   return jumped
 }

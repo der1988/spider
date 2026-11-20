@@ -4,6 +4,7 @@ export interface Strand {
   from: Point;
   to: Point;
   shakeUntil: number;
+  expiresAt?: number;
   bearing?: true;
 }
 

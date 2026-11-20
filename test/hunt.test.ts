@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {capStrands,createHunt,LIMIT,ROUND,tickHunt} from '../src/hunt.ts';
-import {createSpider,queueJump,tickSpider} from '../src/spider.ts';
+import {capStrands,createHunt,HEIGHT,LIMIT,platforms,ROUND,spawn,tickHunt,WEB_SECONDS,WIDTH} from '../src/hunt.ts';
+import {createSpider,queueJump,shoot,tickSpider} from '../src/spider.ts';
 
 const dt=1/120;
 const far={x:345,y:187};
@@ -37,7 +37,7 @@ test('an obstructed committed run is caught, scores once, and spawns a single ne
   assert.equal(hunt.phase,'hunting');
   assert.equal(hunt.time,ROUND);
   assert.equal(hunt.score,1);
-  assert.equal(hunt.strands.length,2);
+  assert.equal(hunt.strands.length,0);
 });
 
 test('at capacity the oldest strand is retired and a fresh round starts clean',()=>{
@@ -95,23 +95,69 @@ test('approaching from above can send a fly into a strand it otherwise avoids',(
   assert.equal(pressed.score,1);
 });
 
-test('a strand that crosses the seam is effective in the visible copy',()=>{
+
+test('a thread stops trapping at the end of its ten seconds',()=>{
   const hunt=createHunt(0);
-  hunt.fly.p={x:84,y:79};
+  hunt.strands=[{...wire(90,60,140),expiresAt:WEB_SECONDS}];
+  hunt.clock=WEB_SECONDS-.015;
+  hunt.fly.p={x:89.45,y:79};
   hunt.fly.v={x:65,y:0};
   hunt.fly.locked=.25;
-  hunt.strands=[wire(450,60,140)];
-  for(let i=0;i<25&&hunt.phase==='hunting';i++) tickHunt(hunt,far,dt);
-  assert.equal(hunt.score,1);
-  assert.equal(hunt.fly.p.x,90);
+  tickHunt(hunt,far,.005);
+  assert.equal(hunt.strands.length,1);
+  tickHunt(hunt,far,.011);
+  assert.equal(hunt.strands.length,0);
+  assert.equal(hunt.score,0);
 });
 
-test('the next fly chooses a free entrance when its usual one is occupied',()=>{
-  const hunt=createHunt(0);
-  hunt.phase='caught';
-  hunt.score=1;
-  hunt.strands=[wire(311,90,160)];
-  assert.equal(tickHunt(hunt,far,dt),'new');
-  assert.notDeepEqual(hunt.fly.p,{x:311,y:129});
-  assert.equal(hunt.time,60);
+test('all four arena sides and the platforms accept a shot, open space misses',()=>{
+  for (const [x,y,tx,ty,expected] of [
+    [40,100,0,100,{x:7,y:100}],
+    [315,126,WIDTH,126,{x:WIDTH-7,y:126}],
+    [40,41,40,0,{x:40,y:7}],
+    [40,150,40,HEIGHT,{x:40,y:197}],
+    [114,82,114,51,{x:114,y:60}],
+  ] as const) {
+    const spider=createSpider({x,y});
+    assert.ok(shoot(spider,platforms,{x:tx,y:ty}));
+    assert.ok(Math.abs(spider.rope!.x-expected.x)+Math.abs(spider.rope!.y-expected.y)<.01);
+  }
+  assert.equal(shoot(createSpider({x:180,y:79}),platforms,{x:WIDTH,y:79}),false);
+});
+
+test('neutral and sideways pass through the thread; up catches it on descent or ascent',()=>{
+  const strand={from:{x:5,y:95},to:{x:122,y:95}};
+  for (const move of [0,1]) {
+    const spider=createSpider({x:40,y:72});
+    spider.vy=85;
+    for(let i=0;i<40;i++) tickSpider(spider,[],{move,reel:false,gripThread:false},dt,undefined,[strand]);
+    assert.ok(spider.y>95);
+    assert.equal(spider.thread,undefined);
+  }
+  for (const [y,vy] of [[72,85],[102,-105]]) {
+    const spider=createSpider({x:40,y});
+    spider.vy=vy;
+    for(let i=0;i<40&&!spider.thread;i++) {
+      tickSpider(spider,[],{move:0,reel:true,gripThread:true},dt,undefined,[strand]);
+    }
+    assert.equal(spider.thread,strand);
+    assert.ok(spider.grounded);
+  }
+});
+
+test('a full charge clears half of the playable arena and medium power lands between',()=>{
+  const height=(speed:number)=>{
+    const spider=createSpider(spawn);
+    tickSpider(spider,platforms,{move:0,reel:false},dt);
+    queueJump(spider);
+    let y=spider.y;
+    for(let i=0;i<130;i++){
+      tickSpider(spider,platforms,{move:0,reel:false},dt,{jumpSpeed:speed});
+      y=Math.min(y,spider.y);
+    }
+    return spawn.y-y;
+  };
+  const short=height(65),middle=height(162.5),full=height(260);
+  assert.ok(short < middle && middle < full);
+  assert.ok(full > (197-7)/2);
 });

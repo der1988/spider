@@ -1,6 +1,6 @@
 import './style.css';
-import {aimHit,createSpider,detach,queueJump,shoot,tickSpider,type Point} from './spider';
-import {capStrands,createHunt,HEIGHT,LIMIT,solids,spawn,tickHunt,walkableSilk,WIDTH} from './hunt';
+import {createSpider,detach,queueJump,shoot,tickSpider,type Point} from './spider';
+import {capStrands,CHARGE_SECONDS,createHunt,LIMIT,platforms,spawn,tickHunt,WEB_SECONDS} from './hunt';
 import {fixSilk,leaveSilk,WEB_KEY} from './threads';
 import {renderHunt} from './hunt-render';
 import {samplePlayStation,silkMotion} from './pad-controls';
@@ -16,7 +16,8 @@ const sound = get<HTMLButtonElement>('sound');
 const jump = get<HTMLInputElement>('jump');
 const intro = 'Osserva i due corridoi. Aggancia una piattaforma e staccati vicino a una seconda superficie per tendere un filo.';
 const waiting = 'Collega il joypad PlayStation e premi un tasto.';
-const walls = solids.concat({x:-WIDTH,y:-10,w:3*WIDTH,h:10});
+const chargeLabel = get('charge');
+const power = get<HTMLProgressElement>('power');
 let audioOn = true;
 try {
   audioOn = localStorage.getItem('tamago.audio')!=='off';
@@ -39,7 +40,8 @@ window.addEventListener('pointerdown',event => {
 },{capture:true});
 
 let hunt = createHunt();
-let floors = walkableSilk(hunt.strands);
+let charge: number|undefined;
+let jumpVelocity = 65;
 let spider = createSpider(spawn);
 let aimDirection: Point = {x:.56,y:-.828};
 let previous: ReturnType<typeof samplePlayStation>['shoulders']|undefined;
@@ -66,13 +68,13 @@ function pad() {
 function shootSilk() {
   const old=spider.rope;
   audio.play('launch');
-  if (shoot(spider,walls,worldAim())) {
+  if (shoot(spider,platforms,worldAim())) {
     if(old) leaveSilk(hunt,old,155);
     audio.play('attach',.06);
   } else audio.play('miss',.06);
 }
 function step(dt: number,input: ReturnType<typeof samplePlayStation>) {
-  const {movement:m,shoulders}=input;
+  const m=input.movement;
   const motion=silkMotion(m,down);
   down=motion.down;
   if (motion.detach && spider.rope) {
@@ -82,20 +84,13 @@ function step(dt: number,input: ReturnType<typeof samplePlayStation>) {
   }
   const deadzone=.12;
   const move=Math.sign(m.x)*Math.max(0,(Math.abs(m.x)-deadzone)/(1-deadzone));
-  if (tickSpider(spider,walls,{move,reel:motion.reel,jumpHeld:shoulders.l1},dt,{jumpSpeed:Number(jump.value)},floors)) audio.play('jump');
-  const offset=Math.floor(spider.x/WIDTH)*WIDTH;
-  if (offset) {
-    spider.x-=offset;
-    if (spider.rope) spider.rope.x-=offset;
-    for(const end of hunt.loose) end.from.x-=offset;
-  }
-  if (spider.y>HEIGHT+30) {
-    spider=createSpider(spawn);
-    hunt.loose.length=0;
-  }
-  if(fixSilk(hunt,spider,walls)) {
+  const grip=motion.reel && !spider.rope;
+  const active=hunt.strands.filter(s=>(s.expiresAt??Infinity)>hunt.clock+dt);
+  if (tickSpider(spider,platforms,{move,reel:motion.reel,gripThread:grip},dt,{jumpSpeed:jumpVelocity},active)) audio.play('jump');
+  const before=hunt.strands.length;
+  if(fixSilk(hunt,spider,platforms)) {
+    for (const strand of hunt.strands.slice(before)) strand.expiresAt=hunt.clock+WEB_SECONDS;
     const evicted=capStrands(hunt);
-    floors=walkableSilk(hunt.strands);
     audio.play('fix');
     say(evicted ? 'Nuovo filo: il più vecchio si dissolve.' : 'Filo fissato. Avvicinati alla mosca per spingerla verso la rete.');
   }
@@ -105,7 +100,7 @@ function step(dt: number,input: ReturnType<typeof samplePlayStation>) {
     say('Mosca catturata!');
   } else if(result==='new') {
     audio.resetMusic();
-    say('Una nuova mosca entra. Le tele restano.');
+    say('Nuova mosca, 60 secondi e arena pulita.');
   } else if(result==='over') {
     say('Tempo scaduto · '+hunt.score+' catture. Premi × per ricominciare.');
     audio.play('miss');
@@ -131,7 +126,7 @@ function frame(time: number) {
     if(input.aim) aimDirection=input.aim;
     if(hunt.phase==='over' && cross && !crossHeld) {
       hunt=createHunt();
-      floors=walkableSilk(hunt.strands);
+      charge=undefined;
       spider=createSpider(spawn);
       down=false;
       audio.resetMusic();
@@ -139,7 +134,15 @@ function frame(time: number) {
     }
     crossHeld=cross;
     if(hunt.phase!=='over') {
-      if(input.jump) queueJump(spider);
+      if (input.jump) charge=0;
+      if (charge !== undefined) {
+        if (input.shoulders.l1) charge=Math.min(1,charge+elapsed/CHARGE_SECONDS);
+        else {
+          jumpVelocity=65+(Number(jump.value)-65)*charge;
+          queueJump(spider);
+          charge=undefined;
+        }
+      }
       if(input.fire) shootSilk();
       remainder+=elapsed;
       while(remainder>=1/120) {
@@ -147,6 +150,7 @@ function frame(time: number) {
         if (step(1/120,input)) { remainder=0; break; }
       }
     }
+    if(hunt.phase==='over') charge=undefined;
     if(time-lastSound>65) {
       lastSound=time;
       const d=hunt.phase==='hunting' ? Math.hypot(spider.x-hunt.fly.p.x,spider.y-hunt.fly.p.y) : Infinity;
@@ -160,6 +164,7 @@ function frame(time: number) {
       spider.jumpBuffer=0;
     }
     previous=undefined;
+    charge=undefined;
     activePad=undefined;
     remainder=0;
     down=false;
@@ -169,7 +174,9 @@ function frame(time: number) {
     [strandsLabel,hunt.strands.length+' / '+LIMIT+' fili']] as const;
   for (const [element,text] of labels) if (element.textContent!==text) element.textContent=text;
   timeLabel.dataset.urgent=String(seconds<=5 && hunt.phase!=='caught');
-  renderHunt(context,hunt,spider,worldAim(),aimHit(spider,walls,worldAim()));
+  chargeLabel.hidden=charge===undefined;
+  power.value=charge??0;
+  renderHunt(context,hunt,spider,aimDirection);
   requestAnimationFrame(frame);
 }
 document.addEventListener('visibilitychange',()=>audio.setPaused(document.hidden));
