@@ -9,7 +9,7 @@ import {
   HATCH_MS,
   loadGame,
   MAX_ABSENCE_MS,
-  REST_MS,
+  movementEnergy,
   SAVE_KEY,
   saveGame,
   TEEN_MS,
@@ -66,7 +66,7 @@ test('loading a saved creature advances time and uses the backup if primary JSON
   const storage = memoryStorage();
   const baby = advance(createGame(birth), hatch);
   const later = hatch + 30 * 60_000;
-  const hungry = advance(baby, later);
+  const hungry = { ...advance(baby, later), energy:100 };
 
   assert.equal(saveGame(storage, baby), true);
   assert.deepEqual(loadGame(storage, later), hungry);
@@ -75,7 +75,7 @@ test('loading a saved creature advances time and uses the backup if primary JSON
   storage.setItem(SAVE_KEY, '{');
   assert.deepEqual(loadGame(storage, later), hungry);
   storage.setItem(BACKUP_KEY, '{');
-  assert.deepEqual(loadGame(storage, later), createGame(later));
+  assert.equal(loadGame(storage, later).stage, 'egg');
 });
 
 test('care history determines the adult form', () => {
@@ -89,21 +89,6 @@ test('care history determines the adult form', () => {
   assert.equal(advance(neglected, birth + ADULT_MS).form, 'bud');
 });
 
-test('the light can change at night and switches on when the creature wakes', () => {
-  const baby = advance(createGame(birth), hatch);
-  assert.equal(act(baby, 'light', hatch).state.lightOn, true);
-
-  const hour = 60 * 60_000;
-  const bedtime = birth + 16 * hour;
-  const sleeping = advance(baby, bedtime);
-  assert.equal(sleeping.sleeping, true);
-  const lightsOff = act(sleeping, 'light', bedtime).state;
-  assert.equal(lightsOff.lightOn, false);
-  const morning = advance(lightsOff, birth + 24 * hour);
-  assert.equal(morning.sleeping, false);
-  assert.equal(morning.lightOn, true);
-});
-
 test('neglect can cause sickness and treatment restores health', () => {
   let now = hatch;
   let pet = advance(createGame(birth), now);
@@ -111,28 +96,32 @@ test('neglect can cause sickness and treatment restores health', () => {
     now += MAX_ABSENCE_MS;
     pet = advance(pet, now);
   }
-  assert.equal(pet.sleeping, false);
   assert.equal(pet.sick, true);
   const treated = act(pet, 'heal', now).state;
   assert.equal(treated.sick, false);
   assert.ok(treated.health > pet.health);
 });
 
-test('a manual nap restores energy across reload and ends on time', () => {
+test('a version-one sleeping pet keeps its progress and starts awake in the clearing', () => {
   const storage = memoryStorage();
-  const awake = advance(createGame(birth), hatch);
-  const nap = act(awake, 'rest', hatch).state;
-  assert.equal(nap.sleeping, true);
-  assert.equal(nap.lightOn, false);
-  assert.equal(saveGame(storage, nap), true);
+  const baby = advance(createGame(birth), hatch);
+  storage.setItem(SAVE_KEY, JSON.stringify({
+    version: 1, state: { ...baby, world: undefined, sleeping: true, lightOn: false, restUntil: hatch + 1000 },
+  }));
+  const migrated = loadGame(storage, hatch);
+  assert.equal(migrated.stage, 'baby');
+  assert.equal(migrated.bornAt, birth);
+  assert.equal(migrated.world.position, 0);
+  assert.equal('sleeping' in migrated, false);
+  assert.equal(act(migrated, 'feed', hatch).state.hunger, 99);
+  assert.ok(saveGame(storage, migrated));
+  assert.deepEqual(loadGame(storage, hatch), migrated);
+});
 
-  const midway = loadGame(storage, hatch + REST_MS / 2);
-  assert.equal(midway.sleeping, true);
-  assert.ok(midway.energy > awake.energy);
-  assert.equal(act(midway, 'rest', hatch + REST_MS / 2).state.restUntil, nap.restUntil);
-
-  const woken = loadGame(storage, hatch + REST_MS);
-  assert.equal(woken.sleeping, false);
-  assert.equal(woken.lightOn, true);
-  assert.ok(woken.energy > midway.energy);
+test('walking spends energy and standing still restores it gradually', () => {
+  const tired = movementEnergy(90, 20, true);
+  assert.ok(tired < 90);
+  assert.ok(movementEnergy(tired, 5, false) > tired);
+  assert.equal(movementEnergy(2, 30, true), 0);
+  assert.equal(movementEnergy(98, 30, false), 100);
 });

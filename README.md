@@ -1,6 +1,8 @@
 # Tamago
 
-Una creatura virtuale originale su un piccolo display LCD. Aspetta la schiusa, poi nutrila, gioca con lei e tienila pulita. Apri **Bisogni** per vedere tutti gli indicatori. Puoi toccare direttamente un'azione o usare **Seleziona**, **Conferma** e **Indietro**. **Riposa** fa dormire Tamago per 30 minuti e gli restituisce energia, anche se chiudi il gioco. Durante il sonno puoi cambiare la luce. **Cura** è utile quando la creatura si ammala.
+Una creatura virtuale in un mondo LCD a tutto schermo. Dopo la schiusa tieni premute le frecce sul display o sulla tastiera per partire dalla radura. Avvicinati ai luccichii per trovare bacche nel bosco, conchiglie in spiaggia, cristalli in grotta e sorgenti nel prato. Dopo 90 secondi puoi tornare a raccoglierli. Fermati per recuperare energia e usa i comandi di cura quando servono.
+
+Tamago riparte dall'ultima posizione e ogni partita conserva il proprio mondo. L'audio si avvia al primo gesto e puoi disattivarlo toccando **Audio On**.
 
 ## Sviluppo
 

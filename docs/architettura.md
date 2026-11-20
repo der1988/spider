@@ -1,6 +1,8 @@
 # Architettura e sviluppo
 
-Il modello riceve timestamp espliciti. Questo permette di testare senza aspettare la schiusa dopo 10 secondi, l'adolescenza dopo 12 ore e l'età adulta dopo 48 ore. I bisogni cambiano al minuto e l'età avanza con il tempo reale. Al ritorno si simulano al massimo 12 ore di decadimento. La forma adulta dipende dalla media dei bisogni durante la crescita. Il ciclo ha 16 ore di veglia e 8 di sonno. Il riposo manuale dura 30 minuti e usa la stessa simulazione del sonno notturno.
+Il modello riceve timestamp espliciti. Questo permette di testare senza aspettare la schiusa dopo 10 secondi, l'adolescenza dopo 12 ore e l'età adulta dopo 48 ore. I bisogni cambiano al minuto e l'età avanza con il tempo reale. Al ritorno si simulano al massimo 12 ore di decadimento. La forma adulta dipende dalla media dei bisogni durante la crescita. Camminare consuma energia, stare fermi la rigenera. Il caricamento ripristina l'energia gradualmente in base al tempo trascorso. La versione 2 del salvataggio conserva i bisogni della versione 1, rimuove il sonno e genera un mondo per i salvataggi precedenti.
+
+Il mondo usa un seme per determinare tipi di zona, dettagli e ritrovamenti su entrambi i lati della radura. Si salva il seme, la posizione, il conteggio delle scoperte e il tempo degli ultimi ritrovamenti. I luccichii ricompaiono dopo 90 secondi.
 
 Il Canvas disegna sprite originali e riceve soltanto lo stato visivo. La UI collega il modello ai controlli e a localStorage. Il salvataggio JSON include una versione e una copia di recupero. Il worker conserva HTML, risorse compilate, manifest e icone nella stessa cache di versione.
 

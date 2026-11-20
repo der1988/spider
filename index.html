@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#a5b28b">
+<meta name="theme-color" content="#c5cf91">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./touch.png">
@@ -12,18 +12,28 @@
 </head>
 <body>
 <main class="lcd" aria-label="Tamago">
-      <div class="display-top"><span id="stage">UOVO</span><span id="clock"></span></div>
-      <canvas width="160" height="88" aria-label="Creatura Tamago"></canvas>
-      <div class="meter"><label for="fullness">SAZIETÀ</label><progress id="fullness" max="100" value="100"></progress></div>
-      <p id="message" role="status">L’uovo si muove…</p>
-  <div class="menu" id="actions" aria-label="Azioni"></div>
-  <div class="controls">
-    <button id="select" type="button"><b aria-hidden="true">›</b>Seleziona</button>
-    <button id="confirm" type="button"><b aria-hidden="true">●</b>Conferma</button>
-    <button id="back" type="button"><b aria-hidden="true">↶</b>Indietro</button>
-  </div>
-  <footer><button id="sound" type="button" aria-pressed="false">Audio spento</button><button id="stats" type="button" aria-expanded="false" aria-controls="details">Bisogni</button></footer>
-  <dl id="details" hidden></dl>
+  <canvas id="world" aria-label="Paesaggio di Tamago"></canvas>
+  <header class="hud">
+    <div class="location"><span class="brand">TAMAGO</span><strong id="zone">Radura</strong><small id="stage"></small></div>
+    <div class="tools">
+      <button id="sound" type="button" aria-pressed="true">Audio On</button>
+      <button id="stats" type="button" aria-expanded="false" aria-controls="details">Bisogni</button>
+    </div>
+    <dl id="details" hidden></dl>
+    <div class="meters">
+      <label>SAZIETÀ <progress id="fullness" max="100"></progress></label>
+      <label>ENERGIA <progress id="energy" max="100"></progress></label>
+    </div>
+  </header>
+  <footer class="controls">
+    <p id="message" role="status"></p>
+    <div class="movement">
+      <button id="left" type="button" aria-label="Cammina a sinistra">◀</button>
+      <span id="distance" aria-hidden="true">0</span>
+      <button id="right" type="button" aria-label="Cammina a destra">▶</button>
+    </div>
+    <div class="menu" id="actions" aria-label="Azioni di cura"></div>
+  </footer>
 </main>
 <script type="module" src="/src/main.ts"></script>
 </body>
