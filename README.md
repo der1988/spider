@@ -1,6 +1,6 @@
 # Spider and Fly
 
-Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scegli **STORY** o **ENDLESS** con la croce direzionale o lo stick sinistro. Conferma con **×** per avviare la musica. Puoi anche fare clic sul pulsante. Il timer parte appena finisce «Start the clock», anche se il controller è scollegato o lo stick è fermo. Da quel momento puoi usare i comandi.
+Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scorri **STORY**, **ENDLESS** e **Top 10** con **↑/↓** sulla croce direzionale o con lo stick sinistro. Premi **×** per confermare. Puoi anche fare clic sul pulsante. Il timer parte appena finisce «Start the clock», anche se il controller è scollegato o lo stick è fermo. Da quel momento puoi usare i comandi.
 
 - **Stick sinistro** per correre sul pavimento, sulle pareti e sul soffitto o per dondolare. Sul filo attivo, spingi **su** per risalire e **giù** per staccarti. Con **su** puoi anche aggrapparti a un filo già fissato.
 - **Stick destro** per mirare in ogni direzione. **R1** lancia verso il primo appiglio entro la portata. Pareti, soffitto, pavimento e piattaforme accettano la seta. Se sei su una superficie, il tiro tende subito una ragnatela. Salta prima di sparare per dondolare: il filo si fissa quando tocchi una superficie valida. In aria puoi lanciare un secondo filo per spostare il dondolio sul nuovo appiglio.
@@ -10,7 +10,7 @@ Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scegli
 
 ## Endless Top 10
 
-Evidenzia **ENDLESS** e premi **△** per aprire la classifica. Lo stesso comando è disponibile dopo la sconfitta. Il server registra ogni partita verificata e ordina i punteggi per catture, poi per ordine di registrazione. Se entri nella Top 10, inserisci da una a sei lettere A–Z. Con il controller, **↑/↓** cambiano la lettera, **←/→** spostano il cursore, **□** cancella, **×** conferma e **○** salta. Puoi anche digitare il nome con la tastiera. I risultati in attesa restano in IndexedDB. Se perdi la connessione, riapri **Top 10** e scegli **Try Again**.
+Seleziona **Top 10** nel menu e conferma con **×**. Premi **○** per chiudere la classifica e tornare alla voce **Top 10**. Dopo una sconfitta puoi aprire la classifica con **△**. Il server registra ogni partita verificata e ordina i punteggi per catture, poi per ordine di registrazione. Se entri nella Top 10, inserisci da una a sei lettere A–Z. Con il controller, **↑/↓** cambiano la lettera, **←/→** spostano il cursore, **□** cancella, **×** conferma e **○** salta. Puoi anche digitare il nome con la tastiera. I risultati in attesa restano in IndexedDB. Se perdi la connessione, riapri **Top 10** e scegli **Try Again**.
 
 ### Deploy su Vercel
 

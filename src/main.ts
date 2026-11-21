@@ -62,7 +62,6 @@ const song = new Soundtrack([
 const leaderboard = bindLeaderboard();
 const endlessBoard=bindEndlessBoard();
 const dialogOpen=()=>leaderboard.open || endlessBoard.open;
-get('menu-top').onclick=()=>void endlessBoard.view();
 get('defeat-top').onclick=()=>void endlessBoard.view();
 let contextAudio: AudioContext|undefined;
 let mode: HuntMode|undefined;
@@ -72,23 +71,35 @@ let paused = false;
 let escape: FlyEscape|undefined;
 let spaceHeld = false;
 
-function bindChoices(left: string,right: string,chooseLeft: ()=>void,chooseRight: ()=>void) {
-  const buttons=[get<HTMLButtonElement>(left),get<HTMLButtonElement>(right)] as const;
-  let selected: 0|1=0;
-  function select(index: 0|1,focus=false) {
+function bindChoices(items: readonly (readonly [string,()=>void])[],vertical=false) {
+  const buttons=items.map(([id])=>get<HTMLButtonElement>(id));
+  let selected=0;
+  function select(index: number,focus=false) {
     selected=index;
     buttons.forEach((button,i)=>button.dataset.selected=String(i===index));
     if (focus) buttons[index].focus({preventScroll:true});
   }
-  buttons[0].onclick=()=>{ select(0); chooseLeft(); };
-  buttons[1].onclick=()=>{ select(1); chooseRight(); };
-  buttons[0].onfocus=()=>select(0);
-  buttons[1].onfocus=()=>select(1);
-  return {select,get selected(){return selected;},confirm:()=>buttons[selected].click()};
+  buttons.forEach((button,index)=>{
+    button.onclick=()=>{ select(index); items[index][1](); };
+    button.onfocus=()=>select(index);
+  });
+  function move(direction: number) {
+    const index=vertical ? (selected+direction+buttons.length)%buttons.length : direction<0 ? 0 : buttons.length-1;
+    select(index,true);
+  }
+  return {select,move,get selected(){return selected;},confirm:()=>buttons[selected].click()};
 }
 
-const menuChoices=bindChoices('story','loop',()=>requestMode('story'),()=>requestMode('loop'));
-const defeatChoices=bindChoices('main-menu','retry',showMenu,retryLoop);
+const topTenIndex=2;
+const menuChoices=bindChoices([
+  ['story',()=>requestMode('story')],
+  ['loop',()=>requestMode('loop')],
+  ['menu-top',()=>void endlessBoard.view()],
+],true);
+const defeatChoices=bindChoices([['main-menu',showMenu],['retry',retryLoop]]);
+get<HTMLDialogElement>('endless-board').addEventListener('close',()=>{
+  if (shell.dataset.screen==='start') menuChoices.select(topTenIndex,true);
+});
 
 function activeChoices() {
   if (dialogOpen()) return;
@@ -197,9 +208,9 @@ window.addEventListener('keydown',event => {
   else if (song.waiting) audio.unlock();
   if (dialogOpen()) return;
   const choices=activeChoices();
-  if (choices && /^Arrow(Left|Right|Up|Down)$/.test(event.code)) {
+  if (choices && (choices===menuChoices ? /^Arrow(Up|Down)$/ : /^Arrow(Left|Right|Up|Down)$/).test(event.code)) {
     event.preventDefault();
-    choices.select(event.code==='ArrowLeft' || event.code==='ArrowUp' ? 0 : 1,true);
+    choices.move(event.code==='ArrowLeft' || event.code==='ArrowUp' ? -1 : 1);
   }
   if (event.code==='Escape' && !event.repeat && !dialogOpen()) togglePause();
   if (event.code!=='Space') return;
@@ -368,11 +379,11 @@ function flyFrame(game: FlyEscape,time: number,elapsed: number,move: Point,cross
 
 let crossHeld=false;
 let optionsHeld=false;
-function navigationDirection(gamepad: Gamepad) {
+function navigationDirection(gamepad: Gamepad,vertical: boolean) {
   const {x,y}=readLeftStick(gamepad);
-  const axis=Math.abs(x)>=Math.abs(y) ? x : y;
-  const negative=gamepad.buttons[14]?.pressed || gamepad.buttons[12]?.pressed;
-  const positive=gamepad.buttons[15]?.pressed || gamepad.buttons[13]?.pressed;
+  const axis=!vertical && Math.abs(x)>=Math.abs(y) ? x : y;
+  const negative=gamepad.buttons[12]?.pressed || (!vertical && gamepad.buttons[14]?.pressed);
+  const positive=gamepad.buttons[13]?.pressed || (!vertical && gamepad.buttons[15]?.pressed);
   return negative ? -1 : positive ? 1 : Math.abs(axis)>.60 ? Math.sign(axis) : 0;
 }
 
@@ -398,9 +409,9 @@ function frame(time: number) {
     }
     crossPressed=cross && !crossHeld;
     crossHeld=cross;
-    const direction=navigationDirection(gamepad);
-    if (navigation && direction && direction!==padDirection) {
-      navigation.select(direction<0 ? 0 : 1,true);
+    const direction=navigationDirection(gamepad,atMenu);
+    if (navigation && !boardWasOpen && direction && direction!==padDirection) {
+      navigation.move(direction);
       if (atMenu) enableMenuSound();
     }
     padDirection=direction;
