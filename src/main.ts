@@ -69,6 +69,7 @@ let padDirection = 0;
 let opening = true;
 let paused = false;
 let escape: FlyEscape|undefined;
+let testingEnding=false;
 let spaceHeld = false;
 
 function bindChoices(items: readonly (readonly [string,()=>void])[],vertical=false) {
@@ -95,6 +96,7 @@ const menuChoices=bindChoices([
   ['story',()=>requestMode('story')],
   ['loop',()=>requestMode('loop')],
   ['menu-top',()=>void endlessBoard.view()],
+  ['test-ending',requestTestEnding],
 ],true);
 const defeatChoices=bindChoices([['main-menu',showMenu],['retry',retryLoop]]);
 get<HTMLDialogElement>('endless-board').addEventListener('close',()=>{
@@ -128,6 +130,7 @@ window.addEventListener('pointerdown',()=>{
 
 function clearFlyScene() {
   escape=undefined;
+  testingEnding=false;
   flyCross=false;
   delete shell.dataset.flyPhase;
   delete shell.dataset.flyShot;
@@ -151,6 +154,7 @@ function startIntro(next: HuntMode) {
 
 function showMenu() {
   const priorMode=mode;
+  const wasTestingEnding=testingEnding;
   mode=undefined;
   song.play('menu',contextAudio);
   paused=false;
@@ -160,7 +164,7 @@ function showMenu() {
   endlessBoard.clear();
   shell.dataset.screen='start';
   launch.inert=false;
-  menuChoices.select(priorMode==='loop' ? 1 : 0,true);
+  menuChoices.select(wasTestingEnding ? 3 : priorMode==='loop' ? 1 : 0,true);
   startStatus.textContent='';
   captions('');
   say('');
@@ -193,12 +197,23 @@ function togglePause() {
   paused = !paused;
   syncPause();
 }
-function beginFly() {
-  escape=createFlyEscape(spider,hunt.fly.p);
+function requestTestEnding() {
+  if (shell.dataset.screen!=='start' || escape) return;
+  contextAudio=audio.audioContext();
+  audio.unlock();
+  mode='story';
+  resetHunt();
+  startStatus.textContent='Loading soundtrack…';
+  beginFly(true);
+}
+
+function beginFly(test=false) {
+  testingEnding=test;
+  escape=test ? createFlyEscape() : createFlyEscape(spider,hunt.fly.p);
   flyCross=false;
   shell.dataset.flyPhase='intro';
   paused=false;
-  song.play('fly',contextAudio);
+  song.play('fly',contextAudio,test ? flyCues.play : 0);
   syncPause();
   say('');
 }
@@ -320,11 +335,12 @@ function flyFrame(game: FlyEscape,time: number,elapsed: number,move: Point,cross
   if (playing && !paused && !document.hidden) {
     flyCross ||= crossPressed;
     remainder+=Math.min(elapsed,time-flyCues.play);
-    const behavior=time>=flyCues.pass ? 'yield' : time>=flyCues.clearShot ? 'aim' : 'hunt';
-    const gesture=behavior==='yield' ? flyDoubtAt(time) : undefined;
     while (remainder>=1/120) {
       remainder-=1/120;
-      const event=stepFlyEscape(game,{move,cross:flyCross},1/120,behavior,gesture);
+      const at=time-remainder;
+      const behavior=at>=flyCues.pass ? 'yield' : at>=flyCues.clearShot ? 'aim' : 'hunt';
+      const gesture=behavior==='yield' ? flyDoubtAt(at) : undefined;
+      const event=stepFlyEscape(game,{move,cross:flyCross},1/120,behavior,gesture,at);
       flyCross=false;
       if (event==='light') {
         say('Light collected · 10 seconds.');
@@ -335,10 +351,14 @@ function flyFrame(game: FlyEscape,time: number,elapsed: number,move: Point,cross
         say('');
       } else if (event==='timeout') {
         audio.play('miss');
-        startIntro('story');
+        if (testingEnding) showMenu();
+        else startIntro('story');
         return;
-      } else if (event==='web') {
+      } else if (event==='attach') {
+        audio.play('attach');
+      } else if (event==='web' || event==='swing') {
         audio.play('launch');
+        if (event==='swing') audio.play('attach',.08);
       }
     }
   }
@@ -351,9 +371,9 @@ function flyFrame(game: FlyEscape,time: number,elapsed: number,move: Point,cross
   if (shell.dataset.flyShot!==(shot??'')) shell.dataset.flyShot=shot??'';
   const beat=reduceMotion.matches ? 0 : beatAt({track:'fly',time});
   const ending=finale ? clamp01((time-flyFinalStart)/20) : undefined;
-  const {shrink,details}=flyRoomEffect(time);
+  const {details}=flyRoomEffect(time);
   renderFlyEscape(context,game,{
-    time,beat,shot,intro:!playing,shotProgress:clamp01((time-flyCues.room)/.9),shrink,details,ending,reducedMotion:reduceMotion.matches,
+    time,beat,shot,intro:!playing,shotProgress:clamp01((time-flyCues.room)/.9),details,ending,reducedMotion:reduceMotion.matches,
   });
 
   const displayTime=Math.ceil(game.time);

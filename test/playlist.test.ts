@@ -48,7 +48,7 @@ test('the questions, watched web and step back have separate song-time windows',
   assert.equal(flyDoubtAt(155.052),'identity');
   assert.equal(flyDoubtAt(157.100),undefined);
   assert.equal(flyDoubtAt(161.192),'decision');
-  assert.equal(flyDoubtAt(164.392),'lastWeb');
+  assert.equal(flyDoubtAt(flyCues.lastWebFire),'lastWeb');
   assert.equal(flyDoubtAt(174.392),'watch');
   assert.equal(flyDoubtAt(178.072),'stepBack');
   assert.equal(flyDoubtAt(flyFinalStart),undefined);

@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createFlyEscape, ESCAPE_PRESSES, finishFlyEscape, FLY_SECONDS, stepFlyEscape} from '../src/fly-escape.ts';
 import {HEIGHT, platforms, spawn, WEB_SECONDS, WIDTH} from '../src/hunt.ts';
+import {flyCues,flyDoubtAt,flyRoomEnd,flyStageApproach,flyStageArrival} from '../src/fly-song-timing.ts';
+import {createCrawler} from '../src/crawler.ts';
+import {aimHit} from '../src/spider.ts';
 
 const idle={move:{x:0,y:0},cross:false};
 const dt=1/120;
@@ -132,9 +135,9 @@ test('the final lock lets the fly cross a light without changing the outcome',()
 });
 
 test('delayed autonomous flight prediction commits a strand and the player can feint around it',()=>{
-  const game=createFlyEscape(undefined,{x:48,y:117},0);
+  const game=createFlyEscape(undefined,{x:95,y:117},0);
   game.light={x:325,y:28};
-  const advance={move:{x:.71,y:-.71},cross:false};
+  const advance={move:{x:.71,y:.71},cross:false};
   const reverse={move:{x:-.71,y:.71},cross:false};
   const untouched=structuredClone(game);
   for (let i=0;i<15;i++) {
@@ -198,36 +201,42 @@ test('the spider commits and executes its own jump without any player movement',
   assert.ok(game.spider.x>start+5 && game.spider.x<=target.x);
 });
 
-test('the hunter keeps following a moving fly and jumps repeatedly',()=>{
+test('the hunter tracks a moving fly while alternating jumps and silk',()=>{
   const game=createFlyEscape(undefined,{x:54,y:91},5);
   const headings=[{x:1,y:0},{x:0,y:1},{x:-1,y:0},{x:0,y:-1}];
   let leaps=0;
+  let swings=0;
   let near=0;
   for (let i=0;i<3600;i++) {
     game.time=FLY_SECONDS;
     game.safeUntil=game.clock+1;
     const staggered=game.plan?.kind==='jump';
     const move=headings[Math.floor(game.clock/1.71)%headings.length];
-    stepFlyEscape(game,{move,cross:false},dt,'hunt');
+    if (stepFlyEscape(game,{move,cross:false},dt,'hunt')==='swing' && i<1200) swings++;
     if (i<1200 && staggered && !game.plan && !game.spider.support) leaps++;
     if (i>=1200 && Math.hypot(game.spider.x-game.fly.p.x,game.spider.y-game.fly.p.y)<75) near++;
   }
-  assert.ok(leaps>=4);
-  assert.ok(near/2400>.73);
+  assert.ok(leaps>=1 && leaps<=3);
+  assert.ok(swings>=2);
+  assert.ok(near/2400>.38);
 });
 
 test('only a couple of early webs are fired before the hunting cadence builds',()=>{
   const game=createFlyEscape(undefined,undefined,5);
   const start=[0,40,90];
   const shots=start.map(()=>0);
+  const gaps=start.map(()=>Infinity);
   for (let i=0;i<12000;i++) {
     game.time=FLY_SECONDS;
     if (stepFlyEscape(game,idle,dt,'hunt')!=='web') continue;
     const window=start.findIndex(seconds=>game.clock>=seconds && game.clock<seconds+10);
-    if (window!==-1) shots[window]++;
+    if (window!==-1) {
+      shots[window]++;
+      gaps[window]=Math.min(gaps[window],game.nextShot-game.clock);
+    }
   }
   assert.ok(shots[0]>=1 && shots[0]<=2,`${shots}`);
-  assert.ok(shots[0]<shots[1] && shots[1]<shots[2],`${shots}`);
+  assert.ok(gaps[0]>gaps[1] && gaps[1]>gaps[2],`${gaps}`);
 });
 
 test('yielding gestures watch a real strand expire without replacing it',()=>{
@@ -289,4 +298,56 @@ test('the spider looks around before changing direction and approaches the stran
   const watchStart=game.spider.x;
   for(let i=0;i<65;i++) stepFlyEscape(game,idle,dt,'yield','watch');
   assert.ok(game.spider.x>watchStart+6);
+});
+
+test('moving walls carry anchors, keep the fly and light inside, and restore the original collision',()=>{
+  const game=createFlyEscape(undefined,{x:16,y:13},0);
+  game.light={x:20,y:20};
+  game.strands=[{from:{x:7,y:85},to:{x:72,y:7},shakeUntil:0}];
+  const thread=game.strands[0];
+  const corner={move:{x:-1,y:-1},cross:false};
+  for (let i=0;i<600;i++) {
+    game.time=10;
+    stepFlyEscape(game,corner,dt,'aim',undefined,flyCues.shrink+i*dt);
+  }
+  assert.deepEqual(game.fly.p,{x:37.5,y:31.5});
+  assert.deepEqual(thread.from,{x:35,y:85});
+  assert.deepEqual(thread.to,{x:72,y:29});
+  assert.ok(game.light.x>=45.5 && game.light.y>=39.5);
+  assert.deepEqual(aimHit(game.spider,game.room.surfaces,{x:0,y:game.spider.y}),{x:35,y:game.spider.y});
+  for (let i=0;i<120;i++) stepFlyEscape(game,corner,dt,'aim',undefined,flyRoomEnd+i*dt);
+  assert.deepEqual(game.fly.p,{x:9.5,y:9.5});
+  assert.deepEqual(thread.from,{x:7,y:85});
+  assert.deepEqual(thread.to,{x:72,y:7});
+});
+
+test('the spider reaches the central ledge before its line, throws and expires one last strand, then hops off',()=>{
+  for (const from of [{x:45,y:189},{x:14,y:30},{x:180,y:119},{x:346,y:170}]) {
+    const game=createFlyEscape(createCrawler(from,platforms),{x:40,y:40},2);
+    const step=(time:number)=>{
+      game.time=10;
+      const behavior=time>=flyCues.pass ? 'yield' : time>=flyCues.clearShot ? 'aim' : 'hunt';
+      return stepFlyEscape(game,idle,dt,behavior,flyDoubtAt(time),time);
+    };
+    for(let time=flyStageApproach;time<flyStageArrival;time+=dt) step(time);
+    step(flyStageArrival);
+    assert.deepEqual([game.spider.x,game.spider.y,game.spider.support],[180,93,'floor']);
+    step(flyCues.stageSpeech);
+    assert.deepEqual([game.spider.vx,game.spider.vy],[0,0]);
+    assert.equal(step(flyCues.lastWebFire),'web');
+    assert.equal(game.strands.length,0);
+    assert.equal(step(flyCues.lastWebAttach),'attach');
+    assert.deepEqual(game.lastWeb?.to,{x:205,y:7});
+    step(flyCues.lastWebSecond);
+    assert.equal(game.strands.length,1);
+    assert.equal(flyCues.lastWebExpire-flyCues.lastWebSecond,1);
+    step(flyCues.lastWebExpire);
+    assert.equal(game.strands.length,0);
+    step(flyCues.stepBack-dt);
+    const {x,y}=game.spider;
+    step(flyCues.stepBack);
+    assert.ok(game.spider.x<x && game.spider.y<y);
+    for(let i=1;i<75;i++) step(flyCues.stepBack+i*dt);
+    assert.ok(game.spider.x<145 && game.spider.y>101);
+  }
 });

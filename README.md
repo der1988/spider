@@ -1,12 +1,16 @@
 # Spider vs Fly
 
-Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scorri **STORY**, **ENDLESS** e **Top 10** con **↑/↓** sulla croce direzionale o con lo stick sinistro. Premi **×** per confermare. Puoi anche fare clic sul pulsante. Il timer parte appena finisce «Start the clock», anche se il controller è scollegato o lo stick è fermo. Da quel momento puoi usare i comandi.
+Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scorri **STORY**, **ENDLESS**, **Top 10** e **Test Ending** con **↑/↓** sulla croce direzionale o con lo stick sinistro. Premi **×** per confermare. Puoi anche fare clic sul pulsante. Il timer parte appena finisce «Start the clock», anche se il controller è scollegato o lo stick è fermo. Da quel momento puoi usare i comandi.
 
 - **Stick sinistro** per correre sul pavimento, sulle pareti e sul soffitto o per dondolare. Sul filo attivo, spingi **su** per risalire e **giù** per staccarti. Con **su** puoi anche aggrapparti a un filo già fissato.
 - **Stick destro** per mirare in ogni direzione. **R1** lancia verso il primo appiglio entro la portata. Pareti, soffitto, pavimento e piattaforme accettano la seta. Se sei su una superficie, il tiro tende subito una ragnatela. Salta prima di sparare per dondolare: il filo si fissa quando tocchi una superficie valida. In aria puoi lanciare un secondo filo per spostare il dondolio sul nuovo appiglio.
 - **L1** salta alla pressione. Premi di nuovo in aria per il doppio salto; un nuovo appoggio lo ripristina. Da appeso, L1 ritira i fili di movimento e ti lancia.
 - Osserva i corridoi ai lati della piattaforma centrale. Avvicinandoti, spingi la mosca a cambiare rotta. Tendi un filo tra due appigli mentre è in manovra. Il filo comincia a lampeggiare prima di sparire, dopo **10 secondi**.
 - Il timer al centro dell’HUD e i dettagli dell’arena pulsano sul battito. La barra sotto il timer indica quanto tempo resta. Ogni mosca è un livello. Il primo è il Livello 1 e ogni cattura vale un punto. In **Story**, dopo ogni cattura la prossima mosca entra con un secondo in meno, da **60 secondi** a un minimo di **10 secondi**. In **Endless** ogni mosca ha **20 secondi**. In entrambe le modalità le vecchie tele spariscono al cambio di mosca. Ogni 5 catture la mosca accelera, ogni 10 reagisce prima alle tele e ogni 20 percepisce il ragno da più lontano.
+
+## Finale di Story
+
+Durante il terzo brano premi **Spazio** per cambiare prospettiva. **Test Ending** apre direttamente il volo della mosca a **18,192 s** del quarto brano, con **10 secondi** sul timer. Lo stick sinistro fa volare la mosca, le luci ripristinano i 10 secondi e otto nuove pressioni di **×** la liberano da una tela. Se scade il tempo in **Test Ending**, torni al menu con la voce già selezionata.
 
 ## Endless Top 10
 

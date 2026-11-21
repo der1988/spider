@@ -14,15 +14,25 @@ export const flyCues = {
   shrink: 73.672,
   clearShot: 147.852,
   pass: 150.032,
+  stageSpeech: 152.492,
+  lastWebFire: 169.932,
+  lastWebAttach: 170.212,
+  lastWebSecond: 171.092,
+  lastWebExpire: 172.092,
+  stepBack: 178.072,
 } as const;
+
+export const flyStageApproach = 148.932;
+export const flyStageArrival = 152.242;
+export const flyStageRetreat = 176.852;
 
 // Acting windows follow the opening and closing words of each phrase.
 const flyDoubtCues = [
   {gesture:'identity',start:155.052,end:157.100},
   {gesture:'decision',start:160.252,end:162.100},
-  {gesture:'lastWeb',start:164.392,end:165.450},
-  {gesture:'watch',start:169.932,end:176.800},
-  {gesture:'stepBack',start:178.072,end:180.132},
+  {gesture:'lastWeb',start:169.532,end:flyCues.lastWebAttach},
+  {gesture:'watch',start:flyCues.lastWebAttach,end:176.800},
+  {gesture:'stepBack',start:flyCues.stepBack,end:180.132},
 ] as const;
 
 export function flyDoubtAt(time: number) {
