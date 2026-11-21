@@ -1,7 +1,7 @@
 const prefix = 'tamago-shell-';
 const scope = self.registration.scope;
 const shell = new URL('index.html', scope).href;
-const staticFiles = ['manifest.webmanifest', 'touch.png', 'icon-192.png', 'icon-512.png', 'the-fly-has-ai.mp3', 'the-fly-has-an-upgrade.mp3', 'the-room-has-a-space-bar.mp3'];
+const staticFiles = ['manifest.webmanifest', 'touch.png', 'icon-192.png', 'icon-512.png', 'the-fly-has-ai.mp3', 'the-fly-has-an-upgrade.mp3', 'the-room-has-a-space-bar.mp3', 'the-fly-is-you.mp3'];
 const activeCache = prefix + build; // build is injected by Vite.
 
 self.addEventListener('install', event => {

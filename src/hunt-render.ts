@@ -1,16 +1,16 @@
 import {HEIGHT, LIMIT, platforms, WIDTH, type Hunt} from './hunt';
-import type {Point} from './spider';
+import type {Point,Rect} from './spider';
 import type {Crawler,Support} from './crawler';
 import type {OpeningShot} from './song-cues';
 
 const ink = '#243c2d';
 const cream = '#eff3c8';
 
-function block(ctx: CanvasRenderingContext2D,x: number,y: number,w: number,h: number,color: string) {
+export function block(ctx: CanvasRenderingContext2D,x: number,y: number,w: number,h: number,color: string) {
   ctx.fillStyle = color;
   ctx.fillRect(Math.round(x),Math.round(y),w,h);
 }
-function line(ctx: CanvasRenderingContext2D,a: Point,b: Point,color: string,dotted = false) {
+export function line(ctx: CanvasRenderingContext2D,a: Point,b: Point,color: string,dotted = false) {
   const span = Math.ceil(Math.max(Math.abs(a.x-b.x),Math.abs(a.y-b.y)));
   for (let i=0; i<=span; i++) {
     if (dotted && i%4>=2) continue;
@@ -44,6 +44,32 @@ function rhythmDetails(ctx: CanvasRenderingContext2D,beat: number) {
   });
 }
 
+export function drawBackground(ctx: CanvasRenderingContext2D,beat: number) {
+  for (let x=17; x<WIDTH; x+=39) {
+    block(ctx,x,0,3+x%5,198,'#a5b97d');
+    const sway=Math.round(Math.sin(x)*beat*2);
+    block(ctx,x-7+sway,16+x%25,23,5,'#a5b97d');
+    block(ctx,x+4-sway,159-x%18,13,4,'#a5b97d');
+  }
+  for (const y of [79,129]) {
+    for (let x=14; x<WIDTH-10; x+=9) block(ctx,x,y,2,1,'#b2c189');
+  }
+  rhythmDetails(ctx,beat);
+}
+
+export function drawPlatform(ctx: CanvasRenderingContext2D,r: Rect,beat: number) {
+  block(ctx,r.x,r.y,r.w,r.h,ink);
+  block(ctx,r.x+1,r.y+2,r.w-2,2,'#638155');
+  for (let n=8;n<r.w-4;n+=13) block(ctx,r.x+n,r.y+2,3,1,beat>.38 ? cream : '#d6e3ab');
+  if (r.w>40 && r.w<WIDTH) {
+    for (let dx=6;dx<r.w-5;dx+=12) {
+      const lift=beat>.42 ? 2 : 0;
+      block(ctx,r.x+dx,r.y-2-lift,1,2+lift,'#638155');
+      block(ctx,r.x+dx+1,r.y-3-lift,2,1,'#82945f');
+    }
+  }
+}
+
 interface MusicFrame { time: number; beat: number; shot?: OpeningShot }
 
 export function renderHunt(ctx: CanvasRenderingContext2D,hunt: Hunt,spider: Crawler,direction: Point,music: MusicFrame) {
@@ -59,28 +85,8 @@ export function renderHunt(ctx: CanvasRenderingContext2D,hunt: Hunt,spider: Craw
   }
   const pressure = hunt.phase==='caught' ? 0 : 1-Math.min(1,hunt.time/20);
   block(ctx,0,0,WIDTH,HEIGHT,`rgb(${Math.round(194-pressure*25)},${Math.round(207-pressure*20)},${Math.round(146-pressure*10)})`);
-  for (let x=17; x<WIDTH; x+=39) {
-    block(ctx,x,0,3+x%5,198,'#a5b97d');
-    const sway=Math.round(Math.sin(x)*beat*2);
-    block(ctx,x-7+sway,16+x%25,23,5,'#a5b97d');
-    block(ctx,x+4-sway,159-x%18,13,4,'#a5b97d');
-  }
-  for (const y of [79,129]) {
-    for (let x=14; x<WIDTH-10; x+=9) block(ctx,x,y,2,1,'#b2c189');
-  }
-  rhythmDetails(ctx,beat);
-  for (const r of platforms) {
-    block(ctx,r.x,r.y,r.w,r.h,ink);
-    block(ctx,r.x+1,r.y+2,r.w-2,2,'#638155');
-    for (let n=8;n<r.w-4;n+=13) block(ctx,r.x+n,r.y+2,3,1,beat>.38 ? cream : '#d6e3ab');
-    if (r.w>40 && r.w<WIDTH) {
-      for (let dx=6;dx<r.w-5;dx+=12) {
-        const lift=beat>.42 ? 2 : 0;
-        block(ctx,r.x+dx,r.y-2-lift,1,2+lift,'#638155');
-        block(ctx,r.x+dx+1,r.y-3-lift,2,1,'#82945f');
-      }
-    }
-  }
+  drawBackground(ctx,beat);
+  for (const r of platforms) drawPlatform(ctx,r,beat);
   hunt.strands.forEach((strand,index) => {
     const shake = Math.max(0,strand.shakeUntil-hunt.clock);
     const fading = (strand.expiresAt??Infinity)-hunt.clock < 1;
@@ -127,7 +133,7 @@ export function renderHunt(ctx: CanvasRenderingContext2D,hunt: Hunt,spider: Craw
     }
   }
 
-  avatar(ctx,spider,hunt.clock,music);
+  drawSpider(ctx,spider,hunt.clock,music);
   ctx.restore();
 }
 
@@ -135,20 +141,26 @@ const matrix: Record<Support,[number,number,number,number]> = {
   floor:[1,0,0,1], left:[0,1,-1,0], right:[0,-1,1,0], ceiling:[-1,0,0,-1],
 };
 
-function avatar(ctx: CanvasRenderingContext2D,spider: Crawler,time: number,music: MusicFrame) {
+export function drawSpider(
+  ctx: CanvasRenderingContext2D,spider: Crawler,time: number,music: MusicFrame,
+  pose: 'normal'|'take'|'aim'|'yield' = 'normal',
+) {
   ctx.save();
   ctx.transform(...matrix[spider.support??'floor'],Math.round(spider.x),Math.round(spider.y));
   const moving=Math.hypot(spider.vx,spider.vy)>4;
   const idle=spider.grounded && !moving && !spider.rope;
   const gait=spider.grounded && moving ? Math.floor(time*16)%2 :
     idle && music.shot?.subject==='spider' ? Math.floor(music.time*4)%2 : 0;
-  const tuck=spider.rope ? 2 : 0;
+  const braced=pose==='aim' || pose==='take';
+  const tuck=spider.rope ? 2 : pose==='aim' ? 1 : 0;
+  const stretch=pose==='take' ? Math.round(Math.sin(music.time*13)*1.6) : 0;
   for(let leg=0;leg<8;leg++){
     const x=-5.5+leg*1.55;
     const stride=(leg+gait)%2;
-    line(ctx,{x,y:2},{x:x+(stride ? -1 : 1),y:6-tuck-stride},ink);
+    const front=(x*spider.facing)>2;
+    line(ctx,{x,y:2},{x:x+(stride ? -1 : 1)+(front ? stretch*spider.facing : 0),y:6-tuck-stride},ink);
   }
-  if (idle && music.beat>.58) ctx.translate(0,1);
+  if (braced || pose==='yield' || (idle && music.beat>.58)) ctx.translate(0,1);
   block(ctx,-5,-3,9,6,ink);
   block(ctx,-4,-2,5,4,'#638155');
   block(ctx,spider.facing*3,-2,3,4,ink);

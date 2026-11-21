@@ -143,3 +143,26 @@ dialog h2 { margin: 0; font-size: 16px; }
   .shell[data-screen=start] .launch { gap: 8px; }
   .launch-copy p { margin-top: 6px; }
 }
+
+.clock[data-reset=true] {
+  --clock-ink: #faffda; --clock-rim: #e8f3a7;
+  background: #426746;
+  box-shadow: 0 0 10px #cbe97580, inset 0 0 0 2px #a3bf62;
+}
+.ending-code { display: none; }
+.shell:is([data-fly-phase=final],[data-fly-phase=complete]) {
+  --fly-end: 0;
+}
+.shell:is([data-fly-phase=final],[data-fly-phase=complete]) header { position: relative; }
+.shell:is([data-fly-phase=final],[data-fly-phase=complete]) :is(.clock,.hunt-info,.tools) {
+  opacity: clamp(0,calc(1.45 - 3 * var(--fly-end)),1);
+}
+.shell:is([data-fly-phase=final],[data-fly-phase=complete]) .stage {
+  border-color: rgb(120 137 96 / calc(1 - var(--fly-end)));
+}
+.shell:is([data-fly-phase=final],[data-fly-phase=complete]) .ending-code {
+  display: block; position: absolute; inset-inline: 0; text-align: center;
+  pointer-events: none; color: #a6bc84;
+  opacity: min(clamp(0,calc(4 * var(--fly-end) - .8),1),clamp(0,calc(4 - 4 * var(--fly-end)),1));
+}
+.shell[data-fly-phase=complete] header { visibility: hidden; }

@@ -1,3 +1,4 @@
+import {flyBeats,flyCaptions} from './fly-song-timing';
 import {roomBeats,roomCaptions} from './room-timing';
 import type {SongPosition} from './playlist';
 import {upgradeBeats,upgradeCaptions} from './upgrade-timing';
@@ -43,14 +44,16 @@ function lastCue(times: readonly number[],time: number) {
 
 const roomStarts = roomCaptions.map(([start])=>start);
 const upgradeStarts = upgradeCaptions.map(([start])=>start);
+const flyStarts = flyCaptions.map(([start])=>start);
 const tracks = {
-  first:{captions,beats},
-  upgrade:{captions:upgradeCaptions,beats:upgradeBeats},
-  room:{captions:roomCaptions,beats:roomBeats},
+  first:{captions,beats,starts:[]},
+  upgrade:{captions:upgradeCaptions,beats:upgradeBeats,starts:upgradeStarts},
+  room:{captions:roomCaptions,beats:roomBeats,starts:roomStarts},
+  fly:{captions:flyCaptions,beats:flyBeats,starts:flyStarts},
 };
 
 export function lyricAt({track,time}: SongPosition,timing: SongTiming) {
-  const starts=track==='first' ? timing.starts : track==='upgrade' ? upgradeStarts : roomStarts;
+  const starts=track==='first' ? timing.starts : tracks[track].starts;
   const lines=tracks[track].captions;
   const i=lastCue(starts,time);
   if (i<0) return '';

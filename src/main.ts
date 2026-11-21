@@ -10,6 +10,9 @@ import {Soundtrack} from './soundtrack';
 import {beatAt, huntStart, loadTiming, lyricAt, openingShot} from './song-cues';
 import {difficultyChanges} from './difficulty';
 import {bindLeaderboard,newRunId} from './leaderboard';
+import {createFlyEscape,finishFlyEscape,FLY_SECONDS,stepFlyEscape,type FlyEscape} from './fly-escape';
+import {renderFlyEscape,type FlyEscapeFrame} from './fly-escape-render';
+import {flyCues,flyDuration,flyFinalStart} from './fly-song-timing';
 
 const get = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const context = get<HTMLCanvasElement>('world').getContext('2d',{alpha:false})!;
@@ -28,6 +31,8 @@ const startStatus = get('start-status');
 const shell = get('shell');
 const pause = get<HTMLButtonElement>('pause');
 const lyric = get('lyric');
+const endingCode = get('ending-code');
+const flyControls = get('fly-controls');
 const intro = 'Shoot from a surface to place a web. Jump before shooting to swing.';
 const waiting = 'Connect your PlayStation controller and press a button.';
 let audioOn = true;
@@ -43,14 +48,14 @@ function fetchTrack(name: string) {
 const timing = loadTiming();
 const song = new Soundtrack([
   fetchTrack('tamago-soundtrack'),fetchTrack('tamago-upgrade'),fetchTrack('tamago-room'),
-],timing.loopStart);
+],timing.loopStart,fetchTrack('tamago-fly'));
 const leaderboard = bindLeaderboard();
 song.setMuted(!audioOn);
 let contextAudio: AudioContext|undefined;
 let requestedStart = false;
 let opening = true;
 let paused = false;
-let interrupted = false;
+let escape: FlyEscape|undefined;
 let spaceHeld = false;
 
 function requestStart() {
@@ -62,16 +67,16 @@ function requestStart() {
 start.onclick = requestStart;
 
 function syncPause() {
-  const frozen = paused || interrupted || document.hidden;
+  const frozen = paused || document.hidden || (escape!==undefined && song.position.time>=flyDuration);
   song.setPaused(frozen);
   audio.setPaused(frozen);
   remainder = 0;
-  pause.textContent = interrupted ? 'Stopped' : paused ? 'Resume' : 'Pause';
-  pause.setAttribute('aria-pressed',String(paused || interrupted));
+  pause.textContent = paused ? 'Resume' : 'Pause';
+  pause.setAttribute('aria-pressed',String(paused));
   if (!frozen && audioOn) audio.unlock();
 }
 function togglePause() {
-  if (!song.started || interrupted) return;
+  if (!song.started || (escape && song.position.time>=flyDuration)) return;
   paused = !paused;
   syncPause();
 }
@@ -96,11 +101,16 @@ window.addEventListener('keydown',event => {
   spaceHeld=true;
   if (!song.started || opening || leaderboard.open || hunt.phase==='over') return;
   event.preventDefault();
-  if (!freshPress || interrupted || song.position.track!=='room') return;
-  interrupted=true;
-  pause.disabled=true;
+  if (!freshPress || escape || song.position.track!=='room') return;
+  escape=createFlyEscape(spider,hunt.fly.p);
+  shell.dataset.flyPhase='intro';
+  get('hunt-controls').hidden=true;
+  get('show-board').hidden=true;
+  flyControls.hidden=true;
+  paused=false;
   syncPause();
-  say('Hunt stopped.');
+  song.enterFly(contextAudio);
+  say('');
 });
 window.addEventListener('keyup',event => {
   if (event.code==='Space') spaceHeld=false;
@@ -192,17 +202,95 @@ function step(dt: number,input: ReturnType<typeof samplePlayStation>) {
   return result==='over';
 }
 
+function captions(text: string,prompt=false) {
+  if (lyric.textContent!==text) lyric.textContent=text;
+  if (lyric.dataset.prompt!==String(prompt)) lyric.dataset.prompt=String(prompt);
+}
+
+const flyIntro = 'Fly through lights to reset the clock.';
+const clamp01 = (value: number)=>Math.max(0,Math.min(1,value));
+let flyCross=false;
+function flyFrame(game: FlyEscape,time: number,elapsed: number,input: ReturnType<typeof samplePlayStation>|undefined,retry: boolean) {
+  const complete=time>=flyDuration;
+  const finale=time>=flyFinalStart;
+  const playing=time>=flyCues.play;
+  const phase=complete ? 'complete' : finale ? 'final' : playing ? 'play' : 'intro';
+  if (shell.dataset.flyPhase!==phase) {
+    shell.dataset.flyPhase=phase;
+    flyControls.hidden=phase!=='play';
+    say(phase==='play' ? flyIntro : '');
+    if (complete) {
+      pause.disabled=true;
+      audio.setPaused(true);
+    }
+  }
+
+  if (finale && !game.ending) finishFlyEscape(game);
+  if (playing && !complete && !paused && !document.hidden) {
+    flyCross ||= retry;
+    remainder+=Math.min(elapsed,time-flyCues.play);
+    const behavior=time>=flyCues.pass ? 'yield' : time>=flyCues.clearShot ? 'aim' : 'hunt';
+    while (remainder>=1/120) {
+      remainder-=1/120;
+      const event=stepFlyEscape(game,{move:input?.movement??{x:0,y:0},cross:flyCross},1/120,behavior);
+      flyCross=false;
+      if (event==='light') {
+        say('Light collected · 10 seconds.');
+        audio.play('catch');
+      } else if (event==='trap') {
+        say('Caught in a web · Tap × to break free.');
+        audio.play('attach');
+      } else if (event==='escape' || event==='retry') {
+        say(flyIntro);
+      } else if (event==='timeout') {
+        say('Time ran out. Press × to try again.');
+      } else if (event==='web') {
+        audio.play('launch');
+      }
+    }
+  }
+
+  const shot: FlyEscapeFrame['shot'] = playing || time<flyCues.spider ? undefined :
+    time>=flyCues.room ? 'room' : time>=flyCues.you ? 'you' :
+    time>=flyCues.fly ? 'fly' : time>=flyCues.take ? 'take' : 'spider';
+  if (shell.dataset.flyShot!==(shot??'')) shell.dataset.flyShot=shot??'';
+  const beat=reduceMotion.matches ? 0 : beatAt({track:'fly',time});
+  const ending=finale ? clamp01((time-flyFinalStart)/20) : undefined;
+  const shrinkElapsed=time-flyCues.shrink;
+  const shrink=clamp01(shrinkElapsed/.85)*clamp01((5.5-shrinkElapsed)/1.8);
+  renderFlyEscape(context,game,{
+    time,beat,shot,intro:!playing,shotProgress:clamp01((time-flyCues.room)/.9),shrink,ending,reducedMotion:reduceMotion.matches,
+  });
+
+  const displayTime=Math.ceil(game.time);
+  const labels=[
+    [levelLabel,'The fly is you'],[timeLabel,displayTime+' s'],[roundLabel,FLY_SECONDS+' s'],
+    [scoreLabel,game.lights+(game.lights===1 ? ' light' : ' lights')],[strandsLabel,game.strands.length+' webs'],
+  ] as const;
+  for (const [element,text] of labels) if (element.textContent!==text) element.textContent=text;
+  clock.dataset.phase=phase==='intro' ? 'ready' : displayTime<=5 ? 'urgent' : 'running';
+  clock.dataset.reset=String(!finale && game.flashUntil>game.clock);
+  clock.style.setProperty('--pulse',beat.toFixed(2));
+  clockMeter.style.setProperty('--remaining',(game.time/FLY_SECONDS).toFixed(3));
+  captions(complete ? '' : lyricAt({track:'fly',time},timing));
+
+  if (ending!==undefined) {
+    shell.style.setProperty('--fly-end',ending.toFixed(3));
+    const code=ending<.58 ? 'clock.timeLeft = '+displayTime+';' : 'return room;';
+    if (endingCode.textContent!==code) endingCode.textContent=code;
+  }
+}
+
 let crossHeld=false;
 let optionsHeld=false;
 function frame(time: number) {
-  if (interrupted) return;
   const elapsed=Math.min(.05,(time-(lastFrame||time))/1000);
   lastFrame=time;
   const gamepad=pad();
   let input: ReturnType<typeof samplePlayStation>|undefined;
   let retry=false;
   const boardWasOpen=leaderboard.open;
-  leaderboard.handlePad(gamepad,time);
+  if (!escape) leaderboard.handlePad(gamepad,time);
   if (gamepad) {
     const cross=!!gamepad.buttons[0]?.pressed;
     const options=!!gamepad.buttons[9]?.pressed;
@@ -214,7 +302,7 @@ function frame(time: number) {
       previous=undefined;
       crossHeld=cross;
       optionsHeld=options;
-      if (song.started && !opening) say(hunt.phase==='over' ? 'Press × to play again.' : intro);
+      if (!escape && song.started && !opening) say(hunt.phase==='over' ? 'Press × to play again.' : intro);
     }
     input=samplePlayStation(gamepad,previous);
     previous=input.shoulders;
@@ -223,10 +311,10 @@ function frame(time: number) {
     crossHeld=cross;
     optionsHeld=options;
   } else {
-    if (activePad!==undefined && !opening && hunt.phase!=='over') say(waiting);
+    if (!escape && activePad!==undefined && !opening && hunt.phase!=='over') say(waiting);
     previous=undefined;
     activePad=undefined;
-    remainder=0;
+    if (!escape) remainder=0;
     down=false;
   }
 
@@ -244,6 +332,11 @@ function frame(time: number) {
   }
   song.connect(contextAudio);
   const position = song.position;
+  if (escape && position.track==='fly') {
+    flyFrame(escape,position.time,elapsed,input,retry);
+    if (position.time<flyDuration) requestAnimationFrame(frame);
+    return;
+  }
   if (opening && song.started && position.track==='first' && position.time>=huntStart(timing)) {
     opening=false;
     say(gamepad ? intro : waiting);
@@ -277,10 +370,7 @@ function frame(time: number) {
     audio.nearby(d,time);
   }
   const caption=song.started ? lyricAt(position,timing) : '';
-  if (lyric.textContent!==caption) {
-    lyric.textContent=caption;
-    lyric.dataset.prompt=String(position.track==='room' && /^Press Space\b/i.test(caption));
-  }
+  captions(caption,position.track==='room' && /^Press Space\b/i.test(caption));
   const seconds=Math.ceil(hunt.time);
   const level=hunt.score+Number(hunt.phase!=='caught');
   const labels = [[levelLabel,'Level '+level],[timeLabel,seconds+' s'],[roundLabel,hunt.difficulty.duration+' s'],[scoreLabel,catchesText(hunt.score)],

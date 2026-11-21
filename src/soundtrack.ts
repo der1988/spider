@@ -1,4 +1,5 @@
 import {locateTrack,playlistEnd,trackStarts,wrapPlaylist} from './playlist';
+import {flyDuration} from './fly-song-timing';
 
 type TrackBytes = Promise<ArrayBuffer | undefined>;
 
@@ -8,6 +9,9 @@ const ease = (t: number) => .5-.5*Math.cos(Math.PI*t);
 
 export class Soundtrack {
   private buffer?: AudioBuffer;
+  private flyBuffer?: AudioBuffer;
+  private flyReady = false;
+  private finale = false;
   private upgradeStart: number = trackStarts[1];
   private roomStart = trackStarts[2];
   private output?: GainNode;
@@ -23,6 +27,7 @@ export class Soundtrack {
   constructor(
     private readonly bytes: readonly [TrackBytes,TrackBytes,TrackBytes],
     private readonly returnAt: number,
+    private readonly flyBytes: TrackBytes,
   ) {}
 
   prepare(context: AudioContext | undefined) {
@@ -30,14 +35,35 @@ export class Soundtrack {
     this.loading = true;
     if (!context) {
       this.failed = true;
+      this.flyReady = true;
       return;
     }
     void this.join(context).then(buffer => {
       this.buffer=buffer;
-      this.output=context.createGain();
-      this.output.gain.value=this.muted ? 0 : .76;
-      this.output.connect(context.destination);
-    }).catch(()=>{this.failed=true;});
+    }).catch(()=>{this.failed=true;}).finally(()=>void this.prepareFly(context));
+    this.output=context.createGain();
+    this.output.gain.value=this.muted ? 0 : .76;
+    this.output.connect(context.destination);
+  }
+
+  private async prepareFly(context: AudioContext) {
+    try {
+      const bytes=await this.flyBytes;
+      if (bytes) this.flyBuffer=await context.decodeAudioData(bytes);
+    } catch { /* Keep the scene and subtitles playable without audio. */ }
+    this.flyReady=true;
+    if (this.finale) {
+      this.epoch=this.clock();
+      this.connect(context,0);
+    }
+  }
+
+  enterFly(context?: AudioContext) {
+    this.stopSource();
+    this.finale=true;
+    this.offset=0;
+    this.epoch=this.clock();
+    this.connect(context,0);
   }
 
   private async join(context: AudioContext) {
@@ -88,13 +114,15 @@ export class Soundtrack {
   }
 
   private currentOffset() {
-    if (!this.started || this.paused) return this.offset;
+    if (!this.started || this.paused || (this.finale && !this.flyReady)) return this.offset;
     const elapsed=this.offset+Math.max(0,this.clock()-this.epoch);
-    return wrapPlaylist(elapsed,this.returnAt,this.buffer?.duration);
+    return this.finale ? Math.min(flyDuration,elapsed) : wrapPlaylist(elapsed,this.returnAt,this.buffer?.duration);
   }
 
   get position() {
-    return locateTrack(this.currentOffset(),this.upgradeStart,this.roomStart);
+    const time=this.currentOffset();
+    if (this.finale) return {track:'fly' as const,time};
+    return locateTrack(time,this.upgradeStart,this.roomStart);
   }
 
   start() {
@@ -106,15 +134,18 @@ export class Soundtrack {
     return !!this.buffer && context?.state==='running';
   }
 
-  connect(context?: AudioContext) {
-    const buffer=this.buffer;
-    if (!this.started || this.paused || this.source || !this.canPlay(context) || !context || !this.output || !buffer) return;
-    this.offset=this.currentOffset();
+  connect(context?: AudioContext,startAt?: number) {
+    const buffer=this.finale ? this.flyBuffer : this.buffer;
+    if (!this.started || this.paused || this.source || context?.state!=='running' || !this.output || !buffer) return;
+    this.offset=startAt??this.currentOffset();
+    if (this.finale && this.offset>=buffer.duration) return;
     const source=context.createBufferSource();
     source.buffer=buffer;
-    source.loop=true;
-    source.loopStart=this.returnAt;
-    source.loopEnd=buffer.duration;
+    if (!this.finale) {
+      source.loop=true;
+      source.loopStart=this.returnAt;
+      source.loopEnd=buffer.duration;
+    }
     source.connect(this.output);
     const launch=context.currentTime+.012;
     source.start(launch,this.offset);
@@ -133,11 +164,14 @@ export class Soundtrack {
     if (paused===this.paused) return;
     this.offset=this.currentOffset();
     this.paused=paused;
-    if (this.source) {
-      this.source.stop();
-      this.source.disconnect();
-      this.source=undefined;
-    }
+    this.stopSource();
     this.epoch=this.clock();
+  }
+
+  private stopSource() {
+    if (!this.source) return;
+    this.source.stop();
+    this.source.disconnect();
+    this.source=undefined;
   }
 }

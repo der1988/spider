@@ -6,6 +6,7 @@
 <meta name="tamago-soundtrack" content="./the-fly-has-ai.mp3">
 <meta name="tamago-upgrade" content="./the-fly-has-an-upgrade.mp3">
 <meta name="tamago-room" content="./the-room-has-a-space-bar.mp3">
+<meta name="tamago-fly" content="./the-fly-is-you.mp3">
 <meta name="theme-color" content="#202f24">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./touch.png">
@@ -38,6 +39,7 @@
       <span class="clock-rhythm" aria-hidden="true"></span>
       <div class="clock-track" aria-hidden="true"><span id="clock-meter"></span></div>
     </div>
+    <code id="ending-code" class="ending-code" aria-hidden="true"></code>
     <div class="tools">
       <button id="pause" type="button" aria-pressed="false" disabled>Pause</button>
       <button id="show-board" type="button">Leaderboard</button>
@@ -50,7 +52,8 @@
   <footer>
     <p id="lyric" class="lyric" lang="en"></p>
     <p id="message" role="status"></p>
-    <p>Left stick: move, ↑ reel in, ↓ detach · Right stick: aim · <kbd>R1</kbd> Shoot web · <kbd>L1</kbd> Jump / double jump · <kbd>Options</kbd> Pause</p>
+    <p id="hunt-controls">Left stick: move, ↑ reel in, ↓ detach · Right stick: aim · <kbd>R1</kbd> Shoot web · <kbd>L1</kbd> Jump / double jump · <kbd>Options</kbd> Pause</p>
+    <p id="fly-controls" hidden>Left stick: fly · <kbd>×</kbd> Break free · <kbd>Options</kbd> Pause</p>
   </footer>
 </main>
 <dialog id="scoreboard" aria-labelledby="board-title">
