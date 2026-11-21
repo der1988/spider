@@ -1,6 +1,6 @@
 # Spider vs Fly
 
-Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scorri **STORY**, **ENDLESS**, **Top 10** e **Test Ending** con **↑/↓** sulla croce direzionale o con lo stick sinistro. Premi **×** per confermare. Puoi anche fare clic sul pulsante. Il timer parte appena finisce «Start the clock», anche se il controller è scollegato o lo stick è fermo. Da quel momento puoi usare i comandi.
+Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scorri **STORY**, **ENDLESS** e **Top 10** con **↑/↓** sulla croce direzionale o con lo stick sinistro. Premi **×** per confermare. Puoi anche fare clic sul pulsante. Il timer parte appena finisce «Start the clock», anche se il controller è scollegato o lo stick è fermo. Da quel momento puoi usare i comandi.
 
 - **Stick sinistro** per correre sul pavimento, sulle pareti e sul soffitto o per dondolare. Sul filo attivo, spingi **su** per risalire e **giù** per staccarti. Con **su** puoi anche aggrapparti a un filo già fissato.
 - **Stick destro** per mirare in ogni direzione. **R1** lancia verso il primo appiglio entro la portata. Pareti, soffitto, pavimento e piattaforme accettano la seta. Se sei su una superficie, il tiro tende subito una ragnatela. Salta prima di sparare per dondolare: il filo si fissa quando tocchi una superficie valida. In aria puoi lanciare un secondo filo per spostare il dondolio sul nuovo appiglio.
@@ -10,7 +10,7 @@ Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scorri
 
 ## Finale di Story
 
-Durante il terzo brano premi **Spazio** per cambiare prospettiva. **Test Ending** apre direttamente il volo della mosca a **18,192 s** del quarto brano, con **10 secondi** sul timer. Lo stick sinistro fa volare la mosca, le luci ripristinano i 10 secondi e otto nuove pressioni di **×** la liberano da una tela. Se scade il tempo in **Test Ending**, torni al menu con la voce già selezionata.
+Durante il terzo brano premi **Spazio** per cambiare prospettiva. Dopo «Start the clock», il volo della mosca inizia a **18,192 s** del quarto brano con **10 secondi** sul timer. Lo stick sinistro fa volare la mosca, le luci ripristinano i 10 secondi e otto nuove pressioni di **×** la liberano da una tela.
 
 ## Endless Top 10
 

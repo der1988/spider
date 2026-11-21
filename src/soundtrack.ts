@@ -37,13 +37,13 @@ export class Soundtrack {
   get waiting() { return this.program!==undefined && !this.started; }
   get failed() { return this.ready && !this.buffer; }
 
-  play(program: Program,context?: AudioContext,offset=0) {
+  play(program: Program,context?: AudioContext) {
     this.stopSource();
     this.program=program;
     this.buffer=undefined;
     this.started=false;
     this.ready=!context;
-    this.offset=offset;
+    this.offset=0;
     const generation=++this.generation;
     if (!context) {
       this.connect();

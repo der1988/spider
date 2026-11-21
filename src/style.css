@@ -185,7 +185,6 @@ dialog h2 { margin: 0; font-size: 16px; }
 #start-status:empty { display: none; }
 #start-status { margin: 0; padding-inline: 8px; text-align: center; font-size: 11px; }
 @media (max-height: 380px) {
-  .launch-copy h1 img { width: min(71vw,56dvh,606px); }
   .shell:is([data-screen=start],[data-reforming]) .launch { gap: 5px; padding-block: 4px; }
   .launch-copy p { margin-top: 4px; }
   .launch > .mode-choices { gap: 3px; padding: 4px; }
@@ -243,7 +242,7 @@ dialog h2 { margin: 0; font-size: 16px; }
   opacity: calc(.70 + var(--menu-pulse) * .30);
   transform: translateX(calc(var(--menu-pulse) * 3px));
 }
-.shell[data-reforming] :is(#menu-top,#test-ending) { visibility: hidden; }
+.shell[data-reforming] #menu-top { visibility: hidden; }
 #start-status { z-index: 1; }
 #endless-status { margin: 0; font-size: 11px; }
 #endless-status:empty { display: none; }

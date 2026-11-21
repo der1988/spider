@@ -69,7 +69,6 @@ let padDirection = 0;
 let opening = true;
 let paused = false;
 let escape: FlyEscape|undefined;
-let testingEnding=false;
 let spaceHeld = false;
 
 function bindChoices(items: readonly (readonly [string,()=>void])[],vertical=false) {
@@ -96,7 +95,6 @@ const menuChoices=bindChoices([
   ['story',()=>requestMode('story')],
   ['loop',()=>requestMode('loop')],
   ['menu-top',()=>void endlessBoard.view()],
-  ['test-ending',requestTestEnding],
 ],true);
 const defeatChoices=bindChoices([['main-menu',showMenu],['retry',retryLoop]]);
 get<HTMLDialogElement>('endless-board').addEventListener('close',()=>{
@@ -130,7 +128,6 @@ window.addEventListener('pointerdown',()=>{
 
 function clearFlyScene() {
   escape=undefined;
-  testingEnding=false;
   flyCross=false;
   delete shell.dataset.flyPhase;
   delete shell.dataset.flyShot;
@@ -154,7 +151,6 @@ function startIntro(next: HuntMode) {
 
 function showMenu() {
   const priorMode=mode;
-  const wasTestingEnding=testingEnding;
   mode=undefined;
   song.play('menu',contextAudio);
   paused=false;
@@ -164,7 +160,7 @@ function showMenu() {
   endlessBoard.clear();
   shell.dataset.screen='start';
   launch.inert=false;
-  menuChoices.select(wasTestingEnding ? 3 : priorMode==='loop' ? 1 : 0,true);
+  menuChoices.select(priorMode==='loop' ? 1 : 0,true);
   startStatus.textContent='';
   captions('');
   say('');
@@ -197,23 +193,12 @@ function togglePause() {
   paused = !paused;
   syncPause();
 }
-function requestTestEnding() {
-  if (shell.dataset.screen!=='start' || escape) return;
-  contextAudio=audio.audioContext();
-  audio.unlock();
-  mode='story';
-  resetHunt();
-  startStatus.textContent='Loading soundtrack…';
-  beginFly(true);
-}
-
-function beginFly(test=false) {
-  testingEnding=test;
-  escape=test ? createFlyEscape() : createFlyEscape(spider,hunt.fly.p);
+function beginFly() {
+  escape=createFlyEscape(spider,hunt.fly.p);
   flyCross=false;
   shell.dataset.flyPhase='intro';
   paused=false;
-  song.play('fly',contextAudio,test ? flyCues.play : 0);
+  song.play('fly',contextAudio);
   syncPause();
   say('');
 }
@@ -351,8 +336,7 @@ function flyFrame(game: FlyEscape,time: number,elapsed: number,move: Point,cross
         say('');
       } else if (event==='timeout') {
         audio.play('miss');
-        if (testingEnding) showMenu();
-        else startIntro('story');
+        startIntro('story');
         return;
       } else if (event==='attach') {
         audio.play('attach');
