@@ -1,4 +1,4 @@
-import {HEIGHT, LIMIT, platforms, WIDTH, type Hunt} from './hunt';
+import {HEIGHT, LIMIT, platforms, WIDTH, type Hunt} from './hunt.ts';
 import type {Point,Rect} from './spider';
 import type {Crawler,Support} from './crawler';
 import type {OpeningShot} from './song-cues';

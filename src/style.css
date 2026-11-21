@@ -228,3 +228,33 @@ dialog h2 { margin: 0; font-size: 16px; }
   display: grid; place-items: center; position: absolute; inset: 0;
   opacity: clamp(0,calc(1.8 - 2 * var(--menu-form)),1);
 }
+
+#menu-room { position: absolute; inset: 0; object-fit: fill; pointer-events: none; }
+.shell[data-reforming] #menu-room { opacity: var(--menu-form); }
+.launch { --menu-pulse: 0; }
+.launch-copy img { transform: scale(calc(1 + var(--menu-pulse) * .012)); }
+.launch > .mode-choices { background: #192b21ed; width: min(235px,66%); padding: 5px; }
+.launch > .mode-choices button[data-selected=true]::before {
+  opacity: calc(.70 + var(--menu-pulse) * .30);
+  transform: translateX(calc(var(--menu-pulse) * 3px));
+}
+.launch > .mode-choices #menu-top {
+  min-height: 27px; font-size: 11px; letter-spacing: .06em; padding-block: 4px;
+}
+#loop[data-selected=false] + #menu-top, .shell[data-reforming] #menu-top { visibility: hidden; }
+#start-status { z-index: 1; }
+#endless-status { margin: 0; font-size: 11px; }
+#endless-status:empty { display: none; }
+.top-ten { color: #e2eabd; }
+#endless-board { max-height: 90dvh; overflow: auto; }
+#endless-entries { padding-inline-start: 2.7em; margin-bottom: 0; }
+#endless-entries li { padding: 5px 0; border-top: 1px solid #526b48; }
+#endless-name-form:not([hidden]) { display: grid; gap: 8px; margin-top: 16px; }
+#endless-name {
+  width: min(100%, 13ch); padding: 6px 9px; color: #eff3c8; background: #192c20;
+  border: 1px solid #8ca46c; font: bold 22px ui-monospace, monospace; letter-spacing: .2em;
+}
+#endless-name:focus-visible { outline: 2px solid #eff3c8; }
+#endless-name::selection { background: #d7e4a1; color: #203025; }
+.board-actions { display: flex; gap: 6px; }
+#name-controls { margin: 0; color: #b8ca94; }

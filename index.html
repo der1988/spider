@@ -8,6 +8,7 @@
 <meta name="tamago-room" content="./the-room-has-a-space-bar.mp3">
 <meta name="tamago-fly" content="./the-fly-is-you.mp3">
 <meta name="tamago-loop" content="./infinite-loop.mp3">
+<meta name="tamago-menu" content="./menusong.mp3">
 <meta name="theme-color" content="#202f24">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./touch.png">
@@ -17,6 +18,7 @@
 <body>
 <main id="shell" class="shell" data-screen="start">
   <section id="launch" class="launch" aria-labelledby="launch-title">
+    <canvas id="menu-room" width="360" height="204" aria-hidden="true"></canvas>
     <div class="launch-copy">
       <h1 id="launch-title"><img src="/src/menu-title.png" alt="SPIDER vs FLY" width="224" height="124"></h1>
       <p>Use your controller</p>
@@ -24,6 +26,7 @@
     <div class="mode-choices">
       <button id="story" type="button" data-selected="true"><span>STORY</span><code aria-hidden="true">story()</code></button>
       <button id="loop" type="button" data-selected="false"><span>ENDLESS</span><code aria-hidden="true">loop()</code></button>
+      <button id="menu-top" class="top-ten" type="button">△ Top 10</button>
     </div>
     <p id="start-status" role="status"></p>
   </section>
@@ -53,6 +56,8 @@
           <label for="defeat-score">Total catches</label>
           <output id="defeat-score">0</output>
         </div>
+        <p id="endless-status" role="status"></p>
+        <button id="defeat-top" class="top-ten" type="button">△ Top 10</button>
         <div class="mode-choices">
           <button id="main-menu" type="button" data-selected="false">Main Menu</button>
           <button id="retry" type="button" data-selected="true">Retry</button>
@@ -73,6 +78,24 @@
   <p id="board-status" role="status"></p>
   <button id="board-reload" type="button" hidden>Try again</button>
   <ol id="board-entries" aria-label="Leaderboard by catches"></ol>
+</dialog>
+<dialog id="endless-board" aria-labelledby="endless-title">
+  <div class="board-header">
+    <h2 id="endless-title">Endless Top 10</h2>
+    <button id="endless-close" type="button">Close</button>
+  </div>
+  <ol id="endless-entries" aria-label="Endless rank, name and catches"></ol>
+  <form id="endless-name-form" hidden>
+    <label for="endless-name">Name · 1–6 letters</label>
+    <input id="endless-name" type="text" autocomplete="off" spellcheck="false" maxlength="6" aria-describedby="name-controls">
+    <p id="name-controls">↑ ↓ Change letter · ← → Move · □ Delete · × Save · ○ Skip</p>
+    <div class="board-actions">
+      <button id="endless-publish" type="submit">Save Score</button>
+      <button id="endless-skip" type="button">Skip</button>
+    </div>
+  </form>
+  <p id="endless-board-status" role="status"></p>
+  <button id="endless-again" type="button" hidden>Try Again</button>
 </dialog>
 <script type="module" src="/src/main.ts"></script>
 </body>

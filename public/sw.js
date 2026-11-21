@@ -1,7 +1,7 @@
 const prefix = 'tamago-shell-';
 const scope = self.registration.scope;
 const shell = new URL('index.html', scope).href;
-const staticFiles = ['manifest.webmanifest', 'touch.png', 'icon-192.png', 'icon-512.png', 'the-fly-has-ai.mp3', 'the-fly-has-an-upgrade.mp3', 'the-room-has-a-space-bar.mp3', 'the-fly-is-you.mp3', 'infinite-loop.mp3'];
+const staticFiles = ['manifest.webmanifest', 'touch.png', 'icon-192.png', 'icon-512.png', 'the-fly-has-ai.mp3', 'the-fly-has-an-upgrade.mp3', 'the-room-has-a-space-bar.mp3', 'the-fly-is-you.mp3', 'infinite-loop.mp3', 'menusong.mp3'];
 const activeCache = prefix + build; // build is injected by Vite.
 
 self.addEventListener('install', event => {
@@ -27,7 +27,7 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const {request} = event;
   if (request.method !== 'GET' || !request.url.startsWith(scope)) return;
-  if (new URL(request.url).pathname===new URL('api/scores',scope).pathname) return;
+  if (request.url.startsWith(new URL('api/',scope).href)) return;
   event.respondWith((async () => {
     const cache = await caches.open(activeCache);
     if (request.mode === 'navigate') {

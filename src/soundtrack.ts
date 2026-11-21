@@ -1,9 +1,11 @@
 import {locateTrack,playlistEnd,trackStarts,wrapPlaylist} from './playlist';
 import {flyDuration} from './fly-song-timing';
 import {infiniteEnd,infiniteReturn} from './infinite-timing';
+import {menuLoopStart,menuLoopEnd} from './menu-timing';
 
 type TrackBytes = Promise<ArrayBuffer | undefined>;
-type Program = 'story'|'fly'|'loop';
+type Program = 'story'|'fly'|'loop'|'menu';
+const loops = {loop:[infiniteReturn,infiniteEnd],menu:[menuLoopStart,menuLoopEnd]} as const;
 
 const boundaryFade = .012;
 const returnBlend = .14;
@@ -29,6 +31,7 @@ export class Soundtrack {
     private readonly returnAt: number,
     private readonly flyBytes: TrackBytes,
     private readonly infiniteBytes: TrackBytes,
+    private readonly menuBytes: TrackBytes,
   ) {}
 
   get waiting() { return this.program!==undefined && !this.started; }
@@ -65,23 +68,15 @@ export class Soundtrack {
       .catch(()=>undefined);
   }
 
-  private async decode(program: 'fly'|'loop',context: AudioContext) {
-    const bytes=await (program==='fly' ? this.flyBytes : this.infiniteBytes);
+  private async decode(program: 'fly'|'loop'|'menu',context: AudioContext) {
+    const bytes=await (program==='fly' ? this.flyBytes : program==='menu' ? this.menuBytes : this.infiniteBytes);
     if (!bytes) return;
     const buffer=await context.decodeAudioData(bytes);
-    if (program==='loop') this.blendLoop(buffer,infiniteReturn,infiniteEnd);
+    if (program!=='fly') {
+      const [start,end]=loops[program];
+      this.blendLoop(buffer,start,end);
+    }
     return buffer;
-  }
-
-  reset() {
-    this.stopSource();
-    this.generation++;
-    this.program=undefined;
-    this.buffer=undefined;
-    this.ready=false;
-    this.started=false;
-    this.offset=0;
-    this.paused=false;
   }
 
   private async join(context: AudioContext) {
@@ -143,13 +138,16 @@ export class Soundtrack {
     if (!this.started || this.paused) return this.offset;
     const elapsed=this.offset+Math.max(0,this.clock()-this.epoch);
     if (this.program==='fly') return Math.min(flyDuration,elapsed);
-    if (this.program==='loop') return wrapPlaylist(elapsed,infiniteReturn,infiniteEnd);
+    if (this.program==='loop' || this.program==='menu') {
+      const [start,end]=loops[this.program];
+      return wrapPlaylist(elapsed,start,end);
+    }
     return wrapPlaylist(elapsed,this.returnAt,this.buffer?.duration);
   }
 
   get position() {
     const time=this.currentOffset();
-    if (this.program==='fly' || this.program==='loop') return {track:this.program,time};
+    if (this.program && this.program!=='story') return {track:this.program,time};
     return locateTrack(time,this.upgradeStart,this.roomStart);
   }
 
@@ -168,8 +166,9 @@ export class Soundtrack {
     source.buffer=buffer;
     if (this.program!=='fly') {
       source.loop=true;
-      source.loopStart=this.program==='loop' ? infiniteReturn : this.returnAt;
-      source.loopEnd=this.program==='loop' ? infiniteEnd : buffer.duration;
+      const [start,end]=this.program==='loop' || this.program==='menu' ? loops[this.program] : [this.returnAt,buffer.duration];
+      source.loopStart=start;
+      source.loopEnd=end;
     }
     source.connect(this.output);
     const launch=context.currentTime+.012;

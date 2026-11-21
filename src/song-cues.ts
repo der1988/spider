@@ -1,5 +1,6 @@
 import {flyBeats,flyCaptions} from './fly-song-timing';
 import {infiniteBeats,infiniteCaptions} from './infinite-timing';
+import {menuBeats} from './menu-timing';
 import {roomBeats,roomCaptions} from './room-timing';
 import type {SongPosition} from './playlist';
 import {upgradeBeats,upgradeCaptions} from './upgrade-timing';
@@ -52,6 +53,7 @@ const tracks = {
   room:{captions:roomCaptions,beats:roomBeats,starts:roomStarts},
   fly:{captions:flyCaptions,beats:flyBeats,starts:flyStarts},
   loop:{captions:infiniteCaptions,beats:infiniteBeats,starts:infiniteCaptions.map(([start])=>start)},
+  menu:{captions:[],beats:menuBeats,starts:[]},
 };
 
 export function lyricAt({track,time}: SongPosition,timing: SongTiming) {

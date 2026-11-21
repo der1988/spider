@@ -1,15 +1,17 @@
 import './style.css';
-import {DEFAULT_TUNING,type Point} from './spider';
-import {anchorCrawlerRope,castCrawler,closeCrawlerRopes,createCrawler,jumpCrawler,tickCrawler} from './crawler';
-import {capStrands,createHunt,platforms,spawn,tickHunt,WEB_SECONDS} from './hunt';
-import {fixSilk,leaveSilk,WEB_KEY} from './threads';
+import type {Point} from './spider';
+import {advanceArena,arenaInput,arenaStep,createArena,type ArenaEvent} from './arena-run';
+import {endlessArena,newEndlessId,recordReplay} from './endless-replay';
+import {WEB_KEY} from './threads';
 import {renderHunt} from './hunt-render';
-import {readLeftStick,samplePlayStation,silkMotion} from './pad-controls';
+import {readLeftStick,samplePlayStation} from './pad-controls';
 import {Soundscape} from './soundscape';
 import {Soundtrack} from './soundtrack';
 import {beatAt, huntStart, loadTiming, lyricAt, openingShot} from './song-cues';
 import {difficultyChanges,type HuntMode} from './difficulty';
 import {bindLeaderboard} from './leaderboard';
+import {bindEndlessBoard} from './endless-board';
+import {createMenuRoom,renderMenuRoom,stepMenuRoom} from './menu-room';
 import {createFlyEscape,ESCAPE_PRESSES,finishFlyEscape,FLY_SECONDS,stepFlyEscape,type FlyEscape} from './fly-escape';
 import {renderFlyEscape,type FlyEscapeFrame} from './fly-escape-render';
 import {flyCues,flyDoubtAt,flyDuration,flyFinalStart,flyMenuStart,flyRoomEffect} from './fly-song-timing';
@@ -25,6 +27,19 @@ const roundLabel = get('round-time');
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const scoreLabel = get('score');
 const launch = get('launch');
+const menuCanvas=get<HTMLCanvasElement>('menu-room');
+const menuContext=menuCanvas.getContext('2d',{alpha:false})!;
+let menuRoom=createMenuRoom();
+new ResizeObserver(([entry])=>{
+  const {width,height}=entry.contentRect;
+  if (!width || !height) return;
+  const scale=Math.max(Math.min(width,height)/204,Math.max(width,height)/540);
+  const w=Math.round(width/scale), h=Math.round(height/scale);
+  if (menuCanvas.width===w && menuCanvas.height===h) return;
+  menuCanvas.width=w;
+  menuCanvas.height=h;
+  menuRoom=createMenuRoom(w,h);
+}).observe(menuCanvas);
 const defeat = get('loop-defeat');
 const defeatScore = get('defeat-score');
 const startStatus = get('start-status');
@@ -43,8 +58,12 @@ const timing = loadTiming();
 const huntStartsAt = huntStart(timing);
 const song = new Soundtrack([
   fetchTrack('tamago-soundtrack'),fetchTrack('tamago-upgrade'),fetchTrack('tamago-room'),
-],timing.loopStart,fetchTrack('tamago-fly'),fetchTrack('tamago-loop'));
+],timing.loopStart,fetchTrack('tamago-fly'),fetchTrack('tamago-loop'),fetchTrack('tamago-menu'));
 const leaderboard = bindLeaderboard();
+const endlessBoard=bindEndlessBoard();
+const dialogOpen=()=>leaderboard.open || endlessBoard.open;
+get('menu-top').onclick=()=>void endlessBoard.view();
+get('defeat-top').onclick=()=>void endlessBoard.view();
 let contextAudio: AudioContext|undefined;
 let mode: HuntMode|undefined;
 let padDirection = 0;
@@ -65,13 +84,14 @@ function bindChoices(left: string,right: string,chooseLeft: ()=>void,chooseRight
   buttons[1].onclick=()=>{ select(1); chooseRight(); };
   buttons[0].onfocus=()=>select(0);
   buttons[1].onfocus=()=>select(1);
-  return {select,confirm:()=>buttons[selected].click()};
+  return {select,get selected(){return selected;},confirm:()=>buttons[selected].click()};
 }
 
 const menuChoices=bindChoices('story','loop',()=>requestMode('story'),()=>requestMode('loop'));
 const defeatChoices=bindChoices('main-menu','retry',showMenu,retryLoop);
 
 function activeChoices() {
+  if (dialogOpen()) return;
   if (shell.dataset.screen==='start') return menuChoices;
   if (!defeat.hidden) return defeatChoices;
 }
@@ -84,7 +104,16 @@ function requestMode(next: HuntMode) {
   startStatus.textContent='Loading soundtrack…';
   startIntro(next);
 }
-window.addEventListener('pointerdown',()=>{ if (song.waiting) audio.unlock(); });
+function enableMenuSound() {
+  if (mode || shell.dataset.screen!=='start') return;
+  contextAudio=audio.audioContext();
+  audio.unlock();
+  if (!song.started && !song.waiting) song.play('menu',contextAudio);
+}
+window.addEventListener('pointerdown',()=>{
+  if (shell.dataset.screen==='start') enableMenuSound();
+  else if (song.waiting) audio.unlock();
+});
 
 function clearFlyScene() {
   escape=undefined;
@@ -111,12 +140,13 @@ function startIntro(next: HuntMode) {
 
 function showMenu() {
   const priorMode=mode;
-  song.reset();
   mode=undefined;
+  song.play('menu',contextAudio);
   paused=false;
   remainder=0;
   clearFlyScene();
   defeat.hidden=true;
+  endlessBoard.clear();
   shell.dataset.screen='start';
   launch.inert=false;
   menuChoices.select(priorMode==='loop' ? 1 : 0,true);
@@ -130,6 +160,7 @@ function showDefeat() {
   defeatScore.textContent=String(hunt.score);
   defeat.hidden=false;
   defeatChoices.select(1,true);
+  if (endlessRun) endlessBoard.finish({runId:endlessRun.id,catches:hunt.score,replay:endlessRun.record.encode()});
 }
 
 function retryLoop() {
@@ -147,7 +178,7 @@ function syncPause() {
   if (!frozen) audio.unlock();
 }
 function togglePause() {
-  if (!song.started || !defeat.hidden) return;
+  if (!mode || !song.started || !defeat.hidden) return;
   paused = !paused;
   syncPause();
 }
@@ -162,17 +193,19 @@ function beginFly() {
 }
 
 window.addEventListener('keydown',event => {
-  if (song.waiting) audio.unlock();
+  if (shell.dataset.screen==='start') enableMenuSound();
+  else if (song.waiting) audio.unlock();
+  if (dialogOpen()) return;
   const choices=activeChoices();
   if (choices && /^Arrow(Left|Right|Up|Down)$/.test(event.code)) {
     event.preventDefault();
     choices.select(event.code==='ArrowLeft' || event.code==='ArrowUp' ? 0 : 1,true);
   }
-  if (event.code==='Escape' && !event.repeat && !leaderboard.open) togglePause();
+  if (event.code==='Escape' && !event.repeat && !dialogOpen()) togglePause();
   if (event.code!=='Space') return;
   const freshPress=!spaceHeld && !event.repeat;
   spaceHeld=true;
-  if (mode!=='story' || !song.started || opening || leaderboard.open || hunt.phase==='over') return;
+  if (mode!=='story' || !song.started || opening || dialogOpen() || hunt.phase==='over') return;
   event.preventDefault();
   if (!freshPress || escape || song.position.track!=='room') return;
   beginFly();
@@ -183,26 +216,28 @@ window.addEventListener('keyup',event => {
 window.addEventListener('blur',()=>{ spaceHeld=false; });
 document.addEventListener('visibilitychange',syncPause);
 
-let hunt = createHunt();
+let arena=createArena('story');
+let hunt=arena.hunt;
+let spider=arena.spider;
+let endlessRun:{id:string;record:ReturnType<typeof recordReplay>}|undefined;
 let difficultyNotice: {text:string; until:number}|undefined;
-let spider = createCrawler(spawn,platforms);
-let aimDirection: Point = {x:.56,y:-.828};
 let previous: ReturnType<typeof samplePlayStation>['shoulders']|undefined;
 let activePad: number|undefined;
 let supportsPads = typeof navigator.getGamepads==='function';
-let down = false;
+let pendingButtons=0;
 let lastFrame=0;
 let remainder=0;
 function say(text: string) { if(message.textContent!==text) message.textContent=text; }
-const worldAim = () => ({x:spider.x+aimDirection.x*70,y:spider.y+aimDirection.y*70});
 
 function resetHunt() {
-  hunt=createHunt(undefined,mode);
+  endlessBoard.clear();
+  endlessRun=mode==='loop' ? {id:newEndlessId(),record:recordReplay()} : undefined;
+  arena=endlessRun ? endlessArena(endlessRun.id) : createArena('story');
+  hunt=arena.hunt;
+  spider=arena.spider;
   difficultyNotice=undefined;
-  spider=createCrawler(spawn,platforms);
-  aimDirection={x:.56,y:-.828};
   previous=undefined;
-  down=false;
+  pendingButtons=0;
   remainder=0;
   updateHud(hunt.time,hunt.difficulty.duration);
   clock.dataset.reset='false';
@@ -221,40 +256,16 @@ function pad() {
   }
 }
 
-function shootSilk() {
-  audio.play('launch');
-  if (castCrawler(spider,platforms,worldAim())) {
-    audio.play('attach',.06);
-    const before=hunt.strands.length;
-    if (anchorCrawlerRope(spider,platforms,hunt.strands)) finishWebs(before);
-    else if (spider.firstAnchor) say('Double tether. Swinging from the latest anchor.');
-  } else audio.play('miss',.06);
-}
-function finishWebs(before: number) {
-  if (hunt.strands.length===before) return;
-  for (const strand of hunt.strands.slice(before)) strand.expiresAt=hunt.clock+WEB_SECONDS;
-  const evicted=capStrands(hunt);
-  audio.play('fix');
-  say(evicted ? 'New web placed. The oldest web is fading.' : 'Web placed.');
-}
-
-function step(dt: number,m: Point) {
-  const motion=silkMotion(m,down);
-  down=motion.down;
-  if (motion.detach && spider.rope) {
-    const old=closeCrawlerRopes(spider);
-    if (old) leaveSilk(hunt,old,DEFAULT_TUNING.range);
-    audio.play('release');
+function arenaFeedback(result:ArenaEvent) {
+  if (result==='attach' || result==='miss') {
+    audio.play('launch');
+    audio.play(result,.06);
+  } else if (result==='jump' || result==='release') audio.play(result);
+  else if (result==='double') say('Double tether. Swinging from the latest anchor.');
+  else if (result==='fix' || result==='evict') {
+    audio.play('fix');
+    say(result==='evict' ? 'New web placed. The oldest web is fading.' : 'Web placed.');
   }
-  const deadzone=.12;
-  const axis=(n: number)=>Math.sign(n)*Math.max(0,(Math.abs(n)-deadzone)/(1-deadzone));
-  const active=hunt.strands.filter(s=>(s.expiresAt??Infinity)>hunt.clock+dt);
-  tickCrawler(spider,platforms,{x:axis(m.x),y:axis(m.y)},motion.reel,dt,active);
-  const before=hunt.strands.length;
-  anchorCrawlerRope(spider,platforms,hunt.strands);
-  fixSilk(hunt,spider,platforms);
-  finishWebs(before);
-  const result=tickHunt(hunt,spider,dt);
   if(result==='catch') {
     audio.play('catch');
     say('Fly caught.');
@@ -270,7 +281,6 @@ function step(dt: number,m: Point) {
     if (message.textContent===difficultyNotice.text) say('');
     difficultyNotice=undefined;
   }
-  return result==='over';
 }
 
 function updateHud(seconds: number,budget: number) {
@@ -349,6 +359,7 @@ function flyFrame(game: FlyEscape,time: number,elapsed: number,move: Point,cross
     if (endingCode.textContent!==code) endingCode.textContent=code;
     if (time>=flyMenuStart) {
       shell.dataset.reforming='true';
+      renderMenuRoom(menuContext,menuRoom,beat);
       const formation=clamp01((time-flyMenuStart)/(flyDuration-flyMenuStart));
       shell.style.setProperty('--menu-form',formation.toFixed(3));
     }
@@ -371,7 +382,9 @@ function frame(time: number) {
   const gamepad=pad();
   let input: ReturnType<typeof samplePlayStation>|undefined;
   let crossPressed=false;
-  const boardWasOpen=leaderboard.open;
+  const boardWasOpen=dialogOpen();
+  const atMenu=shell.dataset.screen==='start';
+  endlessBoard.handlePad(gamepad,time,(atMenu && menuChoices.selected===1) || !defeat.hidden);
   const navigation=activeChoices();
   if (!navigation && !escape && mode==='story') leaderboard.handlePad(gamepad);
   if (gamepad) {
@@ -386,25 +399,43 @@ function frame(time: number) {
     crossPressed=cross && !crossHeld;
     crossHeld=cross;
     const direction=navigationDirection(gamepad);
-    if (navigation && direction && direction!==padDirection) navigation.select(direction<0 ? 0 : 1,true);
+    if (navigation && direction && direction!==padDirection) {
+      navigation.select(direction<0 ? 0 : 1,true);
+      if (atMenu) enableMenuSound();
+    }
     padDirection=direction;
-    if (navigation && crossPressed) navigation.confirm();
+    if (navigation && crossPressed && !boardWasOpen) {
+      if (atMenu && !mode && !song.started && !song.waiting) enableMenuSound();
+      else navigation.confirm();
+    }
     if (!navigation && !escape) {
       input=samplePlayStation(gamepad,previous);
       previous=input.shoulders;
     }
-    if (options && !optionsHeld && !navigation && !leaderboard.open) togglePause();
+    if (options && !optionsHeld && !navigation && !dialogOpen()) togglePause();
     optionsHeld=options;
   } else {
     previous=undefined;
     activePad=undefined;
-    down=false;
     crossHeld=false;
     padDirection=0;
   }
 
   song.connect(contextAudio);
   const menu=shell.dataset.screen==='start';
+  if (menu && (!mode || !song.started)) {
+    const position=song.position;
+    const beat=reduceMotion.matches || position.track!=='menu' ? 0 : beatAt(position);
+    if (!document.hidden) stepMenuRoom(menuRoom,elapsed);
+    launch.style.setProperty('--menu-pulse',beat.toFixed(2));
+    renderMenuRoom(menuContext,menuRoom,beat);
+    if (!mode) {
+      startStatus.textContent=song.started ? '' : song.waiting && contextAudio?.state!=='running' ?
+        'Click or press a keyboard key to enable sound.' : 'Press × or click to enable sound.';
+      requestAnimationFrame(frame);
+      return;
+    }
+  }
   if (!song.started) {
     if (menu && song.waiting) startStatus.textContent=contextAudio?.state==='running' ? 'Loading soundtrack…' :
       'Click or press a keyboard key to enable audio.';
@@ -433,15 +464,18 @@ function frame(time: number) {
     say('');
   }
 
-  if (!opening && !paused && !navigation && !boardWasOpen && !leaderboard.open && !document.hidden && hunt.phase!=='over') {
-    if (input?.aim) aimDirection=input.aim;
-    if (input?.jump && jumpCrawler(spider)) audio.play('jump');
-    if (input?.fire) shootSilk();
+  if (!opening && !paused && !navigation && !boardWasOpen && !dialogOpen() && !document.hidden && hunt.phase!=='over') {
+    if (input?.jump) pendingButtons|=1;
+    if (input?.fire) pendingButtons|=2;
     remainder+=huntElapsed;
-    const movement=input?.movement??neutralStick;
-    while (remainder>=1/120) {
-      remainder-=1/120;
-      if (!step(1/120,movement)) continue;
+    const controls=arenaInput(input?.movement??neutralStick,input?.aim);
+    while (remainder>=arenaStep) {
+      remainder-=arenaStep;
+      const command=[...controls] as typeof controls;
+      command[4]=pendingButtons;
+      pendingButtons=0;
+      endlessRun?.record.add(command);
+      if (advanceArena(arena,command,arenaFeedback)!=='over') continue;
       remainder=0;
       audio.play('miss');
       if (mode==='story') {
@@ -466,7 +500,7 @@ function frame(time: number) {
   if (clock.dataset.phase!==phase) clock.dataset.phase=phase;
   const remaining = (hunt.time/hunt.difficulty.duration).toFixed(3);
   if (clockMeter.style.getPropertyValue('--remaining')!==remaining) clockMeter.style.setProperty('--remaining',remaining);
-  renderHunt(context,hunt,spider,aimDirection,{
+  renderHunt(context,hunt,spider,arena.aim,{
     time:position.time, beat, shot:opening && song.started ? openingShot(position.time,timing,introTrack) : undefined,
   });
   requestAnimationFrame(frame);
