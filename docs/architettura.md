@@ -1,4 +1,4 @@
-# Architettura di Spider and Fly
+# Architettura di Spider vs Fly
 
 `src/hunt.ts` contiene l’arena 360 × 204 e il ciclo di caccia. Una mosca sceglie tra rotte con passaggi sopra e sotto l’ostacolo centrale e vie di ritorno ai margini. Vede i fili entro 48 pixel davanti al tratto che sta percorrendo e reagisce alla vicinanza del ragno con un breve ritardo. Durante una virata mantiene la direzione per un istante. Il punteggio delle rotte scoraggia le ripetizioni. L’intersezione tra tragitto e filo è continua tra due passi, così non si attraversa un filo tra fotogrammi.
 

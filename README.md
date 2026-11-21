@@ -1,4 +1,4 @@
-# Spider and Fly
+# Spider vs Fly
 
 Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scorri **STORY**, **ENDLESS** e **Top 10** con **↑/↓** sulla croce direzionale o con lo stick sinistro. Premi **×** per confermare. Puoi anche fare clic sul pulsante. Il timer parte appena finisce «Start the clock», anche se il controller è scollegato o lo stick è fermo. Da quel momento puoi usare i comandi.
 
