@@ -1,4 +1,9 @@
-import {beats,captions,clockCue,defaultLoopStart,loopCue,loopEnd} from './song-timing';
+import {flyBeats,flyCaptions} from './fly-song-timing';
+import {infiniteBeats,infiniteCaptions} from './infinite-timing';
+import {roomBeats,roomCaptions} from './room-timing';
+import type {SongPosition} from './playlist';
+import {upgradeBeats,upgradeCaptions} from './upgrade-timing';
+import {beats,captions,clockCue,defaultLoopStart,firstTrackEnd,loopCue} from './song-timing';
 
 const timingKey = 'tamago.soundtrack.cues.v1';
 export interface SongTiming {
@@ -14,7 +19,7 @@ export function loadTiming(): SongTiming {
   return defaultTiming();
 }
 
-export function defaultTiming(): SongTiming {
+function defaultTiming(): SongTiming {
   return {starts:captions.map(([start])=>start),loopStart:defaultLoopStart};
 }
 
@@ -22,15 +27,9 @@ function validTiming(value: unknown): value is SongTiming {
   if (!value || typeof value!=='object') return false;
   const {starts,loopStart}=value as SongTiming;
   return Array.isArray(starts) && starts.length===captions.length &&
-    starts.every((time,i)=>Number.isFinite(time) && time>=0 && time<loopEnd && (!i || time>starts[i-1])) &&
+    starts.every((time,i)=>Number.isFinite(time) && time>=0 && time<firstTrackEnd && (!i || time>starts[i-1])) &&
     Number.isFinite(loopStart) && loopStart>starts[clockCue] &&
     loopStart<=starts[loopCue] && starts[loopCue]-loopStart<=.54;
-}
-
-export function saveTiming(timing: SongTiming) {
-  if (!validTiming(timing)) return false;
-  try { localStorage.setItem(timingKey,JSON.stringify(timing)); } catch { /* Session calibration. */ }
-  return true;
 }
 
 function lastCue(times: readonly number[],time: number) {
@@ -44,12 +43,25 @@ function lastCue(times: readonly number[],time: number) {
   return lo-1;
 }
 
-export function lyricAt(time: number,timing: SongTiming) {
-  const i=lastCue(timing.starts,time);
+const roomStarts = roomCaptions.map(([start])=>start);
+const upgradeStarts = upgradeCaptions.map(([start])=>start);
+const flyStarts = flyCaptions.map(([start])=>start);
+const tracks = {
+  first:{captions,beats,starts:[]},
+  upgrade:{captions:upgradeCaptions,beats:upgradeBeats,starts:upgradeStarts},
+  room:{captions:roomCaptions,beats:roomBeats,starts:roomStarts},
+  fly:{captions:flyCaptions,beats:flyBeats,starts:flyStarts},
+  loop:{captions:infiniteCaptions,beats:infiniteBeats,starts:infiniteCaptions.map(([start])=>start)},
+};
+
+export function lyricAt({track,time}: SongPosition,timing: SongTiming) {
+  const starts=track==='first' ? timing.starts : tracks[track].starts;
+  const lines=tracks[track].captions;
+  const i=lastCue(starts,time);
   if (i<0) return '';
-  const [start,end,text]=captions[i];
+  const [start,end,text]=lines[i];
   const duration=Math.max(.55,end-start+.23);
-  return time<timing.starts[i]+duration ? text : '';
+  return time<starts[i]+duration ? text : '';
 }
 
 export function huntStart(timing: SongTiming) {
@@ -57,15 +69,16 @@ export function huntStart(timing: SongTiming) {
   return Math.min(timing.starts[clockCue]+end-start,timing.starts[loopCue]);
 }
 
-export function beatAt(time: number) {
-  const i=lastCue(beats,time);
-  return i<0 ? 0 : Math.max(0,1-(time-beats[i])/.22)**2;
+export function beatAt({track,time}: SongPosition) {
+  const accents=tracks[track].beats;
+  const i=lastCue(accents,time);
+  return i<0 ? 0 : Math.max(0,1-(time-accents[i])/.22)**2;
 }
 
 export interface OpeningShot {subject: 'spider'|'fly'|'arena'; zoom: number}
 
-export function openingShot(time: number,timing: SongTiming): OpeningShot {
-  const [spider,fly,room,game]=timing.starts;
+export function openingShot(time: number,timing: SongTiming,track: 'first'|'loop'='first'): OpeningShot {
+  const [spider,fly,room,game]=track==='loop' ? tracks.loop.starts : timing.starts;
   if (time<spider || time>=game) return {subject:'arena',zoom:1};
   if (time<fly) return {subject:'spider',zoom:4.2};
   if (time<room) return {subject:'fly',zoom:6};

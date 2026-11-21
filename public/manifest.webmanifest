@@ -1,8 +1,8 @@
 {
   "id":"./",
-  "name":"Tamago — Il sentiero di seta",
-  "short_name":"Tamago",
-  "lang":"it",
+  "name":"Spider and Fly",
+  "short_name":"Spider and Fly",
+  "lang":"en",
   "start_url":"./",
   "scope":"./",
   "display":"standalone",

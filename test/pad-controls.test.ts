@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {samplePlayStation, silkMotion} from '../src/pad-controls.ts';
+import {readLeftStick, samplePlayStation, silkMotion} from '../src/pad-controls.ts';
 
 function controller(axes: number[] = [0,0,0,0], pressed: number[] = []) {
   return {axes,buttons:Array.from({length:17},(_,index) => ({
@@ -41,4 +41,10 @@ test('a swing diagonal does not detach, straight down detaches once and up reels
   assert.deepEqual(silkMotion({x:0,y:.64},true),{down:true,detach:false,reel:false});
   assert.equal(silkMotion({x:0,y:.4},true).down,false);
   assert.deepEqual(silkMotion({x:0,y:-.8},false),{down:false,detach:false,reel:true});
+});
+
+test('fly control reads only the left stick, independently of shoulder buttons and aim', () => {
+  const state=controller([-.5,.7,1,-1],[4,5]);
+  assert.deepEqual(readLeftStick(state),{x:-.5,y:.7});
+  assert.deepEqual(readLeftStick(controller([0,0,1,1],[4,5])),{x:0,y:0});
 });

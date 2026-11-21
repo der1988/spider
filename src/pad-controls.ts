@@ -7,6 +7,10 @@ interface Shoulders {
 
 type StandardPad = Pick<Gamepad,'axes'|'buttons'>;
 
+export function readLeftStick(pad: Pick<Gamepad,'axes'>): Point {
+  return {x:pad.axes[0]??0,y:pad.axes[1]??0};
+}
+
 export function samplePlayStation(pad: StandardPad, previous?: Shoulders) {
   const shoulders = {l1:!!pad.buttons[4]?.pressed,r1:!!pad.buttons[5]?.pressed};
   const x = pad.axes[2] ?? 0;
@@ -14,7 +18,7 @@ export function samplePlayStation(pad: StandardPad, previous?: Shoulders) {
   const length = Math.hypot(x,y);
   return {
     shoulders,
-    movement:{x:pad.axes[0] ?? 0,y:pad.axes[1] ?? 0},
+    movement:readLeftStick(pad),
     aim:length >= .22 ? {x:x/length,y:y/length} : undefined,
     jump:!!previous && shoulders.l1 && !previous.l1,
     fire:!!previous && shoulders.r1 && !previous.r1,
