@@ -21,3 +21,5 @@ Il service worker salva i cinque MP3 per giocare offline. `src/soundtrack.ts` co
 `src/difficulty.ts` raccoglie basi, soglie e limiti. `tickHunt` applica la configurazione calcolata dal totale delle catture al momento dell’ingresso della mosca successiva. La velocità e i raggi sommano una percentuale del valore base per soglia. Il ritardo di reazione si moltiplica per 0,9 per soglia fino al minimo. La reazione mantiene il tempo d’impegno delle virate. La barra dell’HUD usa la durata del livello corrente.
 
 `src/leaderboard.ts` usa la lettura di `api/scores.js` per mostrare i punteggi già registrati quando il giocatore preme △ in Story. L’ordinamento usa catture decrescenti, data di inserimento e UUID. Il service worker lascia che le richieste alla classifica vadano direttamente alla rete.
+
+Il menu iniziale usa il logo bitmap originale `src/menu-title.png` con il titolo SPIDER vs FLY e due scelte in colonna, STORY ed ENDLESS. ENDLESS avvia la modalità Infinite Loop. Il logo è incluso nella build e nella cache offline.
