@@ -1,6 +1,6 @@
 # Spider and Fly
 
-Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e seleziona **Start** per sbloccare la musica nel browser. Il timer e i comandi si attivano appena finisce «Start the clock».
+Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e seleziona **Start** per sbloccare la musica nel browser. Il timer parte appena finisce «Start the clock», anche se il controller è scollegato o lo stick è fermo. Da quel momento puoi usare i comandi.
 
 - **Stick sinistro** per correre sul pavimento, sulle pareti e sul soffitto o per dondolare. Sul filo attivo, spingi **su** per risalire e **giù** per staccarti. Con **su** puoi anche aggrapparti a un filo già fissato.
 - **Stick destro** per mirare in ogni direzione. **R1** lancia verso il primo appiglio entro la portata. Pareti, soffitto, pavimento e piattaforme accettano la seta. Se sei su una superficie, il tiro tende subito una ragnatela. Salta prima di sparare per dondolare: il filo si fissa quando tocchi una superficie valida. In aria puoi lanciare un secondo filo per spostare il dondolio sul nuovo appiglio.

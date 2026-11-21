@@ -37,6 +37,7 @@ function fetchTrack(name: string) {
   return fetch(url).then(response=>response.ok ? response.arrayBuffer() : undefined).catch(()=>undefined);
 }
 const timing = loadTiming();
+const huntStartsAt = huntStart(timing);
 const song = new Soundtrack([
   fetchTrack('tamago-soundtrack'),fetchTrack('tamago-upgrade'),fetchTrack('tamago-room'),
 ],timing.loopStart,fetchTrack('tamago-fly'));
@@ -134,8 +135,7 @@ function finishWebs(before: number) {
   say(evicted ? 'New web placed. The oldest web is fading.' : 'Web placed.');
 }
 
-function step(dt: number,input: ReturnType<typeof samplePlayStation>) {
-  const m=input.movement;
+function step(dt: number,m: Point) {
   const motion=silkMotion(m,down);
   down=motion.down;
   if (motion.detach && spider.rope) {
@@ -283,7 +283,6 @@ function frame(time: number) {
   } else {
     previous=undefined;
     activePad=undefined;
-    if (!escape) remainder=0;
     down=false;
   }
 
@@ -305,13 +304,15 @@ function frame(time: number) {
     if (position.time<flyDuration) requestAnimationFrame(frame);
     return;
   }
-  if (opening && song.started && position.track==='first' && position.time>=huntStart(timing)) {
+  let huntElapsed=elapsed;
+  if (opening && song.started && position.track==='first' && position.time>=huntStartsAt) {
     opening=false;
+    huntElapsed=Math.min(elapsed,position.time-huntStartsAt);
     say('');
   }
 
-  if (input && !opening && !paused && !boardWasOpen && !leaderboard.open && !document.hidden) {
-    if (input.aim) aimDirection=input.aim;
+  if (!opening && !paused && !boardWasOpen && !leaderboard.open && !document.hidden) {
+    if (input?.aim) aimDirection=input.aim;
     if (hunt.phase==='over' && retry) {
       hunt=createHunt();
       runId=newRunId();
@@ -321,12 +322,13 @@ function frame(time: number) {
       say('');
     }
     if (hunt.phase!=='over') {
-      if (input.jump && jumpCrawler(spider)) audio.play('jump');
-      if (input.fire) shootSilk();
-      remainder+=elapsed;
+      if (input?.jump && jumpCrawler(spider)) audio.play('jump');
+      if (input?.fire) shootSilk();
+      remainder+=huntElapsed;
+      const movement=input?.movement??neutralStick;
       while (remainder>=1/120) {
         remainder-=1/120;
-        if (step(1/120,input)) { remainder=0; break; }
+        if (step(1/120,movement)) { remainder=0; break; }
       }
     }
   }
