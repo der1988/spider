@@ -1,6 +1,7 @@
 import {block,drawBackground,drawPlatform,drawSpider,line,type SpiderActing} from './hunt-render';
 import {HEIGHT,WIDTH,platforms} from './hunt';
 import type {FlyEscape} from './fly-escape';
+import {flyDuration,flyMenuStart} from './fly-song-timing';
 import type {Point} from './spider';
 
 export interface FlyEscapeFrame {
@@ -240,21 +241,27 @@ function codeLabels(ctx: CanvasRenderingContext2D) {
   });
 }
 
-function dissolve(ctx: CanvasRenderingContext2D,state: FlyEscape,ending: number) {
+function dissolve(ctx: CanvasRenderingContext2D,state: FlyEscape,ending: number,formation: number) {
   const label=codeLabels(ctx);
-  const codeFade=1-range(ending,.84,1);
-  const write=(value: string,x: number,y: number,from: number,to: number)=>
-    label(value,x,y,codeFade*range(ending,from,to));
-  write('room.origin = [0, 0];',13,15,.035,.19);
-  write('room.bounds = [0, 0, '+WIDTH+', '+HEIGHT+'];',179,185,.10,.26);
-  write('clock.timeLeft = '+Math.ceil(state.time)+';',12,183,.08,.28);
-  for (const platform of platforms.slice(4)) {
-    write('['+point(platform)+']',platform.x,platform.y-8,.20,.53);
-  }
+  const codeFade=1-range(formation,.12,.94);
+  const gather=ease(formation);
+  const write=(value: string,x: number,y: number,from: number,to: number)=>{
+    const column=x<WIDTH/2 ? WIDTH*.29 : WIDTH*.63;
+    label(value,x+(column-x)*gather,y+(HEIGHT*.49-y)*gather,codeFade*range(ending,from,to));
+  };
+  write('room.bounds = [0, 0, '+WIDTH+', '+HEIGHT+'];',13,15,.035,.19);
+  write('ceiling.y = 7;',226,16,.09,.28);
+  write('wall.left = 7;',12,85,.10,.30);
+  write('wall.right = 353;',255,84,.11,.32);
+  write('floor.y = 197;',15,180,.13,.36);
+  write('clock.timeLeft = '+Math.ceil(state.time)+';',211,183,.14,.37);
+  platforms.slice(4).forEach((platform,index)=>{
+    write('platform['+index+'] = ['+point(platform)+'];',platform.x,platform.y-8,.20,.53);
+  });
   state.strands.forEach((strand,index)=>{
     const x=(strand.from.x+strand.to.x)/2;
     const y=(strand.from.y+strand.to.y)/2+5;
-    write('web['+index+'] = ['+point(strand.to)+'];',x,y,.34,.64);
+    write('web['+index+'] = ['+point(strand.from)+', '+point(strand.to)+'];',x,y,.34,.64);
   });
   write('light = ['+point(state.light)+'];',state.light.x+8,state.light.y-10,.38,.70);
   write('fly = ['+point(state.fly.p)+'];',state.fly.p.x-7,state.fly.p.y+9,.48,.75);
@@ -284,6 +291,6 @@ export function renderFlyEscape(ctx: CanvasRenderingContext2D,state: FlyEscape,f
     drawSpider(ctx,state.spider,state.clock,music,spiderPose,acting(state));
     drawFly(ctx,state,frame);
   });
-  if (ending>0) dissolve(ctx,state,ending);
+  if (ending>0) dissolve(ctx,state,ending,range(time,flyMenuStart,flyDuration));
   ctx.restore();
 }

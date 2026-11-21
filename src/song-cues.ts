@@ -1,4 +1,5 @@
 import {flyBeats,flyCaptions} from './fly-song-timing';
+import {infiniteBeats,infiniteCaptions} from './infinite-timing';
 import {roomBeats,roomCaptions} from './room-timing';
 import type {SongPosition} from './playlist';
 import {upgradeBeats,upgradeCaptions} from './upgrade-timing';
@@ -50,6 +51,7 @@ const tracks = {
   upgrade:{captions:upgradeCaptions,beats:upgradeBeats,starts:upgradeStarts},
   room:{captions:roomCaptions,beats:roomBeats,starts:roomStarts},
   fly:{captions:flyCaptions,beats:flyBeats,starts:flyStarts},
+  loop:{captions:infiniteCaptions,beats:infiniteBeats,starts:infiniteCaptions.map(([start])=>start)},
 };
 
 export function lyricAt({track,time}: SongPosition,timing: SongTiming) {
@@ -75,8 +77,8 @@ export function beatAt({track,time}: SongPosition) {
 
 export interface OpeningShot {subject: 'spider'|'fly'|'arena'; zoom: number}
 
-export function openingShot(time: number,timing: SongTiming): OpeningShot {
-  const [spider,fly,room,game]=timing.starts;
+export function openingShot(time: number,timing: SongTiming,track: 'first'|'loop'='first'): OpeningShot {
+  const [spider,fly,room,game]=track==='loop' ? tracks.loop.starts : timing.starts;
   if (time<spider || time>=game) return {subject:'arena',zoom:1};
   if (time<fly) return {subject:'spider',zoom:4.2};
   if (time<room) return {subject:'fly',zoom:6};

@@ -1,6 +1,6 @@
 import {crossesSolid, sweptHit, type Strand, type Web} from './threads.ts';
 import type {Point, Rect} from './spider.ts';
-import {difficultyAt,difficultyConfig} from './difficulty.ts';
+import {difficultyAt,difficultyConfig,type HuntMode} from './difficulty.ts';
 
 export const WIDTH = 360;
 export const HEIGHT = 204;
@@ -52,6 +52,7 @@ export interface Fly {
   visits: number[];
 }
 export interface Hunt extends Pick<Web,'loose'|'strands'> {
+  mode: HuntMode;
   fly: Fly;
   difficulty: ReturnType<typeof difficultyAt>;
   score: number;
@@ -70,9 +71,9 @@ function makeFly(score: number,seed: number,reaction: number): Fly {
     notice:reaction+.01,locked:.24,turn:0,bias:(seed+score)%2 ? 1 : -1,age:0,alert:false,visits:lanes.map(()=>0),
   };
 }
-export function createHunt(seed = Math.floor(Math.random()*4294967296)): Hunt {
-  const difficulty=difficultyAt(0);
-  return {fly:makeFly(0,seed,difficulty.reactionTime),difficulty,score:0,time:difficulty.duration,phase:'hunting',countdown:0,
+export function createHunt(seed = Math.floor(Math.random()*4294967296), mode: HuntMode='story'): Hunt {
+  const difficulty=difficultyAt(0,mode);
+  return {mode,fly:makeFly(0,seed,difficulty.reactionTime),difficulty,score:0,time:difficulty.duration,phase:'hunting',countdown:0,
     strands:[],loose:[],clock:0,entropy:seed};
 }
 
@@ -133,7 +134,7 @@ export function tickHunt(hunt: Hunt,spider: Point,dt: number) {
       hunt.strands.length = 0;
       hunt.loose.length = 0;
       hunt.retired = undefined;
-      hunt.difficulty = difficultyAt(hunt.score);
+      hunt.difficulty = difficultyAt(hunt.score,hunt.mode);
       hunt.fly = makeFly(hunt.score,hunt.entropy,hunt.difficulty.reactionTime);
       hunt.time = hunt.difficulty.duration;
       hunt.phase = 'hunting';

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {createFlyEscape, finishFlyEscape, FLY_SECONDS, stepFlyEscape} from '../src/fly-escape.ts';
+import {createFlyEscape, ESCAPE_PRESSES, finishFlyEscape, FLY_SECONDS, stepFlyEscape} from '../src/fly-escape.ts';
 import {HEIGHT, platforms, spawn, WEB_SECONDS, WIDTH} from '../src/hunt.ts';
 
 const idle={move:{x:0,y:0},cross:false};
@@ -86,7 +86,7 @@ test('the hunter intercepts, holds a shot, then gives room and fires away from t
   assert.deepEqual(peers[0].strands,peers[1].strands);
 });
 
-test('threads trap on crossing, and three distinct presses free the fly',()=>{
+test('threads trap on crossing, and the eighth new press frees the fly',()=>{
   const game=createFlyEscape(undefined,{x:35,y:70},0);
   game.strands.push({from:{x:45,y:55},to:{x:45,y:99},shakeUntil:0});
   for (let i=0;i<40 && !game.trapped;i++) stepFlyEscape(game,{move:{x:1,y:0},cross:false},dt,'aim');
@@ -94,7 +94,12 @@ test('threads trap on crossing, and three distinct presses free the fly',()=>{
   const x=game.fly.p.x;
   stepFlyEscape(game,{move:{x:1,y:0},cross:false},dt,'aim');
   assert.equal(game.fly.p.x,x);
-  for (let i=0;i<2;i++) stepFlyEscape(game,{...idle,cross:true},dt,'aim');
+  assert.equal(ESCAPE_PRESSES,8);
+  for (let i=1;i<ESCAPE_PRESSES;i++) {
+    stepFlyEscape(game,{...idle,cross:true},dt,'aim');
+    for (let j=0;j<18;j++) stepFlyEscape(game,idle,dt,'aim');
+    assert.equal(game.trapped.presses,i);
+  }
   assert.equal(stepFlyEscape(game,{...idle,cross:true},dt,'aim'),'escape');
   assert.equal(game.trapped,undefined);
   for (let i=0;i<12;i++) stepFlyEscape(game,{move:{x:1,y:0},cross:false},dt,'aim');

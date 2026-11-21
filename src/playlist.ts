@@ -5,7 +5,7 @@ import {roomEnd} from './room-timing.ts';
 export const trackStarts = [0,firstTrackEnd,firstTrackEnd+upgradeEnd] as const;
 export const playlistEnd = trackStarts[2]+roomEnd;
 
-export type SongPosition = {track: 'first'|'upgrade'|'room'|'fly'; time: number};
+export type SongPosition = {track: 'first'|'upgrade'|'room'|'fly'|'loop'; time: number};
 
 export function wrapPlaylist(elapsed: number,returnAt: number,end=playlistEnd) {
   if (elapsed<end) return elapsed;

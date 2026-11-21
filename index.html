@@ -7,6 +7,7 @@
 <meta name="tamago-upgrade" content="./the-fly-has-an-upgrade.mp3">
 <meta name="tamago-room" content="./the-room-has-a-space-bar.mp3">
 <meta name="tamago-fly" content="./the-fly-is-you.mp3">
+<meta name="tamago-loop" content="./infinite-loop.mp3">
 <meta name="theme-color" content="#202f24">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./touch.png">
@@ -15,12 +16,15 @@
 </head>
 <body>
 <main id="shell" class="shell" data-screen="start">
-  <section class="launch" aria-labelledby="launch-title">
+  <section id="launch" class="launch" aria-labelledby="launch-title">
     <div class="launch-copy">
       <h1 id="launch-title">Spider and Fly</h1>
       <p>Use your controller</p>
     </div>
-    <button id="start" type="button">Start</button>
+    <div class="mode-choices">
+      <button id="story" type="button" data-selected="true"><span>Story</span><code aria-hidden="true">story()</code></button>
+      <button id="loop" type="button" data-selected="false"><span>Infinite Loop</span><code aria-hidden="true">loop()</code></button>
+    </div>
     <p id="start-status" role="status"></p>
   </section>
   <header>

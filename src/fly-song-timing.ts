@@ -2,6 +2,7 @@
 // The MP3 container includes encoder padding. The decoded audio is 204.800 s.
 export const flyDuration = 204.800;
 export const flyFinalStart = flyDuration - 20;
+export const flyMenuStart = 201.450;
 
 export const flyCues = {
   spider: 3.492,

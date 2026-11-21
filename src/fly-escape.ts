@@ -4,6 +4,7 @@ import {aimHit, DEFAULT_TUNING, SPIDER_HALF_HEIGHT, SPIDER_HALF_WIDTH, type Poin
 import {anchorSilk, sweptHit, type Strand} from './threads.ts';
 
 export const FLY_SECONDS = 10;
+export const ESCAPE_PRESSES = Math.ceil(3*2.5);
 export const LIGHT_RADIUS = 7;
 const FLY_RADIUS = 2.5;
 const FLY_SPEED = 104;
@@ -482,7 +483,7 @@ export function stepFlyEscape(
       game.trapped.presses++;
       game.trapped.strand.shakeUntil=game.clock+.22;
     }
-    if (game.trapped.presses>=3 || !game.strands.includes(game.trapped.strand)) {
+    if (game.trapped.presses>=ESCAPE_PRESSES || !game.strands.includes(game.trapped.strand)) {
       game.trapped=undefined;
       game.safeUntil=game.clock+.55;
       event='escape';

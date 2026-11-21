@@ -5,6 +5,7 @@ import {locateTrack,playlistEnd,trackStarts,wrapPlaylist} from '../src/playlist.
 import {defaultLoopStart,firstTrackEnd} from '../src/song-timing.ts';
 import {roomBeats,roomCaptions,roomEnd} from '../src/room-timing.ts';
 import {upgradeBeats,upgradeCaptions,upgradeEnd} from '../src/upgrade-timing.ts';
+import {infiniteBeats,infiniteCaptions,infiniteDuration,infiniteEnd,infiniteHuntStart,infiniteReturn} from '../src/infinite-timing.ts';
 
 test('the first song plays once with its introduction, then all three songs cycle',()=>{
   assert.deepEqual(locateTrack(wrapPlaylist(0,defaultLoopStart)),{track:'first',time:0});
@@ -17,13 +18,23 @@ test('the first song plays once with its introduction, then all three songs cycl
   assert.ok(repeat.time<1e-9);
 });
 
-for (const [captions,beats,duration] of [[upgradeCaptions,upgradeBeats,upgradeEnd],[roomCaptions,roomBeats,roomEnd],[flyCaptions,flyBeats,flyDuration]] as const) {
+for (const [captions,beats,duration] of [[upgradeCaptions,upgradeBeats,upgradeEnd],[roomCaptions,roomBeats,roomEnd],[flyCaptions,flyBeats,flyDuration],[infiniteCaptions,infiniteBeats,infiniteEnd]] as const) {
   test('captions and beats are ordered and fit before the transition at '+duration,()=>{
     assert.ok(captions.every(([start,end],i)=>start<end && end<duration &&
       (!i || start>captions[i-1][0])));
     assert.ok(beats.every((time,i)=>time<duration && (!i || time>beats[i-1])));
   });
 }
+
+test('Infinite Loop starts the hunt at the last word and loops into the first beat before the next lyric',()=>{
+  assert.equal(infiniteCaptions[4][1],infiniteHuntStart);
+  assert.equal(infiniteCaptions[5][2],'Left stick moves.');
+  assert.ok(infiniteCaptions[5][0]-infiniteReturn<.030 && infiniteCaptions[5][0]>=infiniteReturn);
+  assert.ok(infiniteBeats.includes(infiniteReturn));
+  assert.ok(infiniteEnd<=infiniteDuration);
+  assert.ok(Math.abs((infiniteEnd-infiniteReturn)/.540-230)<1e-9);
+  assert.equal(wrapPlaylist(infiniteEnd,infiniteReturn,infiniteEnd),infiniteReturn);
+});
 
 test('fly choreography follows the spoken cues and finale has exactly twenty seconds',()=>{
   assert.equal(flyDuration-flyFinalStart,20);
