@@ -8,8 +8,6 @@ export type Sound = keyof typeof notes;
 export class Soundscape {
   private context?: AudioContext;
   private master?: GainNode;
-  private buzzing?: GainNode;
-  private flyTone?: OscillatorNode;
   private paused = false;
   private pending: {effect:Sound; delay:number; at:number}[] = [];
 
@@ -53,41 +51,6 @@ export class Soundscape {
     master.connect(ctx.destination);
     this.master = master;
 
-    const buffer = ctx.createBuffer(1,ctx.sampleRate * 3,ctx.sampleRate);
-    const samples = buffer.getChannelData(0);
-    for (let i = 0; i < samples.length; i++) samples[i] = Math.random() * 2 - 1;
-    const rustle = ctx.createBufferSource();
-    rustle.buffer = buffer;
-    rustle.loop = true;
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.value = 350;
-    filter.Q.value = .65;
-    const wind = ctx.createGain();
-    wind.gain.value = .04;
-    rustle.connect(filter).connect(wind).connect(master);
-    rustle.start();
-
-    const buzz = ctx.createOscillator();
-    buzz.type = 'sawtooth';
-    buzz.frequency.value = 124;
-    const soft = ctx.createBiquadFilter();
-    soft.type = 'lowpass';
-    soft.frequency.value = 430;
-    const volume = ctx.createGain();
-    volume.gain.value = 0;
-    buzz.connect(soft).connect(volume).connect(master);
-    buzz.start();
-    this.buzzing = volume;
-    this.flyTone = buzz;
-  }
-
-  nearby(distance: number, time: number) {
-    const ctx = this.context;
-    if (!ctx || ctx.state !== 'running' || !this.buzzing || !this.flyTone) return;
-    const strength = Math.max(0,1 - distance / 85);
-    this.buzzing.gain.setTargetAtTime(strength * .027,ctx.currentTime,.075);
-    this.flyTone.frequency.setTargetAtTime(122 + Math.sin(time * .014) * 15,ctx.currentTime,.075);
   }
 
   play(effect: Sound, delay = 0) {

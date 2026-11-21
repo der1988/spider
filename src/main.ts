@@ -105,7 +105,6 @@ function startIntro(next: HuntMode) {
   resetHunt();
   clock.dataset.phase='ready';
   captions('');
-  audio.nearby(Infinity,performance.now());
   song.play(next,contextAudio);
   syncPause();
 }
@@ -122,7 +121,6 @@ function showMenu() {
   launch.inert=false;
   menuChoices.select(priorMode==='loop' ? 1 : 0,true);
   startStatus.textContent='';
-  audio.nearby(Infinity,performance.now());
   captions('');
   say('');
 }
@@ -195,7 +193,6 @@ let supportsPads = typeof navigator.getGamepads==='function';
 let down = false;
 let lastFrame=0;
 let remainder=0;
-let lastSound=0;
 function say(text: string) { if(message.textContent!==text) message.textContent=text; }
 const worldAim = () => ({x:spider.x+aimDirection.x*70,y:spider.y+aimDirection.y*70});
 
@@ -457,12 +454,6 @@ function frame(time: number) {
     }
   }
 
-  if (time-lastSound>65) {
-    lastSound=time;
-    const d=input && !opening && !leaderboard.open && hunt.phase==='hunting' ?
-      Math.hypot(spider.x-hunt.fly.p.x,spider.y-hunt.fly.p.y) : Infinity;
-    audio.nearby(d,time);
-  }
   const caption=song.started ? lyricAt(position,timing) : '';
   captions(caption,position.track==='room' && /^Press Space\b/i.test(caption));
   const seconds=Math.ceil(hunt.time);
