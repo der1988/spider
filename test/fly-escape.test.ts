@@ -77,7 +77,6 @@ test('the hunter intercepts, holds a shot, then gives room and fires away from t
   peers[0].fly.p={x:23,y:23};
   peers[1].fly.p={x:323,y:175};
   for (const peer of peers) {
-    peer.timedOut=false;
     peer.time=FLY_SECONDS;
     peer.clock=peer.nextShot;
     peer.strands=[];
@@ -106,13 +105,18 @@ test('threads trap on crossing, and the eighth new press frees the fly',()=>{
   assert.ok(game.fly.p.x>x);
 });
 
-test('timeout retries locally, and the final lock lets the fly cross a light without changing the outcome',()=>{
+test('a timeout ends the fly round even if the player presses cross',()=>{
   const game=createFlyEscape(undefined,undefined,0);
   game.time=.001;
   assert.equal(stepFlyEscape(game,idle,dt,'aim'),'timeout');
   assert.equal(game.time,0);
-  assert.equal(stepFlyEscape(game,{...idle,cross:true},dt,'aim'),'retry');
-  assert.equal(game.time,10);
+  const snapshot=structuredClone(game);
+  assert.equal(stepFlyEscape(game,{move:{x:1,y:0},cross:true},dt,'hunt'),undefined);
+  assert.deepEqual(game,snapshot);
+});
+
+test('the final lock lets the fly cross a light without changing the outcome',()=>{
+  const game=createFlyEscape(undefined,undefined,0);
   game.time=3.25;
   game.fly.p={x:31,y:27};
   game.light={x:42,y:27};
@@ -214,11 +218,10 @@ test('the hunter keeps following a moving fly and jumps repeatedly',()=>{
 
 test('only a couple of early webs are fired before the hunting cadence builds',()=>{
   const game=createFlyEscape(undefined,undefined,5);
-  game.timedOut=true;
-  game.time=0;
   const start=[0,40,90];
   const shots=start.map(()=>0);
   for (let i=0;i<12000;i++) {
+    game.time=FLY_SECONDS;
     if (stepFlyEscape(game,idle,dt,'hunt')!=='web') continue;
     const window=start.findIndex(seconds=>game.clock>=seconds && game.clock<seconds+10);
     if (window!==-1) shots[window]++;
@@ -227,10 +230,8 @@ test('only a couple of early webs are fired before the hunting cadence builds',(
   assert.ok(shots[0]<shots[1] && shots[1]<shots[2],`${shots}`);
 });
 
-test('yielding gestures run on time-out and watch a real strand expire without replacing it',()=>{
+test('yielding gestures watch a real strand expire without replacing it',()=>{
   const game=createFlyEscape(undefined,undefined,5);
-  game.timedOut=true;
-  game.time=0;
   game.clock=150;
   stepFlyEscape(game,idle,dt,'yield','identity');
   assert.equal(game.gesture,'identity');
@@ -254,19 +255,16 @@ test('yielding gestures run on time-out and watch a real strand expire without r
   const x=game.spider.x;
   for (let i=0;i<100;i++) stepFlyEscape(game,idle,dt,'yield','stepBack');
   assert.ok(Math.abs(game.spider.x-x)>=5 && Math.abs(game.spider.x-x)<12);
-  assert.equal(game.time,0);
   assert.equal(game.strands.length,0);
 });
 
-test('after giving up the spider walks in short independent patrols during timeout',()=>{
+test('after giving up the spider walks in short independent patrols',()=>{
   const game=createFlyEscape(undefined,{x:320,y:165},5);
-  game.time=0;
-  game.timedOut=true;
   const other=structuredClone(game);
   other.fly.p={x:25,y:28};
   let walkSteps=0;
   let idleSteps=0;
-  for (let i=0;i<1200;i++) {
+  for (let i=0;i<1100;i++) {
     const old=game.spider.x;
     stepFlyEscape(game,idle,dt,'yield');
     stepFlyEscape(other,idle,dt,'yield');
@@ -276,7 +274,7 @@ test('after giving up the spider walks in short independent patrols during timeo
   }
   assert.ok(walkSteps>70);
   assert.ok(idleSteps>walkSteps*2);
-  assert.equal(game.time,0);
+  assert.ok(game.time>0);
   assert.equal(game.lights,0);
 });
 

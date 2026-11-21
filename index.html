@@ -46,8 +46,20 @@
   </header>
   <section class="stage" aria-label="Hunting arena">
     <canvas id="world" width="360" height="204" aria-label="Spider, fly and webs"></canvas>
+    <section id="loop-defeat" class="defeat" aria-labelledby="defeat-title" hidden>
+      <div class="defeat-panel">
+        <h2 id="defeat-title">Time ran out</h2>
+        <div class="defeat-score">
+          <label for="defeat-score">Total catches</label>
+          <output id="defeat-score">0</output>
+        </div>
+        <div class="mode-choices">
+          <button id="main-menu" type="button" data-selected="false">Main Menu</button>
+          <button id="retry" type="button" data-selected="true">Retry</button>
+        </div>
+      </div>
+    </section>
   </section>
-  <button id="test-finale" type="button">Test Finale</button>
   <footer>
     <p id="message" role="status"></p>
     <p id="lyric" class="lyric" lang="en"></p>
@@ -58,18 +70,6 @@
     <h2 id="board-title">Leaderboard</h2>
     <button id="board-close" type="button">Close</button>
   </div>
-  <form id="score-form" hidden>
-    <p id="score-result"></p>
-    <fieldset>
-      <legend>Name · five letters A–Z</legend>
-      <div id="score-letters" class="score-letters"></div>
-    </fieldset>
-    <p><kbd>↑</kbd> <kbd>↓</kbd> Change letter · <kbd>←</kbd> <kbd>→</kbd> Move cursor · <kbd>×</kbd> Confirm · <kbd>○</kbd> Skip</p>
-    <div class="board-actions">
-      <button id="score-save" type="submit">Save score</button>
-      <button id="score-skip" type="button">Skip</button>
-    </div>
-  </form>
   <p id="board-status" role="status"></p>
   <button id="board-reload" type="button" hidden>Try again</button>
   <ol id="board-entries" aria-label="Leaderboard by catches"></ol>

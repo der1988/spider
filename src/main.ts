@@ -9,7 +9,7 @@ import {Soundscape} from './soundscape';
 import {Soundtrack} from './soundtrack';
 import {beatAt, huntStart, loadTiming, lyricAt, openingShot} from './song-cues';
 import {difficultyChanges,type HuntMode} from './difficulty';
-import {bindLeaderboard,newRunId} from './leaderboard';
+import {bindLeaderboard} from './leaderboard';
 import {createFlyEscape,ESCAPE_PRESSES,finishFlyEscape,FLY_SECONDS,stepFlyEscape,type FlyEscape} from './fly-escape';
 import {renderFlyEscape,type FlyEscapeFrame} from './fly-escape-render';
 import {flyCues,flyDoubtAt,flyDuration,flyFinalStart,flyMenuStart,flyRoomEffect} from './fly-song-timing';
@@ -25,9 +25,8 @@ const roundLabel = get('round-time');
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const scoreLabel = get('score');
 const launch = get('launch');
-const menuModes = ['story','loop'] as const;
-const choices = menuModes.map(name=>get<HTMLButtonElement>(name));
-const testFinale = get<HTMLButtonElement>('test-finale');
+const defeat = get('loop-defeat');
+const defeatScore = get('defeat-score');
 const startStatus = get('start-status');
 const shell = get('shell');
 const lyric = get('lyric');
@@ -48,56 +47,97 @@ const song = new Soundtrack([
 const leaderboard = bindLeaderboard();
 let contextAudio: AudioContext|undefined;
 let mode: HuntMode|undefined;
-let selected = 0;
-let menuDirection = 0;
+let padDirection = 0;
 let opening = true;
 let paused = false;
 let escape: FlyEscape|undefined;
 let spaceHeld = false;
 
-function highlightMode(index: number) {
-  selected=index;
-  choices.forEach((button,i)=>button.dataset.selected=String(i===index));
+function bindChoices(left: string,right: string,chooseLeft: ()=>void,chooseRight: ()=>void) {
+  const buttons=[get<HTMLButtonElement>(left),get<HTMLButtonElement>(right)] as const;
+  let selected: 0|1=0;
+  function select(index: 0|1,focus=false) {
+    selected=index;
+    buttons.forEach((button,i)=>button.dataset.selected=String(i===index));
+    if (focus) buttons[index].focus({preventScroll:true});
+  }
+  buttons[0].onclick=()=>{ select(0); chooseLeft(); };
+  buttons[1].onclick=()=>{ select(1); chooseRight(); };
+  buttons[0].onfocus=()=>select(0);
+  buttons[1].onfocus=()=>select(1);
+  return {select,confirm:()=>buttons[selected].click()};
+}
+
+const menuChoices=bindChoices('story','loop',()=>requestMode('story'),()=>requestMode('loop'));
+const defeatChoices=bindChoices('main-menu','retry',showMenu,retryLoop);
+
+function activeChoices() {
+  if (shell.dataset.screen==='start') return menuChoices;
+  if (!defeat.hidden) return defeatChoices;
 }
 
 function requestMode(next: HuntMode) {
-  if (shell.dataset.screen!=='start' || escape) return;
+  if (shell.dataset.screen!=='start') return;
   contextAudio=audio.audioContext();
   audio.unlock();
   if (mode===next && song.waiting) return;
-  mode=next;
-  opening=true;
-  resetHunt();
-  testFinale.hidden=next==='loop';
   startStatus.textContent='Loading soundtrack…';
-  song.play(next,contextAudio);
-  syncPause();
+  startIntro(next);
 }
-choices.forEach((button,i)=>{
-  button.onfocus=()=>highlightMode(i);
-  button.onclick=()=>{ highlightMode(i); requestMode(menuModes[i]); };
-});
 window.addEventListener('pointerdown',()=>{ if (song.waiting) audio.unlock(); });
 
-function showMenu() {
-  song.reset();
-  mode=undefined;
+function clearFlyScene() {
   escape=undefined;
   flyCross=false;
-  paused=false;
-  remainder=0;
   delete shell.dataset.flyPhase;
   delete shell.dataset.flyShot;
   delete shell.dataset.reforming;
   shell.style.removeProperty('--fly-end');
   shell.style.removeProperty('--menu-form');
+  endingCode.textContent='';
+}
+
+function startIntro(next: HuntMode) {
+  mode=next;
+  opening=true;
+  paused=false;
+  clearFlyScene();
+  resetHunt();
+  clock.dataset.phase='ready';
+  captions('');
+  audio.nearby(Infinity,performance.now());
+  song.play(next,contextAudio);
+  syncPause();
+}
+
+function showMenu() {
+  const priorMode=mode;
+  song.reset();
+  mode=undefined;
+  paused=false;
+  remainder=0;
+  clearFlyScene();
+  defeat.hidden=true;
   shell.dataset.screen='start';
   launch.inert=false;
-  testFinale.hidden=false;
+  menuChoices.select(priorMode==='loop' ? 1 : 0,true);
   startStatus.textContent='';
   audio.nearby(Infinity,performance.now());
   captions('');
   say('');
+}
+
+function showDefeat() {
+  say('');
+  defeatScore.textContent=String(hunt.score);
+  defeat.hidden=false;
+  defeatChoices.select(1,true);
+}
+
+function retryLoop() {
+  if (defeat.hidden) return;
+  defeat.hidden=true;
+  resetHunt();
 }
 
 function syncPause() {
@@ -109,36 +149,26 @@ function syncPause() {
   if (!frozen) audio.unlock();
 }
 function togglePause() {
-  if (!song.started) return;
+  if (!song.started || !defeat.hidden) return;
   paused = !paused;
   syncPause();
 }
-function beginFly(test=false) {
-  escape=test ? createFlyEscape() : createFlyEscape(spider,hunt.fly.p);
-  if (test) {
-    mode='story';
-    resetHunt();
-    contextAudio=audio.audioContext();
-    audio.unlock();
-    startStatus.textContent='Loading soundtrack…';
-  }
-  testFinale.hidden=true;
+function beginFly() {
+  escape=createFlyEscape(spider,hunt.fly.p);
   flyCross=false;
   shell.dataset.flyPhase='intro';
   paused=false;
-  song.play('fly',contextAudio,test ? flyCues.play : 0);
+  song.play('fly',contextAudio);
   syncPause();
   say('');
 }
-testFinale.onclick=()=>beginFly(true);
 
 window.addEventListener('keydown',event => {
   if (song.waiting) audio.unlock();
-  if (shell.dataset.screen==='start' && /^Arrow(Left|Right|Up|Down)$/.test(event.code)) {
+  const choices=activeChoices();
+  if (choices && /^Arrow(Left|Right|Up|Down)$/.test(event.code)) {
     event.preventDefault();
-    const index=event.code==='ArrowLeft' || event.code==='ArrowUp' ? 0 : 1;
-    highlightMode(index);
-    choices[index].focus();
+    choices.select(event.code==='ArrowLeft' || event.code==='ArrowUp' ? 0 : 1,true);
   }
   if (event.code==='Escape' && !event.repeat && !leaderboard.open) togglePause();
   if (event.code!=='Space') return;
@@ -156,7 +186,6 @@ window.addEventListener('blur',()=>{ spaceHeld=false; });
 document.addEventListener('visibilitychange',syncPause);
 
 let hunt = createHunt();
-let runId = newRunId();
 let difficultyNotice: {text:string; until:number}|undefined;
 let spider = createCrawler(spawn,platforms);
 let aimDirection: Point = {x:.56,y:-.828};
@@ -167,18 +196,20 @@ let down = false;
 let lastFrame=0;
 let remainder=0;
 let lastSound=0;
-const catchesText = (count: number) => count+(count===1 ? ' catch' : ' catches');
 function say(text: string) { if(message.textContent!==text) message.textContent=text; }
 const worldAim = () => ({x:spider.x+aimDirection.x*70,y:spider.y+aimDirection.y*70});
 
 function resetHunt() {
   hunt=createHunt(undefined,mode);
-  runId=newRunId();
   difficultyNotice=undefined;
   spider=createCrawler(spawn,platforms);
   aimDirection={x:.56,y:-.828};
+  previous=undefined;
   down=false;
   remainder=0;
+  updateHud(hunt.time,hunt.difficulty.duration);
+  clock.dataset.reset='false';
+  clockMeter.style.setProperty('--remaining','1');
   say('');
 }
 
@@ -237,10 +268,6 @@ function step(dt: number,m: Point) {
       difficultyNotice = {text:base+' The fly is '+changes.join(', ')+'.',until:hunt.clock+3};
       say(difficultyNotice.text);
     } else say(base);
-  } else if(result==='over') {
-    say('Time ran out · '+catchesText(hunt.score)+'. Press × to play again.');
-    audio.play('miss');
-    if (mode==='story') leaderboard.show({id:runId,catches:hunt.score});
   }
   if (difficultyNotice && hunt.clock>=difficultyNotice.until) {
     if (message.textContent===difficultyNotice.text) say('');
@@ -262,7 +289,7 @@ function captions(text: string,prompt=false) {
 const clamp01 = (value: number)=>Math.max(0,Math.min(1,value));
 const neutralStick: Point={x:0,y:0};
 let flyCross=false;
-function flyFrame(game: FlyEscape,time: number,elapsed: number,move: Point,retry: boolean) {
+function flyFrame(game: FlyEscape,time: number,elapsed: number,move: Point,crossPressed: boolean) {
   const finale=time>=flyFinalStart;
   const playing=time>=flyCues.play;
   const phase=finale ? 'final' : playing ? 'play' : 'intro';
@@ -273,7 +300,7 @@ function flyFrame(game: FlyEscape,time: number,elapsed: number,move: Point,retry
 
   if (finale && !game.ending) finishFlyEscape(game);
   if (playing && !paused && !document.hidden) {
-    flyCross ||= retry;
+    flyCross ||= crossPressed;
     remainder+=Math.min(elapsed,time-flyCues.play);
     const behavior=time>=flyCues.pass ? 'yield' : time>=flyCues.clearShot ? 'aim' : 'hunt';
     const gesture=behavior==='yield' ? flyDoubtAt(time) : undefined;
@@ -286,17 +313,19 @@ function flyFrame(game: FlyEscape,time: number,elapsed: number,move: Point,retry
         audio.play('catch');
       } else if (event==='trap') {
         audio.play('attach');
-      } else if (event==='escape' || event==='retry') {
+      } else if (event==='escape') {
         say('');
       } else if (event==='timeout') {
-        say('Time ran out. Press × to try again.');
+        audio.play('miss');
+        startIntro('story');
+        return;
       } else if (event==='web') {
         audio.play('launch');
       }
     }
   }
 
-  if (game.trapped && !game.timedOut && !finale) say('Caught in a web · × '+game.trapped.presses+'/'+ESCAPE_PRESSES);
+  if (game.trapped && !finale) say('Caught in a web · × '+game.trapped.presses+'/'+ESCAPE_PRESSES);
 
   const shot: FlyEscapeFrame['shot'] = playing || time<flyCues.spider ? undefined :
     time>=flyCues.room ? 'room' : time>=flyCues.you ? 'you' :
@@ -331,15 +360,12 @@ function flyFrame(game: FlyEscape,time: number,elapsed: number,move: Point,retry
 
 let crossHeld=false;
 let optionsHeld=false;
-function readMenu(gamepad: Gamepad,retry: boolean) {
+function navigationDirection(gamepad: Gamepad) {
   const {x,y}=readLeftStick(gamepad);
   const axis=Math.abs(x)>=Math.abs(y) ? x : y;
   const negative=gamepad.buttons[14]?.pressed || gamepad.buttons[12]?.pressed;
   const positive=gamepad.buttons[15]?.pressed || gamepad.buttons[13]?.pressed;
-  const direction=negative ? -1 : positive ? 1 : Math.abs(axis)>.60 ? Math.sign(axis) : 0;
-  if (direction && direction!==menuDirection) highlightMode(direction<0 ? 0 : 1);
-  menuDirection=direction;
-  if (retry) requestMode(menuModes[selected]);
+  return negative ? -1 : positive ? 1 : Math.abs(axis)>.60 ? Math.sign(axis) : 0;
 }
 
 function frame(time: number) {
@@ -347,44 +373,48 @@ function frame(time: number) {
   lastFrame=time;
   const gamepad=pad();
   let input: ReturnType<typeof samplePlayStation>|undefined;
-  let retry=false;
+  let crossPressed=false;
   const boardWasOpen=leaderboard.open;
-  const menu=shell.dataset.screen==='start';
-  if (!menu && !escape && mode==='story') leaderboard.handlePad(gamepad,time);
+  const navigation=activeChoices();
+  if (!navigation && !escape && mode==='story') leaderboard.handlePad(gamepad);
   if (gamepad) {
     const cross=!!gamepad.buttons[0]?.pressed;
     const options=!!gamepad.buttons[9]?.pressed;
     if (activePad!==gamepad.index) {
       activePad=gamepad.index;
       previous=undefined;
-      if (!menu) crossHeld=cross;
+      if (!navigation) crossHeld=cross;
       optionsHeld=options;
     }
-    retry=cross && !crossHeld;
-    if (menu && !escape) readMenu(gamepad,retry);
-    if (!menu && !escape) {
+    crossPressed=cross && !crossHeld;
+    crossHeld=cross;
+    const direction=navigationDirection(gamepad);
+    if (navigation && direction && direction!==padDirection) navigation.select(direction<0 ? 0 : 1,true);
+    padDirection=direction;
+    if (navigation && crossPressed) navigation.confirm();
+    if (!navigation && !escape) {
       input=samplePlayStation(gamepad,previous);
       previous=input.shoulders;
     }
-    if (options && !optionsHeld && !leaderboard.open) togglePause();
-    crossHeld=cross;
+    if (options && !optionsHeld && !navigation && !leaderboard.open) togglePause();
     optionsHeld=options;
   } else {
     previous=undefined;
     activePad=undefined;
     down=false;
     crossHeld=false;
-    menuDirection=0;
+    padDirection=0;
   }
 
   song.connect(contextAudio);
+  const menu=shell.dataset.screen==='start';
+  if (!song.started) {
+    if (menu && song.waiting) startStatus.textContent=contextAudio?.state==='running' ? 'Loading soundtrack…' :
+      'Click or press a keyboard key to enable audio.';
+    requestAnimationFrame(frame);
+    return;
+  }
   if (menu) {
-    if (!song.started) {
-      if (song.waiting) startStatus.textContent=contextAudio?.state==='running' ? 'Loading soundtrack…' :
-        'Click or press a keyboard key to enable audio.';
-      requestAnimationFrame(frame);
-      return;
-    }
     shell.dataset.screen='game';
     launch.inert=true;
     startStatus.textContent='';
@@ -392,10 +422,8 @@ function frame(time: number) {
   }
   const position = song.position;
   if (escape && position.track==='fly') {
-    if (!song.waiting) {
-      if (position.time>=flyDuration) showMenu();
-      else flyFrame(escape,position.time,elapsed,gamepad ? readLeftStick(gamepad) : neutralStick,retry && !menu);
-    }
+    if (position.time>=flyDuration) showMenu();
+    else flyFrame(escape,position.time,elapsed,gamepad ? readLeftStick(gamepad) : neutralStick,crossPressed);
     requestAnimationFrame(frame);
     return;
   }
@@ -408,18 +436,24 @@ function frame(time: number) {
     say('');
   }
 
-  if (!opening && !paused && !boardWasOpen && !leaderboard.open && !document.hidden) {
+  if (!opening && !paused && !navigation && !boardWasOpen && !leaderboard.open && !document.hidden && hunt.phase!=='over') {
     if (input?.aim) aimDirection=input.aim;
-    if (hunt.phase==='over' && retry) resetHunt();
-    if (hunt.phase!=='over') {
-      if (input?.jump && jumpCrawler(spider)) audio.play('jump');
-      if (input?.fire) shootSilk();
-      remainder+=huntElapsed;
-      const movement=input?.movement??neutralStick;
-      while (remainder>=1/120) {
-        remainder-=1/120;
-        if (step(1/120,movement)) { remainder=0; break; }
+    if (input?.jump && jumpCrawler(spider)) audio.play('jump');
+    if (input?.fire) shootSilk();
+    remainder+=huntElapsed;
+    const movement=input?.movement??neutralStick;
+    while (remainder>=1/120) {
+      remainder-=1/120;
+      if (!step(1/120,movement)) continue;
+      remainder=0;
+      audio.play('miss');
+      if (mode==='story') {
+        startIntro('story');
+        requestAnimationFrame(frame);
+        return;
       }
+      showDefeat();
+      break;
     }
   }
 

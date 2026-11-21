@@ -26,7 +26,7 @@ type SpiderPlan = {
   beginsAt: number;
   executeAt: number;
 } & ({kind:'jump';speed:number}|{kind:'web';intercept:Point;strand:Strand});
-export type EscapeEvent = 'light'|'trap'|'escape'|'web'|'timeout'|'retry';
+export type EscapeEvent = 'light'|'trap'|'escape'|'web'|'timeout';
 export interface FlyEscape {
   spider: Crawler;
   fly: Flight;
@@ -51,7 +51,6 @@ export interface FlyEscape {
   nextObservation: number;
   nextJump: number;
   ending: boolean;
-  timedOut: boolean;
   entropy: number;
   nextShot: number;
   safeUntil: number;
@@ -111,7 +110,7 @@ export function createFlyEscape(
   const game: FlyEscape = {
     spider,fly:{p:{...p},v:{...neutral}},light:{...p},lightVisits:lightSectors.map(()=>0),strands:[],
     time:FLY_SECONDS,clock:0,lights:0,flashUntil:0,
-    behavior:'hunt',ending:false,timedOut:false,entropy:seed,nextShot:hunterWebs.first,safeUntil:0,shotUntil:0,retreat:0,retreatUntil:0,
+    behavior:'hunt',ending:false,entropy:seed,nextShot:hunterWebs.first,safeUntil:0,shotUntil:0,retreat:0,retreatUntil:0,
     gestureSince:0,observed:{p:{...p},v:{...neutral},at:0},pendingObservation:{p:{...p},v:{...neutral},at:0},
     nextObservation:OBSERVATION_PERIOD,nextJump:.08,
     nextPatrol:0,patrolMove:0,patrolUntil:0,
@@ -463,19 +462,12 @@ export function stepFlyEscape(
     moveFly(game,input.move,dt);
     return;
   }
+  if (game.time===0) return;
   game.clock+=dt;
   setBehavior(game,behavior);
   setGesture(game,gesture);
   game.strands=game.strands.filter(strand=>(strand.expiresAt??Infinity)>game.clock);
   let event: EscapeEvent|undefined=stepSpider(game,dt) ? 'web' : undefined;
-  if (game.timedOut) {
-    if (!input.cross) return event;
-    game.timedOut=false;
-    game.time=FLY_SECONDS;
-    game.trapped=undefined;
-    game.safeUntil=game.clock+.65;
-    return 'retry';
-  }
   const step=Math.min(dt,game.time);
   game.time=Math.max(0,game.time-step);
   if (game.trapped) {
@@ -496,7 +488,6 @@ export function stepFlyEscape(
     return 'light';
   } else if (game.trapped) event='trap';
   if (game.time===0) {
-    game.timedOut=true;
     game.fly.v={...neutral};
     return 'timeout';
   }
