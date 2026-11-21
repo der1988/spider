@@ -9,9 +9,12 @@ const FLY_RADIUS = 2.5;
 const FLY_SPEED = 104;
 const neutral = {x:0,y:0};
 const OBSERVATION_PERIOD = .16;
-const PLAN_DELAY = .38;
-const SWEEP_INTERVAL = 9.2;
-const SWEEP_DURATION = 7.4;
+const WEB_WINDUP = .38;
+const JUMP_WINDUP = .12;
+const hunterMotion = {crawlSpeed:114,airAcceleration:480};
+const HUNT_JUMP_SPEED = 194;
+const HUNT_JUMP_REACH = 120;
+const hunterWebs = {first:2.65,openingGap:6.2,lateGap:1.25,rampSeconds:85};
 
 export type SpiderBehavior = 'hunt'|'aim'|'yield';
 export type SpiderGesture = 'identity'|'decision'|'lastWeb'|'watch'|'stepBack';
@@ -19,15 +22,15 @@ type Flight = {p:Point;v:Point};
 type SpiderObservation = Flight & {at:number};
 type SpiderPlan = {
   target: Point;
-  intercept: Point;
   beginsAt: number;
   executeAt: number;
-} & ({kind:'jump'}|{kind:'web'; strand:Strand});
+} & ({kind:'jump';speed:number}|{kind:'web';intercept:Point;strand:Strand});
 export type EscapeEvent = 'light'|'trap'|'escape'|'web'|'timeout'|'retry';
 export interface FlyEscape {
   spider: Crawler;
   fly: Flight;
   light: Point;
+  lightVisits: number[];
   strands: Strand[];
   time: number;
   clock: number;
@@ -45,11 +48,7 @@ export interface FlyEscape {
   observed: SpiderObservation;
   pendingObservation: SpiderObservation;
   nextObservation: number;
-  airTarget?: Point;
   nextJump: number;
-  nextSweep: number;
-  sweepUntil: number;
-  sweepDirection: -1|1;
   ending: boolean;
   timedOut: boolean;
   entropy: number;
@@ -72,13 +71,19 @@ function clear(point: Point,radius: number) {
     point.y<=surface.y-radius || point.y>=surface.y+surface.h+radius);
 }
 
-// The arena's open corridors connect every candidate; leave clearance around platforms.
-const lightSites: Point[] = [];
-for (let y=22;y<HEIGHT-17;y+=23) {
-  for (let x=23;x<WIDTH-20;x+=24) {
-    if (clear({x,y},LIGHT_RADIUS+FLY_RADIUS+1)) lightSites.push({x,y});
+// The open corridors connect the whole arena. Sample clear sites in equal-area sectors.
+const lightColumns=4;
+const lightRows=3;
+const lightSectors: Point[][] = Array.from({length:lightColumns*lightRows},()=>[]);
+for (let y=20;y<=HEIGHT-20;y+=14) {
+  for (let x=20;x<=WIDTH-20;x+=16) {
+    if (!clear({x,y},LIGHT_RADIUS+FLY_RADIUS+1)) continue;
+    const column=Math.floor(x*lightColumns/WIDTH);
+    const row=Math.floor(y*lightRows/HEIGHT);
+    lightSectors[row*lightColumns+column].push({x,y});
   }
 }
+const lightSites=lightSectors.flat();
 
 function random(game: FlyEscape) {
   game.entropy=(Math.imul(game.entropy,1664525)+1013904223)>>>0;
@@ -86,10 +91,13 @@ function random(game: FlyEscape) {
 }
 
 function nextLight(game: FlyEscape,previous?: Point) {
-  const choices=lightSites.filter(site=>distance(site,game.fly.p)>=45 && distance(site,game.fly.p)<=167 &&
-    (!previous || distance(site,previous)>=36));
-  const pool=choices.length ? choices : lightSites.filter(site=>distance(site,game.fly.p)>=45);
-  return {...pool[Math.floor(random(game)*pool.length)]};
+  const reachable=lightSectors.map((sites,sector)=>({sector,sites:sites.filter(site=>
+    distance(site,game.fly.p)>=45 && (!previous || distance(site,previous)>=36))})).filter(group=>group.sites.length);
+  const lowest=Math.min(...reachable.map(({sector})=>game.lightVisits[sector]));
+  const choices=reachable.filter(({sector})=>game.lightVisits[sector]===lowest);
+  const {sector,sites}=choices[Math.floor(random(game)*choices.length)];
+  game.lightVisits[sector]++;
+  return {...sites[Math.floor(random(game)*sites.length)]};
 }
 
 export function createFlyEscape(
@@ -100,10 +108,11 @@ export function createFlyEscape(
   const p=clear(sourceFly,FLY_RADIUS) ? sourceFly : lightSites.reduce((best,site)=>
     distance(site,sourceFly)<distance(best,sourceFly) ? site : best);
   const game: FlyEscape = {
-    spider,fly:{p:{...p},v:{...neutral}},light:{...p},strands:[],time:FLY_SECONDS,clock:0,lights:0,flashUntil:0,
-    behavior:'hunt',ending:false,timedOut:false,entropy:seed,nextShot:.8,safeUntil:0,shotUntil:0,retreat:0,retreatUntil:0,
+    spider,fly:{p:{...p},v:{...neutral}},light:{...p},lightVisits:lightSectors.map(()=>0),strands:[],
+    time:FLY_SECONDS,clock:0,lights:0,flashUntil:0,
+    behavior:'hunt',ending:false,timedOut:false,entropy:seed,nextShot:hunterWebs.first,safeUntil:0,shotUntil:0,retreat:0,retreatUntil:0,
     gestureSince:0,observed:{p:{...p},v:{...neutral},at:0},pendingObservation:{p:{...p},v:{...neutral},at:0},
-    nextObservation:OBSERVATION_PERIOD,nextJump:0,nextSweep:2.4,sweepUntil:0,sweepDirection:1,
+    nextObservation:OBSERVATION_PERIOD,nextJump:.08,
     nextPatrol:0,patrolMove:0,patrolUntil:0,
   };
   game.light=nextLight(game);
@@ -153,7 +162,6 @@ function setBehavior(game: FlyEscape,behavior: SpiderBehavior) {
   const previousAim=game.aim;
   game.behavior=behavior;
   game.plan=undefined;
-  game.airTarget=undefined;
   game.aim=behavior==='aim' ? predict(game.fly) : undefined;
   if (game.aim) game.spider.facing=game.aim.x<game.spider.x ? -1 : 1;
   if (behavior==='yield') {
@@ -188,7 +196,9 @@ function chooseWeb(game: FlyEscape,target: Point,routing?: Flight) {
     if (!routing || !route) return strand;
     // Favor cutting across the predicted flight path at a point still ahead of the fly.
     const crossing=sweptHit(routing.p,route,strand);
-    const score=segmentDistance(strand.from,strand.to,target)+Math.abs(offset)*5-
+    const miss=segmentDistance(strand.from,strand.to,target);
+    if (miss>62) continue;
+    const score=miss+Math.abs(offset)*5-
       (crossing && crossing.t>.14 ? 17*(1-Math.abs(crossing.t-.4)) : 0);
     if (!best || score<best.score) best={strand,score};
   }
@@ -269,99 +279,105 @@ function setGesture(game: FlyEscape,gesture?: SpiderGesture) {
   }
 }
 
-function isOnPerimeter(spider: Crawler) {
-  switch (spider.support) {
-    case 'floor': return spider.y>=HEIGHT-16;
-    case 'ceiling': return spider.y<=16;
-    case 'left': return spider.x<=16;
-    case 'right': return spider.x>=WIDTH-16;
-    default: return false;
-  }
+function climbingToRoof(spider: Crawler,target: Point) {
+  const onWall=spider.support==='left' && spider.x<16 || spider.support==='right' && spider.x>WIDTH-16;
+  return onWall && target.y<48 && Math.abs(target.x-spider.x)>62;
 }
 
-function followPerimeter(spider: Crawler,direction: -1|1): Point {
-  switch (spider.support) {
-    case 'floor': return {x:direction,y:0};
-    case 'ceiling': return {x:-direction,y:0};
-    case 'left': return {x:0,y:direction};
-    case 'right': return {x:0,y:-direction};
-    default: return neutral;
-  }
+function climbWall(spider: Crawler,target: Point) {
+  const cost=(x: number)=>Math.abs(spider.x-x)+1.25*Math.abs(target.x-x);
+  return cost(14)<cost(WIDTH-14) ? 10 : WIDTH-10;
 }
 
-function startSweep(game: FlyEscape) {
-  const {spider}=game;
-  // Heading toward the nearest outside wall also picks the direction that climbs it.
-  if (spider.support!=='ceiling' || !isOnPerimeter(spider)) game.sweepDirection=spider.x<WIDTH/2 ? -1 : 1;
-  game.sweepUntil=game.clock+SWEEP_DURATION;
-  game.nextSweep=game.clock+SWEEP_INTERVAL;
+function edgeToward(spider: Crawler,target: Point) {
+  const standing=spider.support==='floor';
+  const face=spider.y+(standing ? SPIDER_HALF_HEIGHT : -SPIDER_HALF_HEIGHT);
+  const ledge=platforms.find(r=>r.w<WIDTH && Math.abs(face-(standing ? r.y : r.y+r.h))<.03 &&
+    spider.x+SPIDER_HALF_WIDTH>r.x && spider.x-SPIDER_HALF_WIDTH<r.x+r.w);
+  if (!ledge) return target.x;
+  const before=ledge.x-SPIDER_HALF_WIDTH-1, after=ledge.x+ledge.w+SPIDER_HALF_WIDTH+1;
+  const cost=(x: number)=>Math.abs(spider.x-x)+.45*Math.abs(target.x-x);
+  return cost(before)<cost(after) ? before : after;
 }
 
-function canLeap(game: FlyEscape,target: Point,sweeping: boolean) {
-  const spider=game.spider;
-  if (!spider.support || game.clock<game.nextJump) return false;
-  const normal=normals[spider.support];
+function pursuitMove(spider: Crawler,target: Point): Point {
+  const {support}=spider;
   const dx=target.x-spider.x,dy=target.y-spider.y;
-  const across=dx*normal.x+dy*normal.y;
-  const along=Math.abs(dx*normal.y-dy*normal.x);
-  // Keep climbing the outside walls during a sweep, all the way to the ceiling.
-  if (sweeping && isOnPerimeter(spider) && spider.support!=='ceiling') return false;
-  return across>=23 && (across<135 || sweeping && spider.support==='ceiling') && along<116;
+  if (!support) return {x:clamp((dx-spider.vx*.19)/22,-1,1),y:0};
+  if (support==='left' || support==='right') {
+    const seek=climbingToRoof(spider,target) ? -1 : clamp(dy/19,-1,1);
+    return {x:0,y:Math.abs(seek)>.24 ? seek : spider.facing*(support==='left' ? .65 : -.65)};
+  }
+  // If the fly is across a ledge, go around it. For high targets, climb a wall instead of hopping in place.
+  const normalDy=dy*normals[support].y;
+  const x=normalDy < -12 ? edgeToward(spider,target) :
+    support==='floor' && spider.y>172 && normalDy>HUNT_JUMP_REACH ? climbWall(spider,target) : target.x;
+  const seek=clamp((x-spider.x)/19,-1,1);
+  return {x:Math.abs(seek)>.28 ? seek : spider.facing*(support==='floor' ? .68 : -.68),y:0};
+}
+
+function leapSpeed(spider: Crawler,target: Point) {
+  const {support}=spider;
+  if (!support || climbingToRoof(spider,target)) return 0;
+  const {x,y}=normals[support];
+  const dx=target.x-spider.x,dy=target.y-spider.y;
+  const away=dx*x+dy*y;
+  const along=Math.abs(dx*y-dy*x);
+  if (x) return away>23 && along<51 ? HUNT_JUMP_SPEED : 0;
+  if (away>=22 && away<=(support==='floor' ? HUNT_JUMP_REACH : 183) && along<140) return HUNT_JUMP_SPEED;
+  return away>=-9 && away<22 && along<52 ? 108 : 0;
+}
+
+function nextWebGap(game: FlyEscape) {
+  const {openingGap,lateGap,rampSeconds}=hunterWebs;
+  const progress=clamp(game.clock/rampSeconds,0,1);
+  return (openingGap+(lateGap-openingGap)*progress)*(.9+random(game)*.2);
 }
 
 function advanceHunter(game: FlyEscape,dt: number) {
   observe(game);
   const spider=game.spider;
-  if (game.plan) {
-    // Hold the launch point and target steady after committing. Late feints can beat the shot.
-    tickCrawler(spider,platforms,neutral,false,dt,[]);
-    if (game.clock<game.plan.executeAt) return false;
-    const plan=game.plan;
+  const plan=game.plan;
+  if (plan) {
+    if (game.clock<plan.executeAt) return false;
     game.plan=undefined;
-    if (plan.kind==='jump') {
-      if (jumpCrawler(spider)) game.airTarget=plan.target;
-      game.nextShot=game.clock+.44;
-      game.nextJump=game.clock+2.15;
-      game.shotUntil=game.clock+.25;
-      return false;
+    if (plan.kind==='web') {
+      const fired=deploy(game,plan.strand);
+      game.nextShot=game.clock+nextWebGap(game);
+      game.nextJump=Math.max(game.nextJump,game.clock+.16);
+      return fired;
     }
-    const fired=deploy(game,plan.strand);
-    game.nextShot=game.clock+(fired ? .78+random(game)*.55 : .27);
-    return fired;
+    jumpCrawler(spider,plan.speed);
+    game.nextJump=game.clock+.72;
   }
   if (game.clock>=game.shotUntil) game.aim=undefined;
-  if (spider.support) game.airTarget=undefined;
-  const target=game.airTarget??predict(game.observed);
-  const wall=target.x<WIDTH/2 ? 12 : WIDTH-12;
-  if (spider.support && game.clock>=game.nextSweep) startSweep(game);
-  const sweeping=game.clock<game.sweepUntil;
-  const shouldClimb=spider.support==='floor' && target.y<112 || spider.support==='ceiling' && target.y>118;
+  const target=predict(game.observed);
   if (spider.support && game.clock>=game.nextShot) {
-    // Aim 0.2 s ahead of the estimated launch point, allowing for the sight and wind-up delay.
-    const flightAtLaunch={p:predict(game.observed,game.clock-game.observed.at+PLAN_DELAY),v:game.observed.v};
-    const intercept=predict(flightAtLaunch);
-    const jump=canLeap(game,intercept,sweeping);
-    const strand=jump ? undefined : chooseWeb(game,intercept,flightAtLaunch);
-    const timing={intercept,beginsAt:game.clock,executeAt:game.clock+PLAN_DELAY};
-    game.plan=jump ? {kind:'jump',target:intercept,...timing} : strand ?
-      {kind:'web',target:strand.from,strand,...timing} : undefined;
-    if (game.plan) {
-      // Bracing prevents a previously held stride from moving the web's anchored endpoint.
+    // Commit to a strand before firing so a late change of direction can still beat the trap.
+    const flight={p:predict(game.observed,game.clock-game.observed.at+WEB_WINDUP),v:game.observed.v};
+    const intercept=predict(flight);
+    const strand=chooseWeb(game,intercept,flight);
+    if (strand) {
       spider.vx=0;
       spider.vy=0;
-      spider.facing=game.plan.target.x<spider.x ? -1 : 1;
-      game.aim=game.plan.target;
+      game.plan={kind:'web',target:strand.from,intercept,strand,beginsAt:game.clock,executeAt:game.clock+WEB_WINDUP};
       return false;
     }
-    game.nextShot=game.clock+.24;
+    game.nextShot=game.clock+.32;
+    game.nextJump=Math.max(game.nextJump,game.nextShot);
   }
-  const pursue={
-    x:clamp(((shouldClimb ? wall : target.x)-spider.x)/23,-1,1),
-    y:clamp((target.y-spider.y)/23,-1,1),
-  };
-  const stalled=spider.support && Math.abs(pursue[supportAxis(spider)])<.15;
-  const move=spider.support && (sweeping || stalled) ? followPerimeter(spider,game.sweepDirection) : pursue;
-  tickCrawler(spider,platforms,move,false,dt,[]);
+  if (game.clock>=game.nextJump && game.nextShot-game.clock>.40) {
+    const intercept=predict(game.observed,.3);
+    const speed=leapSpeed(spider,intercept);
+    if (speed) {
+      game.plan={kind:'jump',target:intercept,speed,beginsAt:game.clock,executeAt:game.clock+JUMP_WINDUP};
+      return false;
+    }
+  }
+  // A second jump near the apex reaches higher platforms when the fly stays above the spider.
+  if (!spider.support && spider.airJump && spider.vy>=-25 && spider.y-target.y>24 &&
+      Math.abs(spider.x-target.x)<72) jumpCrawler(spider,HUNT_JUMP_SPEED);
+  tickCrawler(spider,platforms,pursuitMove(spider,target),false,dt,[],hunterMotion);
   return false;
 }
 
