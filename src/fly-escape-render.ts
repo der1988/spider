@@ -20,7 +20,6 @@ const cream='#eff3c8';
 const border='#8cb072';
 const wallColor='#3f6651';
 const closing='#17281f';
-const intent='#45684e';
 const question='#f2dd86';
 const hesitating='#ad8655';
 const watching='#d19751';
@@ -147,37 +146,6 @@ function drawFly(ctx: CanvasRenderingContext2D,state: FlyEscape,frame: FlyEscape
   block(ctx,x+2,y-2+flap,wing,2,cream);
   block(ctx,x+facing,y-1,1,1,'#eeea9d');
   if (accent) marker(ctx,p,7+Math.round(frame.beat*2),cream);
-  if (state.trapped) marker(ctx,p,8,ink);
-}
-
-function drawIntent(ctx: CanvasRenderingContext2D,state: FlyEscape) {
-  const {spider,plan,gesture}=state;
-  const age=state.clock-state.gestureSince;
-  const heldShot=state.behavior==='aim' && !gesture;
-  const aim=heldShot ? state.fly.p : plan?.target??state.aim??state.decisionAim;
-  if (!aim || (gesture==='decision' && age>.93)) return;
-  if (heldShot) marker(ctx,aim,7,ink);
-  const dx=aim.x-spider.x,dy=aim.y-spider.y;
-  const distance=Math.hypot(dx,dy);
-  if (distance<=1) return;
-  const along=(length: number): Point=>({x:spider.x+dx*length/distance,y:spider.y+dy*length/distance});
-  const progress=plan ? range(state.clock,plan.beginsAt,plan.executeAt) : 1;
-  const withdraw=gesture==='decision' ? range(age,.36,.93) : 0;
-  const length=Math.min(distance,(plan ? 14+12*progress : 19)*(1-.72*withdraw));
-  const tip=along(length);
-  if (plan?.kind==='web') {
-    layer(ctx,.48+.32*progress,()=>line(ctx,plan.strand.from,plan.strand.to,cream,true));
-  }
-  if (plan?.kind==='jump') {
-    const n={x:-dy/distance,y:dx/distance};
-    const base=along(Math.max(3,length-5));
-    const side=(sign: number)=>({x:base.x+n.x*sign*3,y:base.y+n.y*sign*3});
-    line(ctx,along(7),base,intent,true);
-    polyline(ctx,[side(-1),tip,side(1)],intent);
-  } else {
-    line(ctx,along(5),tip,cream,true);
-    if (withdraw<.65) marker(ctx,tip,plan || state.behavior==='aim' ? 4 : 2,plan ? intent : ink);
-  }
 }
 
 function drawTethers(ctx: CanvasRenderingContext2D,state: FlyEscape) {
@@ -204,7 +172,11 @@ function drawTethers(ctx: CanvasRenderingContext2D,state: FlyEscape) {
   }
   if (spider.firstAnchor) line(ctx,spider,spider.firstAnchor,border,true);
   if (spider.rope) line(ctx,spider,spider.rope,cream);
-  drawIntent(ctx,state);
+  const plan=state.plan;
+  if (plan?.kind==='web') {
+    const progress=range(state.clock,plan.beginsAt,plan.executeAt);
+    layer(ctx,.48+.32*progress,()=>line(ctx,plan.strand.from,plan.strand.to,cream,true));
+  }
 }
 
 function lookAlongSurface(state: FlyEscape,target: Point|undefined) {

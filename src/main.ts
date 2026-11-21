@@ -24,6 +24,7 @@ const roundLabel = get('round-time');
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const scoreLabel = get('score');
 const start = get<HTMLButtonElement>('start');
+const testFinale = get<HTMLButtonElement>('test-finale');
 const startStatus = get('start-status');
 const shell = get('shell');
 const lyric = get('lyric');
@@ -70,6 +71,24 @@ function togglePause() {
   paused = !paused;
   syncPause();
 }
+function beginFly(test=false) {
+  escape=test ? createFlyEscape() : createFlyEscape(spider,hunt.fly.p);
+  if (test) {
+    hunt=createHunt();
+    contextAudio=audio.audioContext();
+    audio.unlock();
+    start.disabled=true;
+    startStatus.textContent='Loading soundtrack…';
+  }
+  testFinale.hidden=true;
+  shell.dataset.flyPhase='intro';
+  paused=false;
+  syncPause();
+  song.enterFly(contextAudio,test ? flyCues.play : 0);
+  say('');
+}
+testFinale.onclick=()=>beginFly(true);
+
 window.addEventListener('keydown',event => {
   if (event.code==='Escape' && !event.repeat && !leaderboard.open) togglePause();
   if (event.code!=='Space') return;
@@ -78,12 +97,7 @@ window.addEventListener('keydown',event => {
   if (!song.started || opening || leaderboard.open || hunt.phase==='over') return;
   event.preventDefault();
   if (!freshPress || escape || song.position.track!=='room') return;
-  escape=createFlyEscape(spider,hunt.fly.p);
-  shell.dataset.flyPhase='intro';
-  paused=false;
-  syncPause();
-  song.enterFly(contextAudio);
-  say('');
+  beginFly();
 });
 window.addEventListener('keyup',event => {
   if (event.code==='Space') spaceHeld=false;
@@ -300,7 +314,10 @@ function frame(time: number) {
   song.connect(contextAudio);
   const position = song.position;
   if (escape && position.track==='fly') {
-    flyFrame(escape,position.time,elapsed,gamepad ? readLeftStick(gamepad) : neutralStick,retry);
+    if (!song.waitingForFly) {
+      shell.dataset.screen='game';
+      flyFrame(escape,position.time,elapsed,gamepad ? readLeftStick(gamepad) : neutralStick,retry);
+    }
     if (position.time<flyDuration) requestAnimationFrame(frame);
     return;
   }

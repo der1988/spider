@@ -28,14 +28,14 @@ export function flyDoubtAt(time: number) {
   return flyDoubtCues.find(({start,end})=>time>=start && time<end)?.gesture;
 }
 
-export const flyRoomEnd = flyCues.shrink+9.720;
+export const flyRoomEnd = flyCues.shrink+11.880;
 
 export function flyRoomEffect(time: number) {
   const elapsed=time-flyCues.shrink;
   const clamp=(n: number)=>Math.max(0,Math.min(1,n));
   return {
-    shrink:clamp(elapsed/2.160)*clamp((flyRoomEnd-time)/3.240),
-    details:1-clamp((elapsed-.540)/2.160)*clamp((flyRoomEnd-time)/2.700),
+    shrink:clamp(elapsed/2.700)*clamp((flyRoomEnd-time)/4.320),
+    details:1-clamp((elapsed-.540)/2.700)*clamp((flyRoomEnd-time)/3.240),
   };
 }
 

@@ -11,6 +11,8 @@ export class Soundtrack {
   private buffer?: AudioBuffer;
   private flyBuffer?: AudioBuffer;
   private flyReady = false;
+  private flyLoading = false;
+  private flyStarting = false;
   private finale = false;
   private upgradeStart: number = trackStarts[1];
   private roomStart = trackStarts[2];
@@ -40,29 +42,43 @@ export class Soundtrack {
     void this.join(context).then(buffer => {
       this.buffer=buffer;
     }).catch(()=>{this.failed=true;}).finally(()=>void this.prepareFly(context));
+    this.prepareOutput(context);
+  }
+
+  private prepareOutput(context: AudioContext) {
+    if (this.output) return;
     this.output=context.createGain();
     this.output.gain.value=.76;
     this.output.connect(context.destination);
   }
 
   private async prepareFly(context: AudioContext) {
+    if (this.flyLoading) return;
+    this.flyLoading=true;
     try {
       const bytes=await this.flyBytes;
       if (bytes) this.flyBuffer=await context.decodeAudioData(bytes);
     } catch { /* Keep the scene and subtitles playable without audio. */ }
     this.flyReady=true;
-    if (this.finale) {
-      this.epoch=this.clock();
-      this.connect(context,0);
-    }
+    if (this.finale) this.connect(context);
   }
 
-  enterFly(context?: AudioContext) {
+  get waitingForFly() {
+    return this.flyStarting;
+  }
+
+  enterFly(context?: AudioContext,startAt=0) {
     this.stopSource();
+    this.started=true;
     this.finale=true;
-    this.offset=0;
+    this.flyStarting=true;
+    this.offset=startAt;
     this.epoch=this.clock();
-    this.connect(context,0);
+    if (context) {
+      this.prepareOutput(context);
+      void this.prepareFly(context);
+    } else this.flyReady=true;
+    this.connect(context);
   }
 
   private async join(context: AudioContext) {
@@ -113,7 +129,7 @@ export class Soundtrack {
   }
 
   private currentOffset() {
-    if (!this.started || this.paused || (this.finale && !this.flyReady)) return this.offset;
+    if (!this.started || this.paused || this.flyStarting) return this.offset;
     const elapsed=this.offset+Math.max(0,this.clock()-this.epoch);
     return this.finale ? Math.min(flyDuration,elapsed) : wrapPlaylist(elapsed,this.returnAt,this.buffer?.duration);
   }
@@ -133,10 +149,14 @@ export class Soundtrack {
     return !!this.buffer && context?.state==='running';
   }
 
-  connect(context?: AudioContext,startAt?: number) {
+  connect(context?: AudioContext) {
+    if (this.flyStarting && this.flyReady && !this.flyBuffer) {
+      this.flyStarting=false;
+      this.epoch=this.clock();
+    }
     const buffer=this.finale ? this.flyBuffer : this.buffer;
     if (!this.started || this.paused || this.source || context?.state!=='running' || !this.output || !buffer) return;
-    this.offset=startAt??this.currentOffset();
+    this.offset=this.currentOffset();
     if (this.finale && this.offset>=buffer.duration) return;
     const source=context.createBufferSource();
     source.buffer=buffer;
@@ -149,6 +169,7 @@ export class Soundtrack {
     const launch=context.currentTime+.012;
     source.start(launch,this.offset);
     this.source=source;
+    this.flyStarting=false;
     this.epoch=launch;
   }
 

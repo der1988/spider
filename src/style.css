@@ -11,7 +11,7 @@ body { margin: 0; overflow: hidden; }
 .shell {
   display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
   height: 100vh; height: 100dvh; padding: clamp(5px, 1.4vw, 16px);
-  gap: 7px; user-select: none;
+  gap: 7px; user-select: none; position: relative;
 }
 header {
   display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr);
@@ -79,6 +79,18 @@ button { cursor: pointer; }
 .stage { background: #16251c; border: 1px solid var(--border); min-width: 0; min-height: 0; overflow: hidden; }
 canvas { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
 footer { display: grid; gap: 4px; text-align: center; }
+.shell:not([data-fly-phase]) footer { padding-inline: 82px; }
+#test-finale {
+  position: absolute; right: clamp(5px, 1.4vw, 16px); bottom: clamp(5px, 1.4vw, 16px);
+  margin: 0; min-height: 26px; border-color: #8da572; white-space: nowrap;
+}
+.shell[data-screen=start] #test-finale {
+  right: clamp(12px, 2.8vw, 26px); bottom: clamp(12px, 2.8vw, 26px);
+}
+#test-finale:hover, #test-finale:focus-visible { background: #38503a; }
+@media (max-width: 520px) {
+  .shell:not([data-fly-phase]) footer { padding-inline: 0; padding-bottom: 28px; }
+}
 #message { min-height: 1.5em; }
 footer p { margin: 0; font-size: clamp(9px, 1.4vw, 12px); line-height: 1.5; }
 kbd { padding: 1px 3px; font-size: inherit; }
@@ -118,7 +130,6 @@ dialog h2 { margin: 0; font-size: 16px; }
 .score-row { display: flex; justify-content: space-between; gap: 12px; }
 
 .launch { display: none; }
-.shell[data-screen=start] { position: relative; }
 .shell[data-screen=start] .launch {
   display: grid; grid-row: 1 / -1; justify-items: center;
   grid-template-rows: minmax(0,1fr) auto minmax(0,1fr); gap: 14px;

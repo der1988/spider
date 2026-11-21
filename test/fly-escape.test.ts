@@ -101,27 +101,28 @@ test('timeout retries locally, and the final lock lets the fly cross a light wit
 });
 
 test('delayed autonomous flight prediction commits a strand and the player can feint around it',()=>{
-  const game=createFlyEscape(undefined,{x:319,y:165},5);
-  const left={move:{x:-1,y:0},cross:false};
-  const right={move:{x:1,y:0},cross:false};
+  const game=createFlyEscape(undefined,{x:95,y:117},0);
+  game.light={x:325,y:28};
+  const advance={move:{x:.71,y:.71},cross:false};
+  const reverse={move:{x:-.71,y:-.71},cross:false};
   const untouched=structuredClone(game);
   for (let i=0;i<15;i++) {
-    stepFlyEscape(game,left,dt,'hunt');
-    stepFlyEscape(untouched,right,dt,'hunt');
+    stepFlyEscape(game,advance,dt,'hunt');
+    stepFlyEscape(untouched,reverse,dt,'hunt');
   }
-  assert.notEqual(game.fly.p.x,untouched.fly.p.x);
+  assert.notDeepEqual(game.fly.p,untouched.fly.p);
   assert.deepEqual(game.observed,untouched.observed);
   assert.deepEqual(game.spider,untouched.spider);
-  for (let i=0;i<120 && !game.plan;i++) stepFlyEscape(game,left,dt,'hunt');
+  for (let i=0;i<240 && game.plan?.kind!=='web';i++) stepFlyEscape(game,advance,dt,'hunt');
   const plan=game.plan;
   assert.equal(plan?.kind,'web');
-  assert.ok(plan.intercept.x<game.fly.p.x-35);
+  assert.ok(plan.intercept.x>game.fly.p.x+20);
   assert.ok(plan.executeAt-plan.beginsAt>.35);
   const continuing=structuredClone(game);
   const dodging=structuredClone(game);
   for (let i=0;i<90;i++) {
-    stepFlyEscape(continuing,left,dt,'hunt');
-    stepFlyEscape(dodging,right,dt,'hunt');
+    stepFlyEscape(continuing,advance,dt,'hunt');
+    stepFlyEscape(dodging,reverse,dt,'hunt');
     if (continuing.clock<plan.executeAt) {
       assert.deepEqual(continuing.aim,plan.target);
       assert.deepEqual(dodging.aim,plan.target);
@@ -133,6 +134,24 @@ test('delayed autonomous flight prediction commits a strand and the player can f
   assert.equal(dodging.trapped,undefined);
   assert.deepEqual(continuing.strands[0].from,dodging.strands[0].from);
   assert.deepEqual(continuing.strands[0].to,dodging.strands[0].to);
+});
+
+test('the spider climbs an outside wall, traverses the ceiling and lays traps with a stationary fly',()=>{
+  const game=createFlyEscape(undefined,undefined,5);
+  const initialFly={...game.fly.p};
+  const ceilingPositions:number[]=[];
+  let climbed=false;
+  let fired=0;
+  for (let i=0;i<1080;i++) {
+    if (stepFlyEscape(game,idle,dt,'hunt')==='web') fired++;
+    const {x,y,support}=game.spider;
+    if (support==='left' && x<16 && y<100) climbed=true;
+    if (support==='ceiling' && y<16) ceilingPositions.push(x);
+  }
+  assert.ok(climbed);
+  assert.ok(Math.max(...ceilingPositions)-Math.min(...ceilingPositions)>25);
+  assert.ok(fired>=3);
+  assert.deepEqual(game.fly.p,initialFly);
 });
 
 test('the spider commits and executes its own jump without any player movement',()=>{
