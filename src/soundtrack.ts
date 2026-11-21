@@ -19,7 +19,6 @@ export class Soundtrack {
   private offset = 0;
   private epoch = 0;
   private paused = false;
-  private muted = false;
   private loading = false;
   failed = false;
   started = false;
@@ -42,7 +41,7 @@ export class Soundtrack {
       this.buffer=buffer;
     }).catch(()=>{this.failed=true;}).finally(()=>void this.prepareFly(context));
     this.output=context.createGain();
-    this.output.gain.value=this.muted ? 0 : .76;
+    this.output.gain.value=.76;
     this.output.connect(context.destination);
   }
 
@@ -151,13 +150,6 @@ export class Soundtrack {
     source.start(launch,this.offset);
     this.source=source;
     this.epoch=launch;
-  }
-
-  setMuted(muted: boolean) {
-    this.muted = muted;
-    if (this.output) {
-      this.output.gain.setTargetAtTime(muted ? 0 : .76,this.output.context.currentTime,.015);
-    }
   }
 
   setPaused(paused: boolean) {

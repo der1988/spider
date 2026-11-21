@@ -26,10 +26,9 @@
   <header>
     <div class="hunt-info">
       <h1>Spider and Fly</h1>
-      <div class="scores">
-        <span id="level" class="level">Level 1</span>
-        <output id="score" aria-label="Catches">0 catches</output>
-        <output id="strands" aria-label="Placed webs">0 / 6 webs</output>
+      <div class="catch-count">
+        <label for="score">Catches</label>
+        <output id="score">0</output>
       </div>
     </div>
     <div id="clock" class="clock" data-phase="ready">
@@ -40,20 +39,13 @@
       <div class="clock-track" aria-hidden="true"><span id="clock-meter"></span></div>
     </div>
     <code id="ending-code" class="ending-code" aria-hidden="true"></code>
-    <div class="tools">
-      <button id="pause" type="button" aria-pressed="false" disabled>Pause</button>
-      <button id="show-board" type="button">Leaderboard</button>
-      <button id="sound" type="button" aria-pressed="true">Audio On</button>
-    </div>
   </header>
   <section class="stage" aria-label="Hunting arena">
     <canvas id="world" width="360" height="204" aria-label="Spider, fly and webs"></canvas>
   </section>
   <footer>
-    <p id="lyric" class="lyric" lang="en"></p>
     <p id="message" role="status"></p>
-    <p id="hunt-controls">Left stick: move, ↑ reel in, ↓ detach · Right stick: aim · <kbd>R1</kbd> Shoot web · <kbd>L1</kbd> Jump / double jump · <kbd>Options</kbd> Pause</p>
-    <p id="fly-controls" hidden>Left stick: fly · <kbd>×</kbd> Break free · <kbd>Options</kbd> Pause</p>
+    <p id="lyric" class="lyric" lang="en"></p>
   </footer>
 </main>
 <dialog id="scoreboard" aria-labelledby="board-title">

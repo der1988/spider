@@ -1,4 +1,4 @@
-import {createCrawler, normals, tickCrawler, type Crawler} from './crawler.ts';
+import {createCrawler, jumpCrawler, normals, tickCrawler, type Crawler} from './crawler.ts';
 import {HEIGHT, LIMIT, WIDTH, WEB_SECONDS, platforms, spawn} from './hunt.ts';
 import {aimHit, DEFAULT_TUNING, SPIDER_HALF_HEIGHT, SPIDER_HALF_WIDTH, type Point} from './spider.ts';
 import {anchorSilk, sweptHit, type Strand} from './threads.ts';
@@ -8,12 +8,23 @@ export const LIGHT_RADIUS = 7;
 const FLY_RADIUS = 2.5;
 const FLY_SPEED = 104;
 const neutral = {x:0,y:0};
+const OBSERVATION_PERIOD = .16;
+const PLAN_DELAY = .38;
 
 export type SpiderBehavior = 'hunt'|'aim'|'yield';
+export type SpiderGesture = 'identity'|'decision'|'lastWeb'|'watch'|'stepBack';
+type Flight = {p:Point;v:Point};
+type SpiderObservation = Flight & {at:number};
+type SpiderPlan = {
+  target: Point;
+  intercept: Point;
+  beginsAt: number;
+  executeAt: number;
+} & ({kind:'jump'}|{kind:'web'; strand:Strand});
 export type EscapeEvent = 'light'|'trap'|'escape'|'web'|'timeout'|'retry';
 export interface FlyEscape {
   spider: Crawler;
-  fly: {p:Point;v:Point};
+  fly: Flight;
   light: Point;
   strands: Strand[];
   time: number;
@@ -23,6 +34,17 @@ export interface FlyEscape {
   trapped?: {strand:Strand;presses:number};
   behavior: SpiderBehavior;
   aim?: Point;
+  plan?: SpiderPlan;
+  gesture?: SpiderGesture;
+  gestureSince: number;
+  decisionAim?: Point;
+  watchedStrand?: Strand;
+  lastWeb?: Strand;
+  observed: SpiderObservation;
+  pendingObservation: SpiderObservation;
+  nextObservation: number;
+  airTarget?: Point;
+  nextJump: number;
   ending: boolean;
   timedOut: boolean;
   entropy: number;
@@ -31,6 +53,9 @@ export interface FlyEscape {
   shotUntil: number;
   retreat: number;
   retreatUntil: number;
+  nextPatrol: number;
+  patrolMove: number;
+  patrolUntil: number;
 }
 
 type EscapeInput = {move: Point;cross: boolean};
@@ -72,6 +97,8 @@ export function createFlyEscape(
   const game: FlyEscape = {
     spider,fly:{p:{...p},v:{...neutral}},light:{...p},strands:[],time:FLY_SECONDS,clock:0,lights:0,flashUntil:0,
     behavior:'hunt',ending:false,timedOut:false,entropy:seed,nextShot:.8,safeUntil:0,shotUntil:0,retreat:0,retreatUntil:0,
+    gestureSince:0,observed:{p:{...p},v:{...neutral},at:0},pendingObservation:{p:{...p},v:{...neutral},at:0},
+    nextObservation:OBSERVATION_PERIOD,nextJump:0,nextPatrol:0,patrolMove:0,patrolUntil:0,
   };
   game.light=nextLight(game);
   return game;
@@ -101,85 +128,222 @@ function segmentDistance(from: Point,to: Point,p: Point) {
   return Math.hypot(p.x-(from.x+dx*along),p.y-(from.y+dy*along));
 }
 
-function predicted(game: FlyEscape) {
-  return {
-    x:clamp(game.fly.p.x+game.fly.v.x*.2,12,WIDTH-12),
-    y:clamp(game.fly.p.y+game.fly.v.y*.2,12,HEIGHT-12),
-  };
+function predict(fly: Flight,lead=.2) {
+  const point={...fly.p};
+  sweepAxis(point,'x',fly.v.x*lead);
+  sweepAxis(point,'y',fly.v.y*lead);
+  return point;
+}
+
+function observe(game: FlyEscape) {
+  if (game.clock<game.nextObservation) return;
+  game.observed=game.pendingObservation;
+  game.pendingObservation={p:{...game.fly.p},v:{...game.fly.v},at:game.clock};
+  game.nextObservation=game.clock+OBSERVATION_PERIOD;
 }
 
 function setBehavior(game: FlyEscape,behavior: SpiderBehavior) {
   if (game.behavior===behavior) return;
   const previousAim=game.aim;
   game.behavior=behavior;
-  game.aim=behavior==='aim' ? predicted(game) : undefined;
+  game.plan=undefined;
+  game.airTarget=undefined;
+  game.aim=behavior==='aim' ? predict(game.fly) : undefined;
   if (game.aim) game.spider.facing=game.aim.x<game.spider.x ? -1 : 1;
   if (behavior==='yield') {
     game.nextShot=game.clock+8+random(game)*5;
     const axis=game.spider.support==='left' || game.spider.support==='right' ? 'y' : 'x';
     game.retreat=.16*(previousAim && previousAim[axis]>game.spider[axis] ? -1 : 1);
     game.retreatUntil=game.clock+.55;
+    game.nextPatrol=game.clock+1.3;
+    game.patrolUntil=game.clock;
     game.shotUntil=game.clock;
   }
 }
 
 const shotOffsets=[0,.24,-.24,.48,-.48,.8,-.8,1.2,-1.2,1.65,-1.65,2.2,-2.2];
-function castWeb(game: FlyEscape,target: Point,track: boolean) {
+const webReach=DEFAULT_TUNING.range+SPIDER_HALF_HEIGHT;
+function chooseWeb(game: FlyEscape,target: Point,routing?: Flight) {
   const spider=game.spider;
-  if (!spider.support) return false;
+  if (!spider.support) return;
   const normal=normals[spider.support];
   const contact={x:spider.x-normal.x*SPIDER_HALF_WIDTH,y:spider.y-normal.y*SPIDER_HALF_HEIGHT};
   const angle=Math.atan2(target.y-spider.y,target.x-spider.x);
-  const candidates=shotOffsets.flatMap((offset,index)=>{
+  let best: {strand:Strand;score:number}|undefined;
+  const route=routing && predict(routing,.5);
+  for (const offset of shotOffsets) {
     const direction=angle+offset;
     const aim={x:spider.x+Math.cos(direction)*100,y:spider.y+Math.sin(direction)*100};
     const hit=aimHit(spider,platforms,aim);
-    if (!hit || distance(contact,hit)<23) return [];
-    const score=track ? segmentDistance(contact,hit,target)+Math.abs(offset)*5 : index;
-    return [{hit,score}];
-  }).sort((a,b)=>a.score-b.score);
-  for (const {hit} of candidates) {
-    const count=game.strands.length;
-    if (!anchorSilk(game.strands,hit,DEFAULT_TUNING.range+SPIDER_HALF_HEIGHT,spider,platforms) ||
-      game.strands.length===count) continue;
-    game.strands[count].expiresAt=game.clock+WEB_SECONDS;
-    if (game.strands.length>LIMIT) game.strands.shift();
-    game.aim=hit;
-    game.shotUntil=game.clock+.23;
-    return true;
+    if (!hit || distance(contact,hit)<23) continue;
+    const trial=game.strands.slice();
+    if (!anchorSilk(trial,hit,webReach,spider,platforms) || trial.length===game.strands.length) continue;
+    const strand=trial[trial.length-1];
+    if (!routing || !route) return strand;
+    // Favor cutting across the predicted flight path at a point still ahead of the fly.
+    const crossing=sweptHit(routing.p,route,strand);
+    const score=segmentDistance(strand.from,strand.to,target)+Math.abs(offset)*5-
+      (crossing && crossing.t>.14 ? 17*(1-Math.abs(crossing.t-.4)) : 0);
+    if (!best || score<best.score) best={strand,score};
   }
+  return best?.strand;
+}
+
+function deploy(game: FlyEscape,strand: Strand|undefined) {
+  if (!strand) return false;
+  strand.expiresAt=game.clock+WEB_SECONDS;
+  game.strands.push(strand);
+  if (game.strands.length>LIMIT) game.strands.shift();
+  game.aim=strand.from;
+  game.shotUntil=game.clock+.23;
+  return true;
+}
+
+function independentWeb(game: FlyEscape) {
+  const angle=random(game)*Math.PI*2;
+  return chooseWeb(game,{x:game.spider.x+Math.cos(angle)*100,y:game.spider.y+Math.sin(angle)*100});
+}
+
+function supportAxis(spider: Crawler) {
+  return spider.support==='left' || spider.support==='right' ? 'y' : 'x';
+}
+
+function roomwardStep(spider: Crawler,preferred: number) {
+  const axis=supportAxis(spider);
+  const location=spider[axis];
+  const limit=axis==='y' ? HEIGHT : WIDTH;
+  return location<20 ? Math.abs(preferred) : location>limit-20 ? -Math.abs(preferred) : preferred;
+}
+
+function setGesture(game: FlyEscape,gesture?: SpiderGesture) {
+  if (game.gesture===gesture) return;
+  game.gesture=gesture;
+  game.gestureSince=game.clock;
+  game.decisionAim=undefined;
+  game.watchedStrand=gesture==='watch' ? (game.lastWeb && game.strands.includes(game.lastWeb) ?
+    game.lastWeb : game.strands[game.strands.length-1]) : undefined;
+  if (!gesture || game.behavior!=='yield') return;
+  game.aim=undefined;
+  game.shotUntil=game.clock;
+  game.retreatUntil=game.clock;
+  game.patrolUntil=game.clock;
+  const spider=game.spider;
+  if (gesture==='identity') {
+    const reversed=spider.support==='ceiling' || spider.support==='right' ? 1 : -1;
+    game.patrolMove=roomwardStep(spider,.26*spider.facing*reversed);
+    game.patrolUntil=game.clock+2.45;
+    game.nextPatrol=game.clock+5;
+  }
+  if (gesture==='decision') {
+    const n=normals[spider.support??'floor'];
+    game.decisionAim={
+      x:clamp(spider.x+n.x*34-n.y*27*spider.facing,8,WIDTH-8),
+      y:clamp(spider.y+n.y*34+n.x*27*spider.facing,8,HEIGHT-8),
+    };
+  }
+  if (gesture==='lastWeb') game.nextShot=game.clock;
+  if (gesture==='watch') {
+    game.nextShot=game.clock+9;
+    const strand=game.watchedStrand;
+    if (strand) {
+      const axis=supportAxis(spider);
+      const near=distance(spider,strand.from)<distance(spider,strand.to) ? strand.from : strand.to;
+      game.retreat=clamp((near[axis]-spider[axis])/25,-.26,.26);
+      if (Math.abs(near[axis]-spider[axis])>4) game.retreatUntil=game.clock+.52;
+    }
+  }
+  if (gesture==='stepBack') {
+    const strand=game.lastWeb;
+    const axis=supportAxis(spider);
+    const midpoint=strand ? (strand.from[axis]+strand.to[axis])/2 : spider[axis]+game.retreat;
+    const direction=midpoint>spider[axis] ? -1 : 1;
+    game.retreat=roomwardStep(spider,.21*direction);
+    game.retreatUntil=game.clock+.65;
+    game.nextShot=Math.max(game.nextShot,game.clock+7);
+  }
+}
+
+function advanceHunter(game: FlyEscape,dt: number) {
+  observe(game);
+  const spider=game.spider;
+  if (game.plan) {
+    // Hold the launch point and target steady after committing. Late feints can beat the shot.
+    tickCrawler(spider,platforms,neutral,false,dt,[]);
+    if (game.clock<game.plan.executeAt) return false;
+    const plan=game.plan;
+    game.plan=undefined;
+    if (plan.kind==='jump') {
+      if (jumpCrawler(spider)) game.airTarget=plan.target;
+      game.nextShot=game.clock+.53;
+      game.nextJump=game.clock+3;
+      game.shotUntil=game.clock+.25;
+      return false;
+    }
+    const fired=deploy(game,plan.strand);
+    game.nextShot=game.clock+(fired ? 1.05+random(game)*.7 : .3);
+    return fired;
+  }
+  if (game.clock>=game.shotUntil) game.aim=undefined;
+  if (spider.support) game.airTarget=undefined;
+  const target=game.airTarget??predict(game.observed);
+  const wall=target.x<WIDTH/2 ? 12 : WIDTH-12;
+  const rise=spider.y-target.y;
+  const shouldClimb=spider.support==='floor' && target.y<112 || spider.support==='ceiling' && target.y>118;
+  if (spider.support && game.clock>=game.nextShot) {
+    const jump=spider.support==='floor' && rise>23 && rise<98 && Math.abs(target.x-spider.x)<100 &&
+      game.clock>=game.nextJump;
+    // Aim 0.2 s ahead of the estimated launch point, allowing for the sight and wind-up delay.
+    const flightAtLaunch={p:predict(game.observed,game.clock-game.observed.at+PLAN_DELAY),v:game.observed.v};
+    const intercept=predict(flightAtLaunch);
+    const strand=jump ? undefined : chooseWeb(game,intercept,flightAtLaunch);
+    const timing={intercept,beginsAt:game.clock,executeAt:game.clock+PLAN_DELAY};
+    game.plan=jump ? {kind:'jump',target:intercept,...timing} : strand ?
+      {kind:'web',target:strand.from,strand,...timing} : undefined;
+    if (game.plan) {
+      // Bracing prevents a previously held stride from moving the web's anchored endpoint.
+      spider.vx=0;
+      spider.vy=0;
+      spider.facing=game.plan.target.x<spider.x ? -1 : 1;
+      game.aim=game.plan.target;
+      return false;
+    }
+    game.nextShot=game.clock+.24;
+  }
+  tickCrawler(spider,platforms,{
+    x:clamp(((shouldClimb ? wall : target.x)-spider.x)/23,-1,1),
+    y:clamp((target.y-spider.y)/23,-1,1),
+  },false,dt,[]);
   return false;
 }
 
 function stepSpider(game: FlyEscape,dt: number) {
+  if (game.behavior==='hunt') return advanceHunter(game,dt);
   if (game.behavior==='aim') {
+    game.aim={...game.fly.p};
+    game.spider.facing=game.aim.x<game.spider.x ? -1 : 1;
     tickCrawler(game.spider,platforms,neutral,false,dt,[]);
     return false;
   }
   if (game.clock>=game.shotUntil) game.aim=undefined;
-  const chasing=game.behavior==='hunt';
-  const spider=game.spider;
-  if (chasing) {
-    const target=predicted(game);
-    const wall=target.x<WIDTH/2 ? 12 : WIDTH-12;
-    const shouldClimb=spider.support==='floor' && target.y<112 || spider.support==='ceiling' && target.y>118;
-    tickCrawler(spider,platforms,{
-      x:clamp(((shouldClimb ? wall : target.x)-spider.x)/23,-1,1),
-      y:clamp((target.y-spider.y)/23,-1,1),
-    },false,dt,[]);
-    if (game.clock<game.nextShot) return false;
-    const fired=castWeb(game,target,true);
-    game.nextShot=game.clock+(fired ? 1.25+random(game)*.95 : .32);
-    return fired;
+  if (!game.gesture && game.clock>=game.nextPatrol) {
+    game.patrolMove=roomwardStep(game.spider,random(game)<.5 ? -.24 : .24);
+    game.patrolUntil=game.clock+.7+random(game)*.32;
+    game.nextPatrol=game.clock+4.6+random(game)*1.8;
   }
-  const move=game.clock<game.retreatUntil ? game.retreat : 0;
-  tickCrawler(spider,platforms,{x:move,y:move},false,dt,[]);
-  if (game.clock<game.nextShot) return false;
-  const angle=random(game)*Math.PI*2;
-  const target={x:spider.x+Math.cos(angle)*100,y:spider.y+Math.sin(angle)*100};
-  const fired=castWeb(game,target,false);
-  game.nextShot=game.clock+10+random(game)*6;
-  game.retreat=0;
+  const looking=game.gesture==='identity' && game.clock-game.gestureSince<1.27;
+  const move=game.clock<game.retreatUntil ? game.retreat :
+    game.clock<game.patrolUntil && !looking ? game.patrolMove : 0;
+  tickCrawler(game.spider,platforms,{x:move,y:move},false,dt,[]);
+  if (game.clock<game.nextShot || (game.gesture && game.gesture!=='lastWeb')) return false;
+  const strand=independentWeb(game);
+  const fired=deploy(game,strand);
+  if (game.gesture==='lastWeb') {
+    // If the spider was airborne, try once it can anchor the last strand.
+    if (fired) game.lastWeb=strand;
+    game.nextShot=game.clock+(fired ? 15 : .3);
+  } else {
+    game.nextShot=game.clock+10+random(game)*6;
+  }
   return fired;
 }
 
@@ -219,17 +383,27 @@ function moveFly(game: FlyEscape,move: Point,dt: number) {
 export function finishFlyEscape(game: FlyEscape) {
   game.ending=true;
   game.aim=undefined;
+  game.plan=undefined;
+  game.gesture=undefined;
+  game.decisionAim=undefined;
+  game.watchedStrand=undefined;
   game.trapped=undefined;
 }
 
-export function stepFlyEscape(game: FlyEscape,input: EscapeInput,dt: number,behavior: SpiderBehavior): EscapeEvent|undefined {
+export function stepFlyEscape(
+  game: FlyEscape,input: EscapeInput,dt: number,behavior: SpiderBehavior,gesture?: SpiderGesture,
+): EscapeEvent|undefined {
   if (game.ending) {
     moveFly(game,input.move,dt);
     return;
   }
+  game.clock+=dt;
   setBehavior(game,behavior);
+  setGesture(game,gesture);
+  game.strands=game.strands.filter(strand=>(strand.expiresAt??Infinity)>game.clock);
+  let event: EscapeEvent|undefined=stepSpider(game,dt) ? 'web' : undefined;
   if (game.timedOut) {
-    if (!input.cross) return;
+    if (!input.cross) return event;
     game.timedOut=false;
     game.time=FLY_SECONDS;
     game.trapped=undefined;
@@ -237,10 +411,7 @@ export function stepFlyEscape(game: FlyEscape,input: EscapeInput,dt: number,beha
     return 'retry';
   }
   const step=Math.min(dt,game.time);
-  game.clock+=step;
   game.time=Math.max(0,game.time-step);
-  game.strands=game.strands.filter(strand=>(strand.expiresAt??Infinity)>game.clock);
-  let event: EscapeEvent|undefined=stepSpider(game,step) ? 'web' : undefined;
   if (game.trapped) {
     if (input.cross) {
       game.trapped.presses++;

@@ -10,7 +10,7 @@ Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e selezi
 
 ## Classifica
 
-A fine partita inserisci cinque lettere da **A** a **Z**. Con il joypad usa la croce direzionale o lo stick sinistro. Su e giù cambiano lettera, sinistra e destra spostano il cursore, **×** avanza o conferma l’ultima lettera, **○** chiude o salta. Con la tastiera puoi digitare o incollare le lettere, usare le frecce e premere Invio per salvare. Dopo aver chiuso la finestra, premi **×** per ricominciare. Il pulsante **Leaderboard** o **△** apre i primi 50 punteggi.
+A fine partita inserisci cinque lettere da **A** a **Z**. Con il joypad usa la croce direzionale o lo stick sinistro. Su e giù cambiano lettera, sinistra e destra spostano il cursore, **×** avanza o conferma l’ultima lettera, **○** chiude o salta. Con la tastiera puoi digitare o incollare le lettere, usare le frecce e premere Invio per salvare. Dopo aver chiuso la finestra, premi **×** per ricominciare. **△** apre i primi 50 punteggi.
 
 Le catture maggiori vengono prima. A parità di catture precede il punteggio registrato prima. Se la connessione cade, puoi riprovare con gli stessi dati della partita. Dopo il primo caricamento da un sito, la caccia è disponibile offline. La classifica condivisa richiede la connessione e un server configurato.
 
@@ -24,7 +24,7 @@ In locale, applica lo stesso SQL a un database PostgreSQL e avvia `npm run score
 
 ## Colonna sonora
 
-**The Fly Has A** accompagna l’introduzione e la caccia. A **240,330 s** parte **The Fly Has an Upgrade** dall’inizio. Dopo **119,580 s** parte **The Room Has a Space Bar**. Durante il terzo brano, una nuova pressione di **Space** passa a **The Fly Is You**. Dopo la cutscene, lo stick sinistro controlla la mosca e attraversare una luce riporta il timer a 10 secondi. Premi **×** più volte per uscire da una tela. Allo scadere, **×** avvia un nuovo tentativo di dieci secondi sullo stesso brano. Negli ultimi 20 secondi il timer resta fermo fino alla fine della dissolvenza. Se il terzo brano arriva alla fine, la playlist torna al primo a **15,330 s**. La musica prosegue durante le catture e i nuovi tentativi. **Options** sul joypad e il pulsante **Pause** fermano insieme musica e partita. **Audio Off** silenzia il gioco conservando la sincronizzazione.
+**The Fly Has A** accompagna l’introduzione e la caccia. A **240,330 s** parte **The Fly Has an Upgrade** dall’inizio. Dopo **119,580 s** parte **The Room Has a Space Bar**. Durante il terzo brano, una nuova pressione di **Space** passa a **The Fly Is You**. Dopo la cutscene, lo stick sinistro controlla il volo della mosca. Il ragno anticipa la traiettoria e mostra dove sta preparando un salto o una tela. Cambia rotta mentre si prepara per fargli perdere il bersaglio. Attraversare una luce riporta il timer a 10 secondi. Premi **×** più volte per uscire da una tela. Allo scadere, **×** avvia un nuovo tentativo di dieci secondi sullo stesso brano. Negli ultimi 20 secondi il timer resta fermo fino alla fine della dissolvenza. Se il terzo brano arriva alla fine, la playlist torna al primo a **15,330 s**. La musica prosegue durante le catture e i nuovi tentativi. **Options** sul joypad o **Esc** sulla tastiera mettono in pausa musica e partita. **Start** sblocca la riproduzione del brano nel browser.
 
 ## Sviluppo
 

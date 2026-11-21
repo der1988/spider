@@ -15,6 +15,30 @@ export const flyCues = {
   pass: 150.032,
 } as const;
 
+// Acting windows follow the opening and closing words of each phrase.
+const flyDoubtCues = [
+  {gesture:'identity',start:155.052,end:157.100},
+  {gesture:'decision',start:160.252,end:162.100},
+  {gesture:'lastWeb',start:164.392,end:165.450},
+  {gesture:'watch',start:169.932,end:176.800},
+  {gesture:'stepBack',start:178.072,end:180.132},
+] as const;
+
+export function flyDoubtAt(time: number) {
+  return flyDoubtCues.find(({start,end})=>time>=start && time<end)?.gesture;
+}
+
+export const flyRoomEnd = flyCues.shrink+9.720;
+
+export function flyRoomEffect(time: number) {
+  const elapsed=time-flyCues.shrink;
+  const clamp=(n: number)=>Math.max(0,Math.min(1,n));
+  return {
+    shrink:clamp(elapsed/2.160)*clamp((flyRoomEnd-time)/3.240),
+    details:1-clamp((elapsed-.540)/2.160)*clamp((flyRoomEnd-time)/2.700),
+  };
+}
+
 // Voice cue positions measured against the decoded track.
 export const flyCaptions: readonly (readonly [start: number,end: number,text: string])[] = [
   [3.492, 4.452, "This is the spider."],

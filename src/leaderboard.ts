@@ -178,7 +178,6 @@ export function bindLeaderboard() {
   }
 
   form.onsubmit=event=>{ event.preventDefault(); void submit(); };
-  byId('show-board').onclick=()=>show();
   byId('board-close').onclick=close;
   byId('score-skip').onclick=close;
   reload.onclick=()=>void load();

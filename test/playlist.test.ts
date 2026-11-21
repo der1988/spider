@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {flyBeats,flyCaptions,flyCues,flyDuration,flyFinalStart} from '../src/fly-song-timing.ts';
+import {flyBeats,flyCaptions,flyCues,flyDoubtAt,flyDuration,flyFinalStart,flyRoomEffect,flyRoomEnd} from '../src/fly-song-timing.ts';
 import {locateTrack,playlistEnd,trackStarts,wrapPlaylist} from '../src/playlist.ts';
 import {defaultLoopStart,firstTrackEnd} from '../src/song-timing.ts';
 import {roomBeats,roomCaptions,roomEnd} from '../src/room-timing.ts';
@@ -30,4 +30,25 @@ test('fly choreography follows the spoken cues and finale has exactly twenty sec
   assert.ok(Object.values(flyCues).every((time,index,values)=>!index || time>values[index-1]));
   assert.equal(flyCaptions.find(([, ,text])=>text==='Start the clock.')?.[1],flyCues.play);
   assert.ok(flyCues.pass<flyFinalStart);
+});
+
+test('the questions, watched web and step back have separate song-time windows',()=>{
+  assert.equal(flyDoubtAt(155.051),undefined);
+  assert.equal(flyDoubtAt(155.052),'identity');
+  assert.equal(flyDoubtAt(157.100),undefined);
+  assert.equal(flyDoubtAt(161.192),'decision');
+  assert.equal(flyDoubtAt(164.392),'lastWeb');
+  assert.equal(flyDoubtAt(174.392),'watch');
+  assert.equal(flyDoubtAt(178.072),'stepBack');
+  assert.equal(flyDoubtAt(flyFinalStart),undefined);
+});
+
+test('the room effect eases in at its lyric, hides details briefly and fully returns',()=>{
+  assert.deepEqual(flyRoomEffect(flyCues.shrink-.01),{shrink:0,details:1});
+  const entry=flyRoomEffect(flyCues.shrink+1);
+  assert.ok(entry.shrink>0 && entry.shrink<1);
+  assert.deepEqual(flyRoomEffect(flyCues.shrink+4),{shrink:1,details:0});
+  const exit=flyRoomEffect(flyRoomEnd-1);
+  assert.ok(exit.shrink>0 && exit.shrink<1 && exit.details>0 && exit.details<1);
+  assert.deepEqual(flyRoomEffect(flyRoomEnd),{shrink:0,details:1});
 });

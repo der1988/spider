@@ -1,4 +1,4 @@
-import {block,drawBackground,drawPlatform,drawSpider,line} from './hunt-render';
+import {block,drawBackground,drawPlatform,drawSpider,line,type SpiderActing} from './hunt-render';
 import {HEIGHT,WIDTH,platforms} from './hunt';
 import type {FlyEscape} from './fly-escape';
 import type {Point} from './spider';
@@ -10,6 +10,7 @@ export interface FlyEscapeFrame {
   shot?: 'spider'|'take'|'fly'|'you'|'room';
   shotProgress?: number;
   shrink: number;
+  details?: number;
   ending?: number;
   reducedMotion?: boolean;
 }
@@ -19,6 +20,11 @@ const cream='#eff3c8';
 const border='#8cb072';
 const wallColor='#3f6651';
 const closing='#17281f';
+const intent='#45684e';
+const question='#f2dd86';
+const hesitating='#ad8655';
+const watching='#d19751';
+const steppingBack='#668273';
 
 const limit=(n: number) => Math.min(1,Math.max(0,n));
 const range=(n: number,start: number,end: number) => limit((n-start)/(end-start));
@@ -51,7 +57,16 @@ function polyline(ctx: CanvasRenderingContext2D,points: readonly Point[],color: 
   for (let i=1;i<points.length;i++) line(ctx,points[i-1],points[i],color,dotted);
 }
 
-function dividedSurface(ctx: CanvasRenderingContext2D,points: readonly Point[],rim: readonly Point[]) {
+function dividedSurface(ctx: CanvasRenderingContext2D,points: readonly Point[],rim: readonly Point[],edge: Point[]) {
+  layer(ctx,.24,()=>{
+    const outline=[...points,...edge];
+    ctx.beginPath();
+    ctx.moveTo(outline[0].x,outline[0].y);
+    for (const point of outline.slice(1)) ctx.lineTo(point.x,point.y);
+    ctx.closePath();
+    ctx.fillStyle=wallColor;
+    ctx.fill();
+  });
   polyline(ctx,points,wallColor);
   polyline(ctx,rim,border,true);
   for (let i=1;i<points.length;i+=2) line(ctx,points[i],rim[i],wallColor,true);
@@ -72,7 +87,7 @@ function deformRoom(ctx: CanvasRenderingContext2D,amount: number,time: number,re
       layer(ctx,.32,()=>{
         for (const point of points) line(ctx,{x:x(0),y:point.y},point,wallColor,true);
       });
-      dividedSurface(ctx,points,rim);
+      dividedSurface(ctx,points,rim,[{x:x(0),y:187},{x:x(0),y:7}]);
     }
     const points=[0,.65,.45,1,.58,.83,.28,0].map((factor,i)=>({
       x:12+i*48,
@@ -82,7 +97,7 @@ function deformRoom(ctx: CanvasRenderingContext2D,amount: number,time: number,re
     layer(ctx,.32,()=>{
       for (const point of points) line(ctx,{x:point.x,y:7},point,wallColor,true);
     });
-    dividedSurface(ctx,points,rim);
+    dividedSurface(ctx,points,rim,[{x:348,y:7},{x:12,y:7}]);
   });
 }
 
@@ -135,8 +150,38 @@ function drawFly(ctx: CanvasRenderingContext2D,state: FlyEscape,frame: FlyEscape
   if (state.trapped) marker(ctx,p,8,ink);
 }
 
+function drawIntent(ctx: CanvasRenderingContext2D,state: FlyEscape) {
+  const {spider,plan,gesture}=state;
+  const age=state.clock-state.gestureSince;
+  const heldShot=state.behavior==='aim' && !gesture;
+  const aim=heldShot ? state.fly.p : plan?.target??state.aim??state.decisionAim;
+  if (!aim || (gesture==='decision' && age>.93)) return;
+  if (heldShot) marker(ctx,aim,7,ink);
+  const dx=aim.x-spider.x,dy=aim.y-spider.y;
+  const distance=Math.hypot(dx,dy);
+  if (distance<=1) return;
+  const along=(length: number): Point=>({x:spider.x+dx*length/distance,y:spider.y+dy*length/distance});
+  const progress=plan ? range(state.clock,plan.beginsAt,plan.executeAt) : 1;
+  const withdraw=gesture==='decision' ? range(age,.36,.93) : 0;
+  const length=Math.min(distance,(plan ? 14+12*progress : 19)*(1-.72*withdraw));
+  const tip=along(length);
+  if (plan?.kind==='web') {
+    layer(ctx,.48+.32*progress,()=>line(ctx,plan.strand.from,plan.strand.to,cream,true));
+  }
+  if (plan?.kind==='jump') {
+    const n={x:-dy/distance,y:dx/distance};
+    const base=along(Math.max(3,length-5));
+    const side=(sign: number)=>({x:base.x+n.x*sign*3,y:base.y+n.y*sign*3});
+    line(ctx,along(7),base,intent,true);
+    polyline(ctx,[side(-1),tip,side(1)],intent);
+  } else {
+    line(ctx,along(5),tip,cream,true);
+    if (withdraw<.65) marker(ctx,tip,plan || state.behavior==='aim' ? 4 : 2,plan ? intent : ink);
+  }
+}
+
 function drawTethers(ctx: CanvasRenderingContext2D,state: FlyEscape) {
-  const {spider,aim}=state;
+  const {spider,watchedStrand}=state;
   for (const strand of state.strands) {
     const shake=Math.max(0,strand.shakeUntil-state.clock);
     const nearExpiry=(strand.expiresAt??Infinity)-state.clock<1;
@@ -144,20 +189,59 @@ function drawTethers(ctx: CanvasRenderingContext2D,state: FlyEscape) {
       x:(strand.from.x+strand.to.x)/2,
       y:(strand.from.y+strand.to.y)/2+(shake ? Math.sin(state.clock*105)*shake*5 : 0),
     };
-    const shade=state.trapped?.strand===strand ? ink : '#4e6e50';
+    const shade=strand===watchedStrand ? watching : state.trapped?.strand===strand ? ink : '#4e6e50';
     polyline(ctx,[strand.from,mid,strand.to],shade,nearExpiry);
+  }
+  if (watchedStrand && !state.strands.includes(watchedStrand)) {
+    const expiredFor=state.clock-(watchedStrand.expiresAt??-Infinity);
+    const fade=1-range(expiredFor,0,.42);
+    layer(ctx,fade,()=>{
+      for (const tip of [watchedStrand.from,watchedStrand.to]) {
+        block(ctx,tip.x-1,tip.y,3,1,watching);
+        block(ctx,tip.x,tip.y-1,1,3,watching);
+      }
+    });
   }
   if (spider.firstAnchor) line(ctx,spider,spider.firstAnchor,border,true);
   if (spider.rope) line(ctx,spider,spider.rope,cream);
-  if (aim) {
-    const dx=aim.x-spider.x,dy=aim.y-spider.y;
-    const distance=Math.hypot(dx,dy);
-    if (distance>1) {
-      const reach=Math.min(19,distance);
-      const sight={x:spider.x+dx*reach/distance,y:spider.y+dy*reach/distance};
-      line(ctx,spider,sight,cream,true);
-      marker(ctx,sight,state.behavior==='aim' ? 4 : 2,ink);
-    }
+  drawIntent(ctx,state);
+}
+
+function lookAlongSurface(state: FlyEscape,target: Point|undefined) {
+  const {spider}=state;
+  if (!target) return spider.facing;
+  const dx=target.x-spider.x,dy=target.y-spider.y;
+  const toward=spider.support==='right' ? -dy : spider.support==='left' ? dy :
+    spider.support==='ceiling' ? -dx : dx;
+  return Math.abs(toward)<3 ? spider.facing : toward<0 ? -1 : 1;
+}
+
+function acting(state: FlyEscape): SpiderActing|undefined {
+  const age=Math.max(0,state.clock-state.gestureSince);
+  const facing=state.spider.facing;
+  const opposite=facing===1 ? -1 : 1;
+  if (state.gesture==='identity') {
+    const turning=age<.45 || (age>.83 && age<1.27);
+    return {look:turning ? opposite : facing,curl:turning ? 1 : 0,accent:question};
+  }
+  if (state.gesture==='decision') {
+    const retract=ease(range(age,.42,.98));
+    return {look:lookAlongSurface(state,state.decisionAim),curl:2.5*retract,lean:1-2*retract,accent:hesitating};
+  }
+  if (state.gesture==='watch' || state.gesture==='lastWeb') {
+    const strand=state.watchedStrand;
+    const middle=strand && {x:(strand.from.x+strand.to.x)/2,y:(strand.from.y+strand.to.y)/2};
+    return {look:lookAlongSurface(state,middle),curl:1.2,lean:.6,accent:watching};
+  }
+  if (state.gesture==='stepBack') {
+    const step=range(age,0,.65);
+    const stride=Math.sin(step*Math.PI);
+    return {look:opposite,curl:stride*1.6,lean:-stride*2,accent:steppingBack};
+  }
+  if (state.plan || state.aim) {
+    const {plan}=state;
+    const curl=plan?.kind==='jump' ? 1.7*range(state.clock,plan.beginsAt,plan.executeAt) : 0;
+    return {look:lookAlongSurface(state,state.behavior==='aim' ? state.fly.p : plan?.target??state.aim),curl,lean:plan && !curl ? 1 : 0};
   }
 }
 
@@ -213,7 +297,7 @@ export function renderFlyEscape(ctx: CanvasRenderingContext2D,state: FlyEscape,f
   camera(ctx,state,frame);
   block(ctx,0,0,WIDTH,HEIGHT,closing);
   layer(ctx,alpha(.54,.96),()=>block(ctx,0,0,WIDTH,HEIGHT,'#bacb92'));
-  layer(ctx,alpha(0,.38),()=>drawBackground(ctx,beat));
+  layer(ctx,alpha(0,.38),()=>drawBackground(ctx,beat,frame.details));
   layer(ctx,alpha(.12,.64),()=>deformRoom(ctx,frame.shrink,time,!!frame.reducedMotion));
   platforms.forEach((platform,i)=>layer(ctx,i<4 ? alpha(.08,.50) : alpha(.25,.66),()=>{
     drawPlatform(ctx,platform,beat);
@@ -222,9 +306,10 @@ export function renderFlyEscape(ctx: CanvasRenderingContext2D,state: FlyEscape,f
   layer(ctx,alpha(.34,.75),()=>drawTethers(ctx,state));
   if (!frame.intro && !shot) layer(ctx,alpha(.36,.81),()=>drawLight(ctx,state.light,beat));
   layer(ctx,alpha(.58,.93),()=>{
-    const spiderPose=shot==='take' ? 'take' : state.behavior==='aim' ? 'aim' : state.behavior==='yield' ? 'yield' : 'normal';
+    const aimed=state.behavior==='aim' || state.plan?.kind==='web';
+    const spiderPose=shot==='take' ? 'take' : aimed ? 'aim' : state.behavior==='yield' ? 'yield' : 'normal';
     const music={time,beat,shot:shot==='spider' || shot==='take' ? {subject:'spider' as const,zoom:1} : undefined};
-    drawSpider(ctx,state.spider,state.clock,music,spiderPose);
+    drawSpider(ctx,state.spider,state.clock,music,spiderPose,acting(state));
     drawFly(ctx,state,frame);
   });
   if (ending>0) dissolve(ctx,state,ending);

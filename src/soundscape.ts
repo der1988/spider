@@ -13,15 +13,6 @@ export class Soundscape {
   private paused = false;
   private pending: {effect:Sound; delay:number; at:number}[] = [];
 
-  constructor(private enabled: boolean) {}
-
-  setEnabled(enabled: boolean) {
-    this.enabled = enabled;
-    if (!enabled) this.pending.length = 0;
-    this.updateVolume();
-    if (enabled) this.unlock();
-  }
-
   setPaused(paused: boolean) {
     this.paused = paused;
     this.updateVolume();
@@ -29,7 +20,7 @@ export class Soundscape {
 
   private updateVolume() {
     if (this.master && this.context) {
-      this.master.gain.setTargetAtTime(this.enabled && !this.paused ? .72 : 0,this.context.currentTime,.025);
+      this.master.gain.setTargetAtTime(!this.paused ? .72 : 0,this.context.currentTime,.025);
     }
   }
 
@@ -44,7 +35,7 @@ export class Soundscape {
     const ctx = this.audioContext();
     if (!ctx || ctx.state === 'running') return;
     void ctx.resume().then(() => {
-      if (!this.enabled || this.paused) return;
+      if (this.paused) return;
       for (const {effect,delay,at} of this.pending.splice(0)) {
         if (performance.now()-at < 400) this.play(effect,delay);
       }
@@ -58,7 +49,7 @@ export class Soundscape {
     const ctx = new Type();
     this.context = ctx;
     const master = ctx.createGain();
-    master.gain.value = this.enabled && !this.paused ? .72 : 0;
+    master.gain.value = !this.paused ? .72 : 0;
     master.connect(ctx.destination);
     this.master = master;
 
@@ -101,7 +92,7 @@ export class Soundscape {
 
   play(effect: Sound, delay = 0) {
     const ctx = this.context;
-    if (!this.enabled || this.paused || !ctx || !this.master) return;
+    if (this.paused || !ctx || !this.master) return;
     if (ctx.state !== 'running') {
       if (this.pending.length < 8) this.pending.push({effect,delay,at:performance.now()});
       return;

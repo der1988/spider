@@ -44,9 +44,12 @@ function rhythmDetails(ctx: CanvasRenderingContext2D,beat: number) {
   });
 }
 
-export function drawBackground(ctx: CanvasRenderingContext2D,beat: number) {
+export function drawBackground(ctx: CanvasRenderingContext2D,beat: number,details=1) {
+  for (let x=17; x<WIDTH; x+=39) block(ctx,x,0,3+x%5,198,'#a5b97d');
+  if (details<=0) return;
+  ctx.save();
+  ctx.globalAlpha*=details;
   for (let x=17; x<WIDTH; x+=39) {
-    block(ctx,x,0,3+x%5,198,'#a5b97d');
     const sway=Math.round(Math.sin(x)*beat*2);
     block(ctx,x-7+sway,16+x%25,23,5,'#a5b97d');
     block(ctx,x+4-sway,159-x%18,13,4,'#a5b97d');
@@ -55,6 +58,7 @@ export function drawBackground(ctx: CanvasRenderingContext2D,beat: number) {
     for (let x=14; x<WIDTH-10; x+=9) block(ctx,x,y,2,1,'#b2c189');
   }
   rhythmDetails(ctx,beat);
+  ctx.restore();
 }
 
 export function drawPlatform(ctx: CanvasRenderingContext2D,r: Rect,beat: number) {
@@ -141,9 +145,16 @@ const matrix: Record<Support,[number,number,number,number]> = {
   floor:[1,0,0,1], left:[0,1,-1,0], right:[0,-1,1,0], ceiling:[-1,0,0,-1],
 };
 
+export interface SpiderActing {
+  look?: -1|1;
+  curl?: number;
+  lean?: number;
+  accent?: string;
+}
+
 export function drawSpider(
   ctx: CanvasRenderingContext2D,spider: Crawler,time: number,music: MusicFrame,
-  pose: 'normal'|'take'|'aim'|'yield' = 'normal',
+  pose: 'normal'|'take'|'aim'|'yield' = 'normal',acting?: SpiderActing,
 ) {
   ctx.save();
   ctx.transform(...matrix[spider.support??'floor'],Math.round(spider.x),Math.round(spider.y));
@@ -151,19 +162,27 @@ export function drawSpider(
   const idle=spider.grounded && !moving && !spider.rope;
   const gait=spider.grounded && moving ? Math.floor(time*16)%2 :
     idle && music.shot?.subject==='spider' ? Math.floor(music.time*4)%2 : 0;
+  const facing=acting?.look??spider.facing;
   const braced=pose==='aim' || pose==='take';
   const tuck=spider.rope ? 2 : pose==='aim' ? 1 : 0;
   const stretch=pose==='take' ? Math.round(Math.sin(music.time*13)*1.6) : 0;
   for(let leg=0;leg<8;leg++){
     const x=-5.5+leg*1.55;
     const stride=(leg+gait)%2;
-    const front=(x*spider.facing)>2;
-    line(ctx,{x,y:2},{x:x+(stride ? -1 : 1)+(front ? stretch*spider.facing : 0),y:6-tuck-stride},ink);
+    const front=x*facing>2;
+    const curl=front ? (acting?.curl??0) : 0;
+    const tip={
+      x:x+(stride ? -1 : 1)+(front ? (stretch-curl)*facing : 0),
+      y:6-tuck-stride-curl,
+    };
+    line(ctx,{x,y:2},tip,ink);
+    if (front && acting?.accent) block(ctx,tip.x,tip.y,1,1,acting.accent);
   }
-  if (braced || pose==='yield' || (idle && music.beat>.58)) ctx.translate(0,1);
+  const crouch=braced || pose==='yield' || (idle && music.beat>.58);
+  ctx.translate(Math.round((acting?.lean??0)*facing),crouch ? 1 : 0);
   block(ctx,-5,-3,9,6,ink);
   block(ctx,-4,-2,5,4,'#638155');
-  block(ctx,spider.facing*3,-2,3,4,ink);
-  block(ctx,spider.facing*4,-1,1,1,cream);
+  block(ctx,facing*3,-2,3,4,ink);
+  block(ctx,facing*4,-1,1,1,acting?.accent??cream);
   ctx.restore();
 }
