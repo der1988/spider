@@ -11,9 +11,9 @@ Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scorri
 ## Open World e impostazioni
 
 - **Open World** attraversa tre quartieri sullo stesso anello. Continua a destra o a sinistra per tornare nello stesso posto. Premi **△** o **M** per la mappa. Appigli e partenze variano a ogni nuova partita.
-- Usa **L1** o **Z** per saltare e **R1** o **X** per la seta. Con la corda attiva, muovi lo stick in alto per risalire e in basso per scendere. Rilascia su un secondo appiglio per lasciare una tela. **R2** o **G** interagisce con l’oggetto o l’abitante indicato, oppure afferra una tela quando non c’è un bersaglio.
-- Porta le prede alla tana **DEN**. I guardiani inseguono Spidey solo quando vedono il bottino. Il contatore **Delivered** aumenta all’ingresso nella tana, dove si stacca tutta la catena.
-- Raccogli polline e scambialo da **Sister Sprig** per allungare di sei secondi la durata delle nuove tele per 80 secondi. **Hops** può insegnarti un salto più alto per la partita. Nei dialoghi usa **↑/↓** e **×** per scegliere, oppure **○** per uscire.
+- Usa **L1** o **Z** per saltare. Tocca **R1** o **X** e rilascia da una superficie per piazzare una tela. Tieni premuto per almeno 220 ms per agganciare una corda. Lo stick accorcia o allunga la corda con su e giù. **R2** o **G** interagisce con l’oggetto o l’abitante indicato, oppure afferra una tela quando non c’è un bersaglio.
+- La città è in basso e le prede rare volano sopra gli ultimi appigli. Tre guardiani pattugliano i passaggi anche in verticale. Porta la catena al **Fly Market** e conferma la vendita a Tally. Le prede comuni valgono **4 monete**, quelle rare **12**.
+- Raccogli polline e scambialo da **Sister Sprig** per allungare di sei secondi la durata delle nuove tele per 80 secondi. **Hops** può insegnarti un salto più alto per la partita. Nella fascia delle risposte usa **↑/↓** e **×** per scegliere, oppure **○** per uscire.
 - **Practice** è una stanza libera con gradoni, piattaforme sfalsate e un pozzo per allenarsi con gli stessi comandi di movimento di Gnat Hunt. Da **Options** o **Esc** puoi tornare al menu.
 - **Endless** ruota fra tre disposizioni delle piattaforme ogni 10 catture, quando entra la mosca successiva.
 - **Settings** è disponibile dal menu e dalla pausa. Puoi regolare musica ed effetti separatamente, ingrandire o nascondere i sottotitoli, ridurre il movimento e tenere premuto il tasto di fuga come alternativa ai tocchi ripetuti. Puoi usare la tastiera con WASD e frecce per movimento e mira, Z per saltare e X per sparare o liberarti.

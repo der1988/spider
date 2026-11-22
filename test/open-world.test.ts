@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createCrawler} from '../src/crawler.ts';
 import {
-  bedroomWidth, cameraFor, createOpenWorld, inDen, stepWindowHunt, worldNear,
+  bedroomWidth, cameraFor, createOpenWorld, inDen, sellCatch, catchValue, stepWindowHunt, worldNear,
   type WindowEvent, type WindowRun,
 } from '../src/window-hunt.ts';
 
@@ -14,7 +14,7 @@ function circularDelta(value: number) {
   return value-Math.round(value/bedroomWidth)*bedroomWidth;
 }
 
-test('Open World generates different, separated starts on the ring around a recognizable den',()=>{
+test('Open World generates different, separated starts on the ring around a recognizable shop',()=>{
   let state=23;
   const random=()=>((state=(Math.imul(state,1664525)+1013904223)>>>0)/4294967296);
   const positions=new Set<string>();
@@ -22,7 +22,8 @@ test('Open World generates different, separated starts on the ring around a reco
     const game=createOpenWorld(random);
     assert.ok(game.town);
     assert.equal(game.gnats.length,3);
-    assert.ok(game.predators.length>=2);
+    assert.equal(game.predators.length,3);
+    assert.ok(game.gnats.some(insect=>insect.rare && insect.p.y<160));
     assert.ok(inDen(game,game.den));
     assert.ok(inDen(game,{x:game.den.x+bedroomWidth,y:game.den.y}));
     const actors=[game.spider,...game.gnats.map(fly=>fly.p),...game.predators.map(guard=>guard.body)];
@@ -36,7 +37,7 @@ test('Open World generates different, separated starts on the ring around a reco
   assert.ok(positions.size>30);
 });
 
-test('captured prey and a seam-spanning web stay together through the join until den delivery',()=>{
+test('captured prey and a seam-spanning web stay together through the join until a sale',()=>{
   const game=createOpenWorld(()=>.5);
   const y=game.den.y;
   game.predators=[];
@@ -58,7 +59,7 @@ test('captured prey and a seam-spanning web stay together through the join until
   assert.equal(game.carried.length,2);
   const span=wire.to.x-wire.from.x;
   let crossed=false;
-  for(let frame=0;frame<170&&!game.delivered;frame++){
+  for(let frame=0;frame<170&&!inDen(game,game.spider);frame++){
     const x=game.spider.x;
     const camera=cameraFor(game).x;
     step(game,1,emit);
@@ -72,9 +73,15 @@ test('captured prey and a seam-spanning web stay together through the join until
     }
   }
   assert.ok(crossed);
+  assert.equal(game.carried.length,2);
+  game.carried[0].rare=false;
+  game.carried[1].rare=true;
+  assert.equal(catchValue(game),16);
+  assert.equal(sellCatch(game),16);
   assert.equal(game.carried.length,0);
   assert.equal(game.delivered,2);
-  assert.deepEqual(events,['catch','catch','delivery']);
+  assert.equal(game.coins,16);
+  assert.deepEqual(events,['catch','catch']);
   for(let frame=0;frame<60;frame++) step(game,0,emit);
   assert.equal(game.delivered,2);
 });
@@ -116,9 +123,37 @@ test('guard requires visible loot, searches the last seen location, and stays ou
   for(let frame=0;frame<300;frame++){
     step(game,1);
     assert.equal(inDen(game,enemy.body),false);
-    if(game.delivered) break;
+    if(inDen(game,game.spider)) break;
   }
-  assert.equal(game.delivered,1);
+  assert.equal(game.carried.length,1);
+  assert.equal(game.delivered,0);
   assert.equal(enemy.lastKnown,undefined);
   assert.equal(enemy.chaseUntil,0);
+});
+
+
+test('R1 tap stays grounded, a hold attaches, and a held miss leaves support intact',()=>{
+  const game=createOpenWorld(()=>.5);
+  game.surfaces=[{x:0,y:350,w:500,h:16,grip:true},{x:35,y:140,w:90,h:12,grip:true}];
+  game.spider=createCrawler({x:80,y:342},game.surfaces);
+  game.predators=[];
+  game.gnats=[];
+  const input={move:{x:0,y:0},aim:{x:0,y:-1},jump:false,silk:true};
+  const tick=(silk:boolean)=>stepWindowHunt(game,{...input,silk},1/120,()=>{});
+  for(let i=0;i<10;i++) tick(true);
+  assert.equal(game.spider.support,'floor');
+  assert.equal(game.web.strands.length,0);
+  tick(false);
+  assert.equal(game.spider.support,'floor');
+  assert.equal(game.spider.rope,undefined);
+  assert.equal(game.web.strands.length,1);
+  for(let i=0;i<32;i++) tick(true);
+  assert.ok(game.spider.rope);
+  assert.equal(game.spider.support,undefined);
+  tick(false);
+  game.spider=createCrawler({x:80,y:342},game.surfaces);
+  input.aim={x:1,y:0};
+  for(let i=0;i<32;i++) tick(true);
+  assert.equal(game.spider.rope,undefined);
+  assert.equal(game.spider.support,'floor');
 });

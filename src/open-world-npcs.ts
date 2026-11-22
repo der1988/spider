@@ -1,7 +1,7 @@
 import type {Point} from './spider.ts';
 
 type ResidentId='mantis'|'springtail'|'quartermaster';
-type Reward='food'|'jump';
+type Reward='food'|'jump'|'sale';
 export type TownSites=Partial<Record<ResidentId,Point>>&{items?:readonly Point[]};
 export type TownTarget={kind:'talk';id:ResidentId;position:Point}|{kind:'pickup';id:number;position:Point};
 
@@ -40,6 +40,7 @@ export function createTown(random=Math.random,sites:TownSites={}) {
     inventory:{pollen:0},
     rewards:{highJump:false,foodUntil:0},
     visits:{mantis:0,springtail:0,quartermaster:0},
+    activeResident:undefined as ResidentId|undefined,
     dialogue:undefined as Scene|undefined,
   };
 }
@@ -63,7 +64,7 @@ export function townTarget(town:Town,player:Point,project:(point:Point)=>Point=p
   return result;
 }
 
-function residentScene(town:Town,id:ResidentId,clock:number):Scene {
+function residentScene(town:Town,id:ResidentId,clock:number,value:number):Scene {
   const visit=town.visits[id];
   switch (id) {
     case 'mantis': {
@@ -104,20 +105,18 @@ function residentScene(town:Town,id:ResidentId,clock:number):Scene {
     case 'quartermaster':
       return {
         resident:'Tally',
-        opening:visit===0
-          ? 'Rations are issued in size order. I could guess what comes first, but that would still count as processing your request.'
-          : 'The queue has not moved. I have moved a pencil along it, to give the impression we have.',
+        opening:value ? `Offer: ${value} coins. Common 4, rare 12. All sales final.`
+          : 'Common flies pay four, rare ones twelve. Bring the merchandise.',
         options:[
-          {label:'Ask for a ration',response:'Smaller spiders wait. Flying insects belong to the distribution office.'},
-          {label:'Ask about the patrol',response:'They ignore empty legs. Let them see a fly on your line and they call it inventory loss.'},
-          {label:'Ask about the den',response:'They stop at the den entrance. There is no form for coming in after you.'},
-          {label:'Leave',response:'Thank you. That was our fastest transaction today.'},
+          ...(value ? [{label:`Sell · ${value} coins`,response:'Paid in full. You kept a receipt, right?',reward:'sale' as const}] : []),
+          {label:'Ask about rare prey',response:'Above the high shelves. They charge extra for stairs.'},
+          {label:'Leave',response:'Take your time. I invoice by the fly.'},
         ],
       };
   }
 }
 
-export function interactTown(town:Town,target:TownTarget,clock:number) {
+export function interactTown(town:Town,target:TownTarget,clock:number,value=0) {
   if (target.kind==='pickup') {
     const item=town.items.find(candidate=>candidate.id===target.id);
     if (!item || item.collected) return 'Somebody got here first. I am willing to blame myself.';
@@ -127,7 +126,8 @@ export function interactTown(town:Town,target:TownTarget,clock:number) {
       ? 'Pollen. That smells like somebody else’s work.'
       : 'More pollen. At least one of us is collecting benefits.';
   }
-  town.dialogue=residentScene(town,target.id,clock);
+  town.activeResident=target.id;
+  town.dialogue=residentScene(town,target.id,clock,value);
   const lines=greetings[target.id];
   return lines[town.visits[target.id]++%lines.length];
 }
@@ -141,7 +141,7 @@ export function chooseTownReply(town:Town,index:number,clock:number) {
     town.inventory.pollen--;
     town.rewards.foodUntil=clock+80;
   }
-  return choice.response;
+  return {text:choice.response,sell:choice.reward==='sale'};
 }
 
 export function closeTownDialogue(town:Town) {

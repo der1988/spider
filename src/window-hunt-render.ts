@@ -207,7 +207,7 @@ function openBackdrop(ctx:CanvasRenderingContext2D,camera:ReturnType<typeof came
   }
 }
 
-function drawDen(ctx:CanvasRenderingContext2D,game:WindowRun) {
+function drawShop(ctx:CanvasRenderingContext2D,game:WindowRun) {
   const {x,y}=worldNear(game.den,game.spider.x);
   block(ctx,x-24,y-30,48,31,'#657a54');
   block(ctx,x-16,y-41,32,11,'#657a54');
@@ -227,7 +227,7 @@ function drawDen(ctx:CanvasRenderingContext2D,game:WindowRun) {
   ctx.fillStyle=cream;
   ctx.textAlign='center';
   ctx.font='bold 9px monospace';
-  ctx.fillText('DEN · '+game.delivered,x,y-48);
+  ctx.fillText('FLY MARKET',x,y-48);
   ctx.restore();
 }
 
@@ -265,6 +265,14 @@ function drawResident(ctx:CanvasRenderingContext2D,id:string,x:number,y:number) 
 
 function drawTown(ctx:CanvasRenderingContext2D,game:WindowRun,camera:ReturnType<typeof cameraFor>) {
   if (!game.town) return;
+  for (const [i,walker] of game.walkers.entries()) {
+    const {x,y}=worldNear(walker,game.spider.x);
+    block(ctx,x-4,y-3,8,5,i%2 ? '#775842' : '#4b6848');
+    block(ctx,x+walker.direction*4,y-4,2,3,ink);
+    const gait=Math.floor(game.clock*11+i)%2;
+    block(ctx,x-3+gait,y+2,2,2,ink);
+    block(ctx,x+2-gait,y+2,2,2,ink);
+  }
   for (const resident of game.town.residents) {
     const {x,y}=worldNear(resident.position,game.spider.x);
     drawResident(ctx,resident.id,x,y);
@@ -375,7 +383,7 @@ function renderMap(ctx:CanvasRenderingContext2D,game:WindowRun) {
   ctx.font='12px monospace';
   ctx.fillText(game.openWorld ? 'OPEN WORLD MAP' : 'BEDROOM MAP',75,30);
   ctx.font='9px monospace';
-  ctx.fillText(game.openWorld ? '● You    · Insect    ■ Guardian    ▣ Den    — Web' : '● You    · Insect    ■ Hunter    — Web',75,251);
+  ctx.fillText(game.openWorld ? '● You    · Insect    ■ Guardian    ▣ Shop    — Web' : '● You    · Insect    ■ Hunter    — Web',75,251);
 }
 
 function drawHunter(ctx:CanvasRenderingContext2D,game:WindowRun,enemy:WindowRun['predators'][number]) {
@@ -436,7 +444,7 @@ export function renderWindowHunt(ctx:CanvasRenderingContext2D,game:WindowRun,red
           item.y+item.h<camera.y || item.y>camera.y+roomHeight) continue;
       furnishing(ctx,item);
     }
-    drawDen(ctx,game);
+    drawShop(ctx,game);
   } else {
     windowBackdrop(ctx,game.corner.objects);
     for (const item of game.corner.objects) furnishing(ctx,item);
@@ -461,7 +469,13 @@ export function renderWindowHunt(ctx:CanvasRenderingContext2D,game:WindowRun,red
   for (const fly of game.gnats) {
     const {x,y}=fly.p;
     const flap=!reduced && Math.floor(game.clock*22+fly.phase)%2;
-    if (fly.kind==='swift') {
+    if (fly.rare) {
+      block(ctx,x-2,y-2,5,5,'#533c54');
+      block(ctx,x-1,y-3,3,6,'#eaadd9');
+      line(ctx,{x,y},{x:x-5,y:y-(flap ? 5 : 2)},'#ffe0ee');
+      line(ctx,{x,y},{x:x+5,y:y-(flap ? 5 : 2)},'#ffe0ee');
+      block(ctx,x,y+4,1,2,'#bc6ba5');
+    } else if (fly.kind==='swift') {
       block(ctx,x-fly.direction*5,y,3,1,'#607d59');
       block(ctx,x-2,y,5,2,ink);
       block(ctx,x-2,y-(flap ? 2 : 1),4,1,cream);

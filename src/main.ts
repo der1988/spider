@@ -2,7 +2,7 @@ import {chooseTownReply,closeTownDialogue,interactTown} from './open-world-npcs'
 import {bindGnatDialogueView} from './gnat-dialogue-view';
 import {dialogueRate} from './gnat-dialogue';
 import './style.css';
-import {advanceWindowDialogue,cameraFor,chasingPrey,createOpenWorld,createWindowHunt,gnatPositions,sayTown,stepWindowHunt,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
+import {advanceWindowDialogue,cameraFor,catchValue,chasingPrey,createOpenWorld,createWindowHunt,gnatPositions,sayTown,sellCatch,stepWindowHunt,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
 import {renderWindowHunt} from './window-hunt-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
@@ -73,7 +73,6 @@ const endlessBoard=bindEndlessBoard();
 const pausePanel=get<HTMLDialogElement>('pause-panel');
 const settingsPanel=get<HTMLDialogElement>('settings-panel');
 const renderGnatDialogue=bindGnatDialogueView();
-const townPanel=get<HTMLDialogElement>('open-conversation');
 const townOptions=get('open-options');
 let townChoice=0;
 let townR2Held=false;
@@ -87,36 +86,45 @@ function selectTownChoice(index:number) {
 function openTownPanel(run:WindowRun) {
   const scene=run.town?.dialogue;
   if (!scene) return;
-  get('open-speaker').textContent=scene.resident;
-  get('open-opening').textContent=(run.speech.line?.text ? 'Spidey: '+run.speech.line.text+'\n\n' : '')+scene.resident+': '+scene.opening;
+  sayTown(run,scene.resident+': '+scene.opening,'resident');
   townOptions.replaceChildren(...scene.options.map(({label},index)=>{
     const button=document.createElement('button');
     button.type='button';button.textContent=label;
     button.onclick=()=>{
       const reply=run.town && chooseTownReply(run.town,index,run.clock);
-      if (reply) sayTown(run,scene.resident+': '+reply);
-      townPanel.close();
+      if (reply) {
+        if (reply.sell) {
+          sellCatch(run);
+          audio.play('catch');
+        }
+        sayTown(run,scene.resident+': '+reply.text,'resident');
+      }
+      closeTownPanel();
     };
     return button;
   }));
   keyboard.clear();
-  if (!townPanel.open) townPanel.showModal();
+  townOptions.hidden=false;
   selectTownChoice(0);
 }
-townPanel.onclose=()=>{if (windowHunt?.town) closeTownDialogue(windowHunt.town);};
+function closeTownPanel() {
+  townOptions.hidden=true;
+  if (windowHunt?.town) closeTownDialogue(windowHunt.town);
+}
 function repeatTownGreeting() {
   const run=windowHunt;
   if (!run?.town || run.interaction?.kind!=='talk') return;
-  sayTown(run,interactTown(run.town,run.interaction,run.clock));
+  sayTown(run,interactTown(run.town,run.interaction,run.clock,catchValue(run)));
   openTownPanel(run);
 }
-townPanel.onkeydown=event=>{
+townOptions.onkeydown=event=>{
+  if (event.code==='Escape') {event.preventDefault();closeTownPanel();}
   if (event.code==='KeyG' && !event.repeat) repeatTownGreeting();
   if (event.key==='ArrowUp' || event.key==='ArrowDown') {
     event.preventDefault();selectTownChoice(townChoice+(event.key==='ArrowUp' ? -1 : 1));
   }
 };
-const dialogOpen=()=>townPanel.open || leaderboard.open || endlessBoard.open || settingsPanel.open;
+const dialogOpen=()=>!townOptions.hidden || leaderboard.open || endlessBoard.open || settingsPanel.open;
 get('defeat-top').onclick=()=>void endlessBoard.view();
 let contextAudio: AudioContext|undefined;
 let mode: HuntMode|undefined;
@@ -380,7 +388,7 @@ function beginFly(resume=false) {
 }
 
 window.addEventListener('keydown',event => {
-  if (settingsPanel.open || townPanel.open) return;
+  if (settingsPanel.open || !townOptions.hidden) return;
   if (event.code==='KeyM' && !event.repeat && windowHunt && !windowHunt.practice && !paused && windowHunt.phase==='play') {
     roomMapOpen=!roomMapOpen;
     remainder=0;
@@ -614,7 +622,7 @@ function setWindowView() {
   worldCanvas.height=windowHunt ? roomHeight : 204;
   windowInfo.hidden=!windowHunt?.practice;
   get('open-controls').hidden=!windowHunt?.openWorld;
-  get('score-label').textContent=windowHunt?.openWorld ? 'Delivered' : 'Catches';
+  get('score-label').textContent=windowHunt?.openWorld ? 'Coins' : 'Catches';
   get('silk-count').hidden=!windowHunt || windowHunt.practice;
   showWindowDialogue(windowHunt);
 }
@@ -627,11 +635,13 @@ function startWindowHunt(practice=false) {
   mode=undefined;
   windowDefeat.close();
   clearFlyScene();
+  closeTownPanel();
   windowHunt=practice ? createWindowHunt(true) : createOpenWorld();
   windowHunt.escapeHeld=crossHeld;
   roomMapOpen=false;
   huntNoticeUntil=0;
   preyChase=false;
+  silkHeldFor=0;
   setWindowView();
   shell.dataset.screen='game';
   launch.inert=true;
@@ -646,6 +656,7 @@ function startWindowHunt(practice=false) {
 const silkLabel=get('silk-points');
 let huntNoticeUntil=0;
 let preyChase=false;
+let silkHeldFor=0;
 function syncGnatMusic(run:WindowRun) {
   if (run.practice) {
     gnatMusic.reset();
@@ -658,15 +669,16 @@ function syncGnatMusic(run:WindowRun) {
 
 function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number,realElapsed:number) {
   let captionElapsed=0;
-  if (!paused && !roomMapOpen && !townPanel.open && !document.hidden && run.phase==='play') {
+  if (!paused && !roomMapOpen && townOptions.hidden && !document.hidden && run.phase==='play') {
+    silkHeldFor=input.silk ? silkHeldFor+realElapsed : 0;
+    input={...input,silkHeldFor};
     advanceWindowDialogue(run,input,realElapsed);
     captionElapsed=elapsed;
     remainder+=elapsed*dialogueRate(run.speech,run.dialogueClock);
     while (remainder>=arenaStep && run.phase==='play' && !run.town?.dialogue) {
       remainder-=arenaStep;
       stepWindowHunt(run,input,arenaStep,event=>{
-        if (event==='delivery') { audio.play('catch'); say('Delivered safely'); huntNoticeUntil=run.clock+2.4; }
-        else if (event==='trap') audio.play('tension');
+        if (event==='trap') audio.play('tension');
         else if (event==='escaped') audio.play('release');
         else if (event==='caught-insect' || event==='caught-predator') audio.play('fix');
         else {
@@ -690,7 +702,7 @@ function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number,realElap
   else if (roomMapOpen) say('World map · △ / M to close');
   else if (run.trapped) say('Trapped · Tap × / C · '+run.escapeCount+'/'+breakFreePresses);
   else if (run.clock>=huntNoticeUntil && message.textContent) say('');
-  const catches=String(run.openWorld ? run.delivered : run.catches);
+  const catches=String(run.openWorld ? run.coins : run.catches);
   if (run.town) {
     const action=run.interaction?.kind==='talk' ? 'Talk' : run.interaction?.kind==='pickup' ? 'Pick up' : 'Grip';
     if (get('open-action').textContent!==action) get('open-action').textContent=action;
@@ -703,7 +715,7 @@ function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number,realElap
   renderWindowHunt(context,run,reduced(),roomMapOpen);
   showWindowDialogue(run,captionElapsed);
   if (run.phase==='over' && !windowDefeat.open) {
-    get('window-hunt-result').textContent='Delivered · '+run.delivered;
+    get('window-hunt-result').textContent='Coins · '+run.coins;
     windowDefeat.showModal();
     windowChoices.select(1,true);
   }
@@ -751,12 +763,12 @@ function frame(time: number) {
     }
     crossPressed=cross && !crossHeld;
     crossHeld=cross;
-    const direction=navigationDirection(gamepad,atMenu || pausePanel.open || settingsPanel.open || townPanel.open);
+    const direction=navigationDirection(gamepad,atMenu || pausePanel.open || settingsPanel.open || !townOptions.hidden);
     if (settingsPanel.open) settingsPad(gamepad,crossPressed,cancel && !cancelHeld,direction);
     const townR2=!!gamepad.buttons[7]?.pressed || (gamepad.buttons[7]?.value??0)>.3;
-    if (townPanel.open) {
+    if (!townOptions.hidden) {
       if (townR2 && !townR2Held) repeatTownGreeting();
-      else if (cancel && !cancelHeld) townPanel.close();
+      else if (cancel && !cancelHeld) closeTownPanel();
       else if (crossPressed) townOptions.querySelectorAll('button')[townChoice]?.click();
       else if (direction && direction!==padDirection) selectTownChoice(townChoice+direction);
     }

@@ -11,6 +11,7 @@ export const bedroomWidth=2000;
 export const bedroomHeight=1008;
 export const caughtLifetime=3;
 export const webLifetime=5;
+export const ropeHoldSeconds=.22;
 export const hunterSilkRange=620;
 export const hunterWindup=.75;
 const silkClimbSpeed=152;
@@ -112,8 +113,14 @@ export function createOpenWorld(random=Math.random) {
   const ledge=815+random()*37;
   const objects=room.objects.filter(r=>r.kind!=='wall' || r.w>100);
   objects.push(object('sill',0,ledge,76,12),object('sill',1944,ledge,56,12),
-    object('wood',26,ledge-166,94,12),object('wood',1920,ledge-270,70,13));
-  return createWindowHunt(false,{...room,objects},random,true);
+    object('wood',26,ledge-166,94,12),object('wood',1920,ledge-270,70,13),
+    object('leaf',64,435,96,12),object('wood',90,239,100,13),
+    object('wood',690,811,65,12),object('wood',690,588,72,12),object('wood',685,363,86,12),
+    object('wood',1230,787,90,12),object('wood',1245,530,75,12),object('wood',1250,310,90,12));
+  const floor=objects[1].y-SPIDER_HALF_HEIGHT;
+  const spawnSites=[106,580,716,1015,1320,1955].map(x=>({x:x+random()*12,y:floor})).filter(p=>
+    !objects.some(r=>p.x>r.x-7 && p.x<r.x+r.w+7 && p.y>r.y-7 && p.y<r.y+r.h+7));
+  return createWindowHunt(false,{...room,objects,spawnSites},random,true);
 }
 
 const practiceRoom=[
@@ -130,7 +137,7 @@ const practiceRoom=[
 ];
 
 type GnatKind='common'|'swift'|'wary'|'fly';
-type Gnat={p:Point;v:Point;home:Point;direction:-1|1;kind:GnatKind;phase:number;steering:Point;decideAt:number};
+type Gnat={rare:boolean;p:Point;v:Point;home:Point;direction:-1|1;kind:GnatKind;phase:number;steering:Point;decideAt:number};
 type Predator={
   body:Crawler; origin:Point; facing:-1|1; lastKnown?:Point; chaseUntil:number;
   spokeInChase:boolean;
@@ -139,7 +146,7 @@ type Predator={
   patrolIndex:number;patrolStep:number;swingUntil:number;planAt:number;plan?:Point;
   bypass?:{roof:Rect;exit:number};
 };
-export interface CornerInput {move:Point;aim?:Point;jump:boolean;silk:boolean;grip?:boolean;escape?:boolean;remove?:boolean;}
+export interface CornerInput {move:Point;aim?:Point;jump:boolean;silk:boolean;silkHeldFor?:number;grip?:boolean;escape?:boolean;remove?:boolean;}
 
 function predator(surfaces:readonly Rect[],x:number,y:number,facing:-1|1):Predator {
   return {body:createCrawler({x,y},surfaces),origin:{x,y},facing,chaseUntil:0,spokeInChase:false,boundUntil:0,immuneUntil:0,jumpAt:0,fireAt:0,patrolIndex:0,patrolStep:1,swingUntil:0,planAt:0};
@@ -164,18 +171,28 @@ export function createWindowHunt(practice=false,corner=bedroom,random=Math.rando
     }
   }
   const starts=hunters.length ? pickFlightSites(corner,spider,random,3,hunters,openWorld) : [];
+  if (openWorld) {
+    const options=[{x:110+random()*85,y:115+random()*24},{x:710+random()*65,y:95+random()*30},
+      {x:1160+random()*95,y:105+random()*38},{x:1790+random()*80,y:82+random()*30}];
+    const upper=options.filter(p=>[spawn,...hunters,...starts.slice(0,2)].every(q=>
+      distance(worldNear(p,q.x),q)>170) && !corner.objects.some(r=>p.x>r.x-15&&p.x<r.x+r.w+15&&p.y>r.y-15&&p.y<r.y+r.h+15));
+    if (upper.length && starts.length===3) starts[2]=randomSite(upper,random);
+  }
   const town:Town|undefined=openWorld ? createTown(random,{
-    mantis:{x:565,y:floor},springtail:{x:718,y:floor},quartermaster:{x:1360,y:floor},
+    mantis:{x:565,y:floor},springtail:{x:718,y:floor},quartermaster:den,
     items:[90,688,1265,1960].map(x=>({x:x+random()*26-13,y:floor})),
   }) : undefined;
   return {
-    practice,corner,surfaces,spider,openWorld,den,town,delivered:0,
+    practice,corner,surfaces,spider,openWorld,den,town,delivered:0,coins:0,silkPressedAt:0,ropeAttempt:false,
+    walkers:openWorld ? [53,174,567,650,716,1212,1350,1961].map((x,i)=>({
+      x:x+random()*12,y:floor,direction:i%2 ? 1 : -1,speed:16+i*3,next:.9+i*.41,
+    })) : [],
     interaction:undefined as ReturnType<typeof townTarget>,interactHeld:false,contextGrip:false,
     web:{strands:[] as Strand[]},
     speech:createSpiderSpeech(),dialogueClock:0,
     greeted:new WeakSet<Gnat>(),
     occupants:new Map<Strand,Gnat[]>(),
-    gnats:starts.map((p,i)=>makeGnat(p,i,random)),
+    gnats:starts.map((p,i)=>makeGnat(p,i,random,openWorld && (i===2 || p.y<340 && random()<.35))),
     carried:[] as Gnat[],
     trail:[{...spawn}] as Point[],
     predators:hunters.map(p=>{
@@ -195,7 +212,7 @@ export function createWindowHunt(practice=false,corner=bedroom,random=Math.rando
   };
 }
 export type WindowRun=ReturnType<typeof createWindowHunt>;
-export type WindowEvent='jump'|'launch'|'attach'|'fix'|'release'|'miss'|'caught-insect'|'catch'|'land'|'trap'|'escaped'|'caught-predator'|'delivery';
+export type WindowEvent='jump'|'launch'|'attach'|'fix'|'release'|'miss'|'caught-insect'|'catch'|'land'|'trap'|'escaped'|'caught-predator';
 const clamp=(n:number,min:number,max:number)=>Math.min(max,Math.max(min,n));
 const magnitude=(p:Point)=>Math.hypot(p.x,p.y);
 const distance=(a:Point,b:Point)=>Math.hypot(a.x-b.x,a.y-b.y);
@@ -244,6 +261,53 @@ function aimEnd(game:WindowRun) {
   return {x:spider.x+aim.x*range,y:spider.y+aim.y*range};
 }
 
+function walkTown(game:WindowRun,dt:number) {
+  for (const [i,walker] of game.walkers.entries()) {
+    if (game.clock>=walker.next) {
+      walker.direction*=-1;
+      walker.next=game.clock+3+(i%4);
+    }
+    if (walker.next-game.clock<.55+(i%3)*.2) continue;
+    const x=worldX(walker.x+walker.direction*walker.speed*dt);
+    const p={x,y:walker.y};
+    if (game.corner.objects.some(r=>p.x>r.x-6 && p.x<r.x+r.w+6 && p.y>r.y-5 && p.y<r.y+r.h+5)) {
+      walker.direction*=-1;
+    } else walker.x=x;
+  }
+}
+
+function fireRope(game:WindowRun,emit:(event:WindowEvent)=>void) {
+  emit('launch');
+  if (castCrawler(game.spider,game.surfaces,aimEnd(game),{range:silkRange(game),minLength:8})) {
+    game.clinging=undefined;
+    emit('attach');
+  } else emit('miss');
+}
+
+function fireTrap(game:WindowRun,emit:(event:WindowEvent)=>void) {
+  const {spider,surfaces,web}=game;
+  emit('launch');
+  const anchor=spider.support && aimHit(spider,surfaces,aimEnd(game),{range:silkRange(game)});
+  const before=web.strands.length;
+  if (anchor) anchorSilk(web.strands,anchor,silkRange(game)+SPIDER_HALF_HEIGHT,spider,surfaces,Infinity);
+  if (web.strands.length===before) {emit('miss');return;}
+  web.strands[before].expiresAt=game.clock+webLifetime+(game.town ? townWebBonus(game.town,game.clock) : 0);
+  emit('fix');
+}
+
+export function catchValue(game:WindowRun) {
+  return game.carried.reduce((value,insect)=>value+(insect.rare ? 12 : 4),0);
+}
+
+export function sellCatch(game:WindowRun) {
+  const value=catchValue(game);
+  game.delivered+=game.carried.length;
+  game.coins+=value;
+  game.carried=[];
+  game.shots=[];
+  return value;
+}
+
 function releaseSilk(game:WindowRun,emit:(event:WindowEvent)=>void) {
   const rope=closeCrawlerRopes(game.spider);
   if (!rope) return;
@@ -279,9 +343,9 @@ function pickFlightSites(corner:Corner,spider:Point,random:()=>number,count:numb
   return picks;
 }
 
-function makeGnat(home:Point,index:number,random:()=>number):Gnat {
+function makeGnat(home:Point,index:number,random:()=>number,rare=false):Gnat {
   const angle=random()*Math.PI*2;
-  return {p:{...home},v:{x:0,y:0},home:{...home},direction:angle>Math.PI ? -1 : 1,
+  return {rare,p:{...home},v:{x:0,y:0},home:{...home},direction:angle>Math.PI ? -1 : 1,
     steering:{x:Math.cos(angle),y:Math.sin(angle)},kind:(['wary','swift','fly'] as const)[index%3],
     phase:angle,decideAt:0};
 }
@@ -534,7 +598,11 @@ function stepPredator(game:WindowRun,enemy:Predator,dt:number,emit:(event:Window
     enemy.chaseUntil=game.clock+7;
   }
   const tracking=game.clock<enemy.chaseUntil && enemy.lastKnown;
-  const posts=game.openWorld ? game.corner.hunterSites.map(p=>worldNear(p,body.x)) : game.corner.hunterSites;
+  const routes=game.openWorld ? [enemy.origin,{x:enemy.origin.x+105,y:614},
+    {x:enemy.origin.x+215,y:335},{x:enemy.origin.x+285,y:126},
+    {x:enemy.origin.x-140,y:376},{x:enemy.origin.x-85,y:695}] : game.corner.hunterSites;
+  const posts=game.openWorld ? routes.map(p=>worldNear(p,body.x)) : routes;
+  if (enemy.patrolIndex>=posts.length) enemy.patrolIndex=0;
   if (!tracking && distance(body,posts[enemy.patrolIndex])<64) enemy.patrolIndex=(enemy.patrolIndex+enemy.patrolStep+posts.length)%posts.length;
   const goal=tracking || posts[enemy.patrolIndex];
   if (game.clock>=enemy.planAt) {
@@ -589,7 +657,7 @@ function stepPredator(game:WindowRun,enemy:Predator,dt:number,emit:(event:Window
   const wire=firstCrossing(body,ahead,game.web.strands);
   if (!roof && !body.rope && game.clock>=enemy.jumpAt && (body.support || tracking)) {
     const hop=wire && wire.t>.26 && clear(game,body,{x:ahead.x,y:body.y-35});
-    if (swingToward(game,enemy,waypoint)) enemy.jumpAt=game.clock+1;
+    if (swingToward(game,enemy,waypoint) || game.openWorld && swingToward(game,enemy,goal)) enemy.jumpAt=game.clock+1;
     else if (body.support && (hop || dy<-32 && !wall || wall && Math.abs(dy)<16 && Math.abs(dx)>23)) {
       if (jumpCrawler(body,158) && !wall) body.vx=clamp(dx*3,-120,120);
       enemy.jumpAt=game.clock+1.1;
@@ -657,6 +725,8 @@ function inWindow(game:WindowRun,point:Point) {
 
 export function gnatPositions(game:WindowRun):Partial<Record<Speaker,Point>> {
   const positions:Partial<Record<Speaker,Point>>={spider:game.spider,hunter:game.predators[0]?.body};
+  const resident=game.town?.residents.find(r=>r.id===game.town?.activeResident);
+  if (resident) positions.resident=worldNear(resident.position,game.spider.x);
   for (const insect of game.gnats) positions[preySpeaker(insect)]=insect.p;
   for (const occupants of game.occupants.values()) {
     for (const insect of occupants) positions[preySpeaker(insect)]=insect.p;
@@ -675,8 +745,8 @@ export function chasingPrey(game:WindowRun,input:CornerInput) {
   });
 }
 
-export function gnatCast(game:WindowRun):Record<Speaker,CastState> {
-  const cast:Record<Speaker,CastState>={spider:'active',midge:'away',dart:'away',pip:'away',hunter:'away'};
+export function gnatCast(game:WindowRun):Record<Exclude<Speaker,'resident'>,CastState> {
+  const cast:Record<Exclude<Speaker,'resident'>,CastState>={spider:'active',midge:'away',dart:'away',pip:'away',hunter:'away'};
   for (const insect of game.gnats) if (inWindow(game,insect.p)) cast[preySpeaker(insect)]='active';
   for (const occupants of game.occupants.values()) {
     for (const insect of occupants) if (inWindow(game,insect.p)) cast[preySpeaker(insect)]='active';
@@ -698,7 +768,7 @@ export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(
     if (input.grip && !game.interactHeld) {
       game.contextGrip=!!game.interaction && !game.trapped;
       if (game.contextGrip && game.interaction) {
-        sayTown(game,interactTown(game.town,game.interaction,game.clock));
+        sayTown(game,interactTown(game.town,game.interaction,game.clock,catchValue(game)));
       }
     }
     game.interactHeld=!!input.grip;
@@ -729,13 +799,20 @@ export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(
       game.clinging=undefined;
       if (jumpWindow(game,input.move)) emit('jump');
     }
-    if (input.silk && !game.silkHeld) {
-      emit('launch');
-      if (castCrawler(spider,game.surfaces,aimEnd(game),{range:silkRange(game),minLength:8})) {
-        game.clinging=undefined;
-        emit('attach');
-      } else emit('miss');
-    } else if (!input.silk && game.silkHeld) releaseSilk(game,emit);
+    if (game.openWorld) {
+      if (input.silk && !game.silkHeld) {
+        game.silkPressedAt=game.clock;
+        game.ropeAttempt=false;
+      }
+      if (input.silk && !game.ropeAttempt && (input.silkHeldFor??game.clock-game.silkPressedAt)>=ropeHoldSeconds) {
+        game.ropeAttempt=true;
+        fireRope(game,emit);
+      } else if (!input.silk && game.silkHeld) {
+        if (game.ropeAttempt) releaseSilk(game,emit);
+        else fireTrap(game,emit);
+      }
+    } else if (input.silk && !game.silkHeld) fireRope(game,emit);
+    else if (!input.silk && game.silkHeld) releaseSilk(game,emit);
     const previous={x:spider.x,y:spider.y};
     const falling=spider.vy;
     if (spider.rope && input.move.y>.43 && spider.rope.length<silkRange(game)) {
@@ -763,14 +840,9 @@ export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(
   game.silkHeld=input.silk;
   game.escapeHeld=!!input.escape;
   if (game.practice) return;
+  walkTown(game,dt);
   advanceGnats(game,beforeMove,dt,emit);
   pullChain(game);
-  if (inDen(game,spider) && game.carried.length) {
-    game.delivered+=game.carried.length;
-    game.carried=[];
-    game.shots=[];
-    emit('delivery');
-  }
   for (const enemy of game.predators) stepPredator(game,enemy,dt,emit);
   advanceShots(game,dt,emit);
   if (game.openWorld) rebaseWorld(game);
@@ -783,9 +855,9 @@ export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(
   }
 }
 
-export function sayTown(game:WindowRun,text:string) {
+export function sayTown(game:WindowRun,text:string,speaker:Speaker='spider') {
   game.speech.pending=[];
-  game.speech.line={speaker:'spider',text};
+  game.speech.line={speaker,text};
   game.speech.slowAt=-Infinity;
   game.speech.visibleUntil=game.dialogueClock+5;
   game.speech.next=game.speech.visibleUntil;
@@ -838,5 +910,5 @@ export function advanceWindowDialogue(game:WindowRun,input:CornerInput,seconds:n
   const idle=!!spider.support && !game.trapped && !spider.rope && !input.silk && !input.jump &&
     magnitude(input.move)<.1 && Math.hypot(spider.vx,spider.vy)<12 &&
     !game.predators.some(enemy=>game.clock>=enemy.boundUntil && game.clock<enemy.chaseUntil);
-  updateSpiderSpeech(game.speech,game.dialogueClock,idle,speaker=>speaker==='spider' || gnatCast(game)[speaker]==='active');
+  updateSpiderSpeech(game.speech,game.dialogueClock,idle,speaker=>speaker==='spider' || speaker==='resident' || gnatCast(game)[speaker]==='active');
 }

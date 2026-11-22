@@ -102,13 +102,13 @@ type HunterEvent=keyof typeof hunterScenes;
 type PreyEvent=keyof typeof preyScenes.pip;
 type Encounter=HunterEvent|PreyEvent;
 export type PreySpeaker=keyof typeof preyScenes;
-export type Speaker='spider'|'hunter'|PreySpeaker;
+export type Speaker='spider'|'hunter'|'resident'|PreySpeaker;
 export const speakerNames:Record<Speaker,string>={
-  spider:'Spidey',midge:'Gwen',dart:'Zip',pip:'Crumb',hunter:'Inspector Webber',
+  resident:'Resident',spider:'Spidey',midge:'Gwen',dart:'Zip',pip:'Crumb',hunter:'Inspector Webber',
 };
 export type CastState='active'|'away'|'eliminated';
 export type DialogueLine={speaker:Speaker;text:string};
-type Request={speaker:Exclude<Speaker,'spider'>;event:Encounter;clock:number;priority:number;relevant:()=>boolean};
+type Request={speaker:Exclude<Speaker,'spider'|'resident'>;event:Encounter;clock:number;priority:number;relevant:()=>boolean};
 
 export const idleDelay=7;
 export const dialogueFade=.35;

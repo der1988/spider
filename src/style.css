@@ -274,9 +274,12 @@ dialog h2 { margin: 0; font-size: 16px; }
 @media (max-width: 540px) {
   .open-controls:not([hidden]) { grid-template-columns: repeat(3,minmax(0,1fr)); block-size: 54px; }
 }
-#open-conversation { max-height: 90dvh; overflow: auto; }
-#open-opening { white-space: pre-line; }
-#open-options { grid-template-columns: 1fr; gap: 5px; }
+.open-controls { position: relative; }
+#open-options:not([hidden]) {
+  position: absolute; inset: 0; display: grid; grid-template-columns: repeat(3,minmax(0,1fr));
+  align-items: stretch; gap: 3px; padding: 3px; background: #14271d;
+}
+#open-options button { min-width: 0; padding: 1px 3px; font-size: clamp(9px, 1.5vw, 13px); }
 .gnat-caption {
   position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none;
   width: max-content; max-width: min(var(--caption-width, 65%), 34ch);
