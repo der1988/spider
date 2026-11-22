@@ -1,31 +1,34 @@
 import {block,drawAimMarker,drawPlatform,drawSpider,line} from './hunt-render';
-import {bedroomHeight,bedroomWidth,cameraFor,roomHeight,roomWidth,windowAnchor,type Corner,type WindowRun} from './window-hunt';
+import {bedroomHeight,bedroomScale,bedroomWidth,cameraFor,roomHeight,roomWidth,windowAnchor,type Corner,type WindowRun} from './window-hunt';
 
 const ink='#22392e';
 const cream='#eff3c8';
 const amber='#f0d389';
 
 function windowBackdrop(ctx:CanvasRenderingContext2D,objects:Corner['objects']) {
-  const wall=ctx.createLinearGradient(0,0,0,bedroomHeight);
+  ctx.save();
+  ctx.scale(bedroomScale,bedroomScale);
+  const width=bedroomWidth/bedroomScale,height=bedroomHeight/bedroomScale;
+  const wall=ctx.createLinearGradient(0,0,0,height);
   wall.addColorStop(0,'#c5d0ab');
   wall.addColorStop(.56,'#abbc95');
   wall.addColorStop(1,'#7e9a7a');
   ctx.fillStyle=wall;
-  ctx.fillRect(0,0,bedroomWidth,bedroomHeight);
+  ctx.fillRect(0,0,width,height);
   const daylight=ctx.createRadialGradient(503,300,70,560,435,990);
   daylight.addColorStop(0,'#f7eac188');
   daylight.addColorStop(1,'#f7eac100');
   ctx.fillStyle=daylight;
-  ctx.fillRect(0,0,bedroomWidth,bedroomHeight);
-  for (let x=31;x<bedroomWidth;x+=109) {
+  ctx.fillRect(0,0,width,height);
+  for (let x=31;x<width;x+=109) {
     block(ctx,x,20,1,1090,'#819a7929');
     block(ctx,x+1,20,2,1090,'#ecedcd25');
   }
-  block(ctx,0,1090,bedroomWidth,122,'#859e7a');
-  block(ctx,0,1090,bedroomWidth,5,'#bac6a0');
-  block(ctx,0,1101,bedroomWidth,3,'#687d65');
-  block(ctx,0,1183,bedroomWidth,4,'#a0ad8a');
-  for (let x=24;x<bedroomWidth;x+=172) {
+  block(ctx,0,1090,width,122,'#859e7a');
+  block(ctx,0,1090,width,5,'#bac6a0');
+  block(ctx,0,1101,width,3,'#687d65');
+  block(ctx,0,1183,width,4,'#a0ad8a');
+  for (let x=24;x<width;x+=172) {
     block(ctx,x,1212,2,48,'#2b493b');
     block(ctx,x+3,1218,66,1,'#a5a677');
   }
@@ -52,15 +55,16 @@ function windowBackdrop(ctx:CanvasRenderingContext2D,objects:Corner['objects']) 
   line(ctx,{x:1698,y:466},{x:1740,y:513},'#879f78');
   const pot=objects.find(item=>item.kind==='pot');
   if (pot) {
-    const base={x:pot.x+pot.w*.58,y:pot.y};
+    const base={x:(pot.x+pot.w*.58)/bedroomScale,y:pot.y/bedroomScale};
     for (const item of objects) {
       if (item.kind!=='leaf') continue;
-      const node={x:item.x+item.w*.64,y:item.y+4};
+      const node={x:(item.x+item.w*.64)/bedroomScale,y:item.y/bedroomScale+4};
       const elbow={x:base.x-6,y:(base.y+node.y)*.5};
       line(ctx,base,elbow,'#789764');
       line(ctx,elbow,node,'#789764');
     }
   }
+  ctx.restore();
 }
 
 function furnishing(ctx:CanvasRenderingContext2D,item:Corner['objects'][number]) {
@@ -225,6 +229,15 @@ export function renderWindowHunt(ctx:CanvasRenderingContext2D,game:WindowRun,red
       block(ctx,p.x-4,p.y,1,1,cream);
       block(ctx,p.x+4,p.y,1,1,cream);
     }
+  }
+  let head:{x:number;y:number}=spider;
+  for (const {p} of game.carried) {
+    line(ctx,head,p,'#dce5a3');
+    block(ctx,p.x-4,p.y-3,9,7,ink);
+    block(ctx,p.x-3,p.y-2,7,5,'#ebd694');
+    block(ctx,p.x-1,p.y-2,1,5,'#a08756');
+    block(ctx,p.x+2,p.y-2,1,5,'#a08756');
+    head=p;
   }
   ctx.restore();
   drawAimMarker(ctx,{x:spider.x-camera.x,y:spider.y-camera.y},game.aim,roomWidth,roomHeight,!!windowAnchor(game));

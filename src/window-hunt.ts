@@ -4,8 +4,9 @@ import {anchorSilk,crossesSolid,fixSilk,leaveSilk,sweptHit,type Strand,type Web}
 
 export const roomWidth=520;
 export const roomHeight=290;
-export const bedroomWidth=2500;
-export const bedroomHeight=1260;
+export const bedroomScale=.8;
+export const bedroomWidth=2000;
+export const bedroomHeight=1008;
 export const caughtLifetime=3;
 export const breakFreePresses=5;
 const jumpSpeed=172;
@@ -14,22 +15,24 @@ const boundary=[grip(0,0,520,16),grip(0,270,520,20),grip(0,16,9,254),grip(511,16
 type Furnishing=Rect & {kind:'sill'|'curtain'|'leaf'|'pot'|'wood'|'mattress'|'book'|'wardrobe'|'wall'};
 export type Corner={
   objects:readonly Furnishing[];
-  spawn:Point;
+  spawnSites:readonly Point[];
   flightSites:readonly Point[];
   hunterSites:readonly Point[];
 };
 function object(kind:Furnishing['kind'],x:number,y:number,w:number,h:number):Furnishing {
   return {...grip(x,y,w,h),kind};
 }
-export const bedroom:Corner={
+const scaled=(p:Point):Point=>({x:p.x*bedroomScale,y:p.y*bedroomScale});
+const scaledPerch=(p:Point):Point=>({x:p.x*bedroomScale,y:p.y*bedroomScale-SPIDER_HALF_HEIGHT});
+const bedroomBlueprint:Corner={
   objects:[
     object('wall',0,0,1250,10),object('wall',0,606,1250,24),
     object('wall',0,10,10,596),object('wall',1240,10,10,596),
     object('mattress',62,485,272,30),object('wood',73,515,252,14),
-    object('wood',89,529,12,77),object('wood',295,529,12,77),object('wood',55,435,12,50),
+    object('wood',89,529,12,77),object('wood',55,435,12,50),
     object('sill',142,405,137,10),object('sill',201,310,177,12),
     object('curtain',358,24,24,263),object('sill',165,204,156,12),
-    object('wood',479,399,257,17),object('wood',491,416,17,190),object('wood',707,416,17,190),
+    object('wood',479,399,257,17),object('wood',491,416,17,190),
     object('wood',507,482,59,12),object('book',535,365,48,34),
     object('wood',497,276,143,13),object('book',578,250,27,26),
     object('wood',673,186,151,12),object('wood',793,100,132,12),
@@ -43,15 +46,24 @@ export const bedroom:Corner={
     object('wood',1610,290,95,12),object('wood',1810,801,83,12),object('wood',1955,676,90,12),
     object('leaf',2200,485,63,10),
   ]),
-  spawn:{x:460,y:962},
+  spawnSites:[
+    {x:460,y:970},{x:800,y:1212},{x:1300,y:798},{x:600,y:620},
+    {x:2100,y:960},{x:2250,y:180},{x:1830,y:1212},
+  ],
   flightSites:[
     {x:258,y:720},{x:570,y:567},{x:242,y:263},{x:884,y:478},
     {x:1112,y:376},{x:1413,y:245},{x:1746,y:395},{x:1698,y:658},
     {x:1932,y:282},{x:2060,y:570},{x:2321,y:410},{x:2334,y:245},
   ],
   hunterSites:[
-    {x:251,y:1204},{x:1250,y:1204},{x:1630,y:364},{x:2115,y:952},{x:2350,y:172},
+    {x:251,y:1212},{x:1250,y:1212},{x:1630,y:372},{x:2115,y:960},{x:2350,y:180},
   ],
+};
+export const bedroom:Corner={
+  objects:bedroomBlueprint.objects.map(r=>({...r,...scaled(r),w:r.w*bedroomScale,h:r.h*bedroomScale})),
+  spawnSites:bedroomBlueprint.spawnSites.map(scaledPerch),
+  flightSites:bedroomBlueprint.flightSites.map(scaled),
+  hunterSites:bedroomBlueprint.hunterSites.map(scaledPerch),
 };
 const practiceRoom=[
   ...boundary,
@@ -82,16 +94,19 @@ function predator(surfaces:readonly Rect[],x:number,y:number,facing:-1|1):Predat
 
 export function createWindowHunt(practice=false,corner=bedroom,random=Math.random) {
   const surfaces=practice ? practiceRoom : corner.objects;
-  const spider=createCrawler(practice ? {x:32,y:262} : corner.spawn,surfaces);
-  const starts=practice ? [] : pickFlightSites(corner,spider,random,3);
-  const hunterStarts=corner.hunterSites.filter(p=>distance(p,spider)>=470);
-  const hunterStart=hunterStarts[Math.floor(random()*hunterStarts.length)];
+  const spawn=practice ? {x:32,y:262} : randomSite(corner.spawnSites,random);
+  const spider=createCrawler(spawn,surfaces);
+  const hunterStarts=corner.hunterSites.filter(p=>distance(p,spider)>=320);
+  const hunterStart=practice ? undefined : randomSite(hunterStarts,random);
+  const starts=hunterStart ? pickFlightSites(corner,spider,random,3,[hunterStart]) : [];
   return {
     practice,corner,surfaces,random,spider,
     web:{loose:[],strands:[]} as Pick<Web,'loose'|'strands'>,
     occupants:new Map<Strand,Gnat[]>(),
     gnats:starts.map((p,i)=>makeGnat(p,i,random)),
-    predators:practice ? [] : [predator(surfaces,hunterStart.x,hunterStart.y,random()<.5 ? -1 : 1)],
+    carried:[] as Gnat[],
+    trail:[{...spawn}] as Point[],
+    predators:hunterStart ? [predator(surfaces,hunterStart.x,hunterStart.y,random()<.5 ? -1 : 1)] : [],
     shots:[] as {p:Point;to:Point}[],
     clinging:undefined as Strand|undefined, gripAt:0,
     trapped:false,escapeCount:0,escapeHeld:false,safeUntil:0,removeHeld:false,
@@ -101,7 +116,7 @@ export function createWindowHunt(practice=false,corner=bedroom,random=Math.rando
   };
 }
 export type WindowRun=ReturnType<typeof createWindowHunt>;
-export type WindowEvent='jump'|'launch'|'attach'|'fix'|'release'|'miss'|'caught-insect'|'catch'|'land'|'trap'|'escaped'|'caught-predator'|'web-limit';
+export type WindowEvent='jump'|'launch'|'attach'|'fix'|'release'|'miss'|'caught-insect'|'catch'|'land'|'trap'|'escaped'|'caught-predator';
 const clamp=(n:number,min:number,max:number)=>Math.min(max,Math.max(min,n));
 const magnitude=(p:Point)=>Math.hypot(p.x,p.y);
 const distance=(a:Point,b:Point)=>Math.hypot(a.x-b.x,a.y-b.y);
@@ -149,9 +164,7 @@ function releaseSilk(game:WindowRun,emit:(event:WindowEvent)=>void) {
   const rope=closeCrawlerRopes(game.spider);
   if (!rope) return;
   const reach=DEFAULT_TUNING.range+SPIDER_HALF_HEIGHT;
-  if (!game.practice && game.web.strands.length) emit('web-limit');
-  else if (!anchorSilk(game.web.strands,rope,reach,game.spider,game.surfaces,game.practice ? 8 : 1)) {
-    if (!game.practice) game.web.loose.length=0;
+  if (!anchorSilk(game.web.strands,rope,reach,game.spider,game.surfaces,game.practice ? 8 : Infinity)) {
     leaveSilk(game.web,rope,reach);
   }
   const contact=createCrawler(game.spider,game.surfaces).support;
@@ -162,16 +175,17 @@ function releaseSilk(game:WindowRun,emit:(event:WindowEvent)=>void) {
   emit('release');
 }
 
+function randomSite(sites:readonly Point[],random:()=>number) {
+  return sites[Math.floor(random()*sites.length)];
+}
+
 function pickFlightSites(corner:Corner,spider:Point,random:()=>number,count:number,occupied:readonly Point[]=[]) {
-  const available=corner.flightSites.filter(p=>distance(p,spider)>300);
   const picks:Point[]=[];
   for (let i=0;i<count;i++) {
-    const separated=available.filter(p=>[...occupied,...picks].every(q=>distance(p,q)>230));
-    const choices=separated.length ? separated : available;
-    const point=choices[Math.floor(random()*choices.length)];
-    if (!point) break;
-    picks.push(point);
-    available.splice(available.indexOf(point),1);
+    const available=corner.flightSites.filter(p=>distance(p,spider)>205 &&
+      [...occupied,...picks].every(q=>distance(p,q)>132));
+    if (!available.length) break;
+    picks.push(randomSite(available,random));
   }
   return picks;
 }
@@ -219,7 +233,38 @@ function steerGnat(game:WindowRun,gnat:Gnat,threat:Point|undefined) {
   return best;
 }
 
-function advanceGnats(game:WindowRun,dt:number,emit:(event:WindowEvent)=>void) {
+function collectInsect(game:WindowRun,gnat:Gnat,replacements:Gnat[],emit:(event:WindowEvent)=>void) {
+  game.carried.push(gnat);
+  game.silk++;
+  game.catches++;
+  const occupied=game.gnats.filter(other=>other!==gnat).map(other=>other.p);
+  const sites=pickFlightSites(game.corner,game.spider,game.random,1,[
+    ...occupied,...replacements.map(other=>other.p),...game.predators.map(enemy=>enemy.body),
+  ]);
+  const next=makeGnat(sites[0]??gnat.home,0,game.random);
+  next.kind=gnat.kind;
+  replacements.push(next);
+  emit('catch');
+}
+
+function touchesInsect(game:WindowRun,p:Point,previous:Point,from:Point=p) {
+  const relative={from:{x:previous.x-from.x,y:previous.y-from.y},
+    to:{x:game.spider.x-p.x,y:game.spider.y-p.y},shakeUntil:0};
+  const zero={x:0,y:0};
+  return distance(zero,pointAt(relative,projection(zero,relative)))<=11 && clear(game,game.spider,p);
+}
+
+function advanceGnats(game:WindowRun,previous:Point,dt:number,emit:(event:WindowEvent)=>void) {
+  const replacements:Gnat[]=[];
+  for (const [wire,occupants] of game.occupants) {
+    const remaining=occupants.filter(gnat=>{
+      if (!touchesInsect(game,gnat.p,previous)) return true;
+      collectInsect(game,gnat,replacements,emit);
+      return false;
+    });
+    if (remaining.length) game.occupants.set(wire,remaining);
+    else game.occupants.delete(wire);
+  }
   game.gnats=game.gnats.filter(gnat=>{
     const {p,v,kind}=gnat;
     const {spider}=game;
@@ -237,6 +282,10 @@ function advanceGnats(game:WindowRun,dt:number,emit:(event:WindowEvent)=>void) {
       v.x=0;v.y=0;gnat.decideAt=0;
       return true;
     }
+    if (touchesInsect(game,next,previous,p)) {
+      collectInsect(game,gnat,replacements,emit);
+      return false;
+    }
     const hit=firstCrossing(p,next,game.web.strands);
     if (hit) {
       const occupants=game.occupants.get(hit.wire)??[];
@@ -252,6 +301,7 @@ function advanceGnats(game:WindowRun,dt:number,emit:(event:WindowEvent)=>void) {
     if (Math.abs(v.x)>6) gnat.direction=v.x<0 ? -1 : 1;
     return true;
   });
+  game.gnats.push(...replacements);
 }
 
 function projection(p:Point,wire:Strand) {
@@ -284,24 +334,45 @@ function crawlWeb(game:WindowRun,wire:Strand,stick:Point,dt:number) {
   if (stick.x) spider.facing=stick.x<0 ? -1 : 1;
 }
 
-function expireWebs(game:WindowRun,emit:(event:WindowEvent)=>void) {
+function expireWebs(game:WindowRun) {
   game.web.strands=game.web.strands.filter(wire=>{
     if ((wire.expiresAt??Infinity)>game.clock) return true;
-    const caught=game.occupants.get(wire)??[];
-    game.occupants.delete(wire);
-    if (caught.length) {
-      game.silk+=caught.length;
-      game.catches+=caught.length;
-      const sites=pickFlightSites(game.corner,game.spider,game.random,caught.length,game.gnats.map(gnat=>gnat.home));
-      for (const [i,gnat] of caught.entries()) {
-        const next=makeGnat(sites[i]??gnat.home,0,game.random);
-        next.kind=gnat.kind;
-        game.gnats.push(next);
-      }
-      emit('catch');
+    for (const insect of game.occupants.get(wire)??[]) {
+      insect.v={x:0,y:0};
+      insect.decideAt=0;
+      game.gnats.push(insect);
     }
+    game.occupants.delete(wire);
     return false;
   });
+}
+
+function pullChain(game:WindowRun) {
+  const spacing=17;
+  const head={x:game.spider.x,y:game.spider.y};
+  const {trail,carried}=game;
+  if (distance(head,trail[0])>2) trail.unshift(head);
+  let previous=head;
+  let travelled=0,link=0;
+  for (const [index,node] of trail.entries()) {
+    const length=distance(previous,node);
+    while (length && link<carried.length && travelled+length>=(link+1)*spacing) {
+      const t=((link+1)*spacing-travelled)/length;
+      carried[link++].p={x:previous.x+(node.x-previous.x)*t,y:previous.y+(node.y-previous.y)*t};
+    }
+    travelled+=length;
+    previous=node;
+    if (travelled>(carried.length+2)*spacing) {
+      trail.length=index+1;
+      break;
+    }
+  }
+  while (link<carried.length) {
+    const back=unit({x:previous.x-head.x || -game.spider.facing,y:previous.y-head.y});
+    const next={x:previous.x+back.x*spacing,y:previous.y+back.y*spacing};
+    if (clear(game,previous,next)) previous=next;
+    carried[link++].p={...previous};
+  }
 }
 
 function hunterRoute(game:WindowRun,body:Point,goal:Point) {
@@ -442,12 +513,17 @@ export function cameraFor(game:WindowRun) {
 export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(event:WindowEvent)=>void) {
   if (game.phase==='over') return;
   const {spider,web}=game;
+  const beforeMove={x:spider.x,y:spider.y};
   game.clock+=dt;
-  expireWebs(game,emit);
+  expireWebs(game);
   if (input.aim) game.aim=unit(input.aim);
   if (!game.practice && input.remove && !game.removeHeld && !game.trapped) {
-    const wire=web.strands[0];
-    if (wire && !game.occupants.has(wire)) web.strands=[];
+    const empty=web.strands.filter(wire=>!game.occupants.has(wire));
+    const closest=empty.reduce<Strand|undefined>((best,wire)=>{
+      const distanceTo=(line:Strand)=>distance(spider,pointAt(line,projection(spider,line)));
+      return !best || distanceTo(wire)<distanceTo(best) ? wire : best;
+    },undefined);
+    if (closest) web.strands=web.strands.filter(wire=>wire!==closest);
   }
   game.removeHeld=!!input.remove;
   if (game.trapped) {
@@ -487,8 +563,7 @@ export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(
       }
     }
     if (spider.support==='floor' && falling>52) emit('land');
-    if (game.practice || !web.strands.length) fixSilk(web,spider,game.surfaces,game.practice ? 8 : 1);
-    if (!game.practice && web.strands.length) web.loose.length=0;
+    fixSilk(web,spider,game.surfaces,game.practice ? 8 : Infinity);
     if (game.practice) for (const strand of web.strands.slice(before)) strand.expiresAt=game.clock+18;
     if (web.strands.length>before) emit('fix');
   }
@@ -496,7 +571,8 @@ export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(
   game.silkHeld=input.silk;
   game.escapeHeld=!!input.escape;
   if (game.practice) return;
-  advanceGnats(game,dt,emit);
+  advanceGnats(game,beforeMove,dt,emit);
+  pullChain(game);
   for (const enemy of game.predators) stepPredator(game,enemy,dt,emit);
   advanceShots(game,dt,emit);
 }

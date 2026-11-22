@@ -10,6 +10,7 @@ import {renderHunt} from './hunt-render';
 import {readLeftStick,samplePlayStation} from './pad-controls';
 import {Soundscape} from './soundscape';
 import {Soundtrack} from './soundtrack';
+import {GnatMusic} from './gnat-music';
 import {beatAt, huntStart, loadTiming, lyricAt, openingShot} from './song-cues';
 import {difficultyChanges,type HuntMode} from './difficulty';
 import {bindLeaderboard} from './leaderboard';
@@ -54,6 +55,7 @@ try {
   localStorage.removeItem(WEB_KEY);
 } catch { /* Storage may be unavailable. */ }
 const audio = new Soundscape();
+const gnatMusic=new GnatMusic();
 function fetchTrack(name: string) {
   const url=document.querySelector<HTMLMetaElement>('meta[name="'+name+'"]')!.content;
   return fetch(url).then(response=>response.ok ? response.arrayBuffer() : undefined).catch(()=>undefined);
@@ -144,7 +146,9 @@ motionMode.checked=preferences.reduced;
 escapeMode.checked=preferences.hold;
 keyboardMode.selectedIndex=preferences.keyboard;
 function applySettings() {
-  song.setVolume(Number(musicVolume.value)/100);
+  const music=Number(musicVolume.value)/100;
+  song.setVolume(music);
+  gnatMusic.setVolume(music);
   audio.setVolume(Number(effectsVolume.value)/100);
   shell.dataset.subtitles=['normal','large','off'][subtitleMode.selectedIndex];
 }
@@ -221,7 +225,7 @@ function enableMenuSound() {
 }
 window.addEventListener('pointerdown',()=>{
   if (shell.dataset.screen==='start') enableMenuSound();
-  else if (song.waiting) audio.unlock();
+  else if (song.waiting || windowHunt) audio.unlock();
 });
 
 function clearFlyScene() {
@@ -261,6 +265,7 @@ function showMenu() {
   const practice=windowHunt?.practice;
   const wasWindowHunt=!!windowHunt;
   windowHunt=undefined;
+  gnatMusic.reset();
   roomMapOpen=false;
   storyCheckpoint=undefined;
   escapeCheckpoint=undefined;
@@ -301,6 +306,7 @@ function syncPause() {
   const frozen = paused || document.hidden;
   song.setPaused(frozen);
   audio.setPaused(frozen);
+  if (windowHunt) syncGnatMusic(windowHunt);
   remainder = 0;
   clock.dataset.paused=String(paused);
   if (!frozen) audio.unlock();
@@ -342,7 +348,7 @@ window.addEventListener('keydown',event => {
     }
   }
   if (shell.dataset.screen==='start') enableMenuSound();
-  else if (song.waiting) audio.unlock();
+  else if (song.waiting || windowHunt) audio.unlock();
   if (dialogOpen()) return;
   const choices=activeChoices();
   if (choices && ((choices===menuChoices || choices===pauseChoices) ? /^Arrow(Up|Down)$/ : /^Arrow(Left|Right|Up|Down)$/).test(event.code)) {
@@ -557,13 +563,14 @@ function setWindowView() {
   get('silk-count').hidden=!windowHunt || windowHunt.practice;
   windowInfo.textContent=windowHunt?.practice
     ? 'L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower'
-    : 'L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower · R2 / G grip · △ / M map · □ / V remove web · × / C escape';
+    : 'L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower · R2 / G grip · △ / M map · □ / V remove nearest empty web · × / C escape';
 }
 
 function startWindowHunt(practice=false) {
   contextAudio=audio.audioContext();
   audio.unlock();
   song.stop();
+  gnatMusic.reset();
   mode=undefined;
   windowDefeat.close();
   clearFlyScene();
@@ -584,33 +591,42 @@ function startWindowHunt(practice=false) {
 
 const silkLabel=get('silk-points');
 let huntNoticeUntil=0;
+function syncGnatMusic(run:WindowRun) {
+  if (run.practice) {
+    gnatMusic.reset();
+    return;
+  }
+  const alerted=run.phase==='play' && (run.trapped || run.predators.some(predator=>
+    run.clock>=predator.boundUntil && run.clock<predator.chaseUntil));
+  gnatMusic.sync(contextAudio,alerted,paused || document.hidden);
+}
+
 function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number) {
   if (!paused && !roomMapOpen && !document.hidden && run.phase==='play') {
     remainder+=elapsed;
     while (remainder>=arenaStep && run.phase==='play') {
       remainder-=arenaStep;
       stepWindowHunt(run,input,arenaStep,event=>{
-        if (event==='web-limit') {
-          say('One web at a time · □ / V removes an empty web');
-          huntNoticeUntil=run.clock+1.8;
-        } else if (event==='trap') audio.play('tension');
+        if (event==='trap') audio.play('tension');
         else if (event==='escaped') audio.play('release');
         else if (event==='caught-insect' || event==='caught-predator') audio.play('fix');
         else {
           audio.play(event);
           if (event==='catch') {
-            say('Web collected · silk credited');
+            say('Insect collected · added to the silk chain');
             huntNoticeUntil=run.clock+1.35;
           }
         }
       });
     }
   }
+  syncGnatMusic(run);
   if (run.practice) {
     renderWindowHunt(context,run,reduced());
     return;
   }
-  if (roomMapOpen) say('Bedroom map · △ / M to close');
+  if (contextAudio && contextAudio.state!=='running') say('Click or press a keyboard key to enable music');
+  else if (roomMapOpen) say('Bedroom map · △ / M to close');
   else if (run.trapped) say('Trapped · Tap × / C · '+run.escapeCount+'/'+breakFreePresses);
   else if (run.clock>=huntNoticeUntil && message.textContent) say('');
   const catches=String(run.catches);
