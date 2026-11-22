@@ -29,7 +29,7 @@
     <div class="mode-choices">
       <button id="story" type="button" data-selected="true"><span>STORY</span><code aria-hidden="true">story()</code></button>
       <button id="loop" type="button" data-selected="false"><span>ENDLESS</span><code aria-hidden="true">loop()</code></button>
-      <button id="window-hunt-mode" type="button" data-selected="false">Gnat Hunt</button>
+      <button id="window-hunt-mode" type="button" data-selected="false">Open World</button>
       <button id="practice-mode" type="button" data-selected="false">Practice</button>
       <button id="settings-menu" type="button" data-selected="false">Settings</button>
       <button id="menu-top" type="button" data-selected="false" aria-haspopup="dialog"><span>Top 10</span></button>
@@ -74,8 +74,10 @@
     </section>
   </section>
   <footer>
-    <section id="gnat-conversation" class="gnat-conversation" aria-label="Dialogue" hidden>
-      <ul id="gnat-cast" class="gnat-cast" aria-label="Characters"></ul>
+    <section id="open-controls" class="open-controls" aria-label="Open World controls" hidden>
+      <span><kbd>LS</kbd> Move</span><span><kbd>L1</kbd> Jump</span>
+      <span><kbd>R1</kbd> Silk</span><span><kbd>R2</kbd> <span id="open-action">Grip</span></span>
+      <span><kbd>△</kbd> Map</span><span id="open-cargo"></span>
     </section>
     <p id="window-hunt-info" hidden>L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower</p>
     <p id="message" role="status"></p>
@@ -110,12 +112,17 @@
   <button id="endless-again" type="button" hidden>Try Again</button>
 </dialog>
 <dialog id="window-hunt-defeat" aria-labelledby="window-hunt-title">
-  <h2 id="window-hunt-title">A hunter caught you</h2>
+  <h2 id="window-hunt-title">Caught on patrol</h2>
   <p id="window-hunt-result"></p>
   <div class="mode-choices">
     <button id="window-hunt-menu" type="button">Main Menu</button>
     <button id="window-hunt-retry" type="button">Retry</button>
   </div>
+</dialog>
+<dialog id="open-conversation" aria-labelledby="open-speaker">
+  <h2 id="open-speaker"></h2>
+  <p id="open-opening"></p>
+  <div id="open-options" class="mode-choices"></div>
 </dialog>
 <dialog id="pause-panel" aria-labelledby="pause-title">
   <h2 id="pause-title">Paused</h2>
