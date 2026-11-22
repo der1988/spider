@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {advanceArena,arenaStep,createArena,type ArenaInput} from '../src/arena-run.ts';
 import {createWindowHunt,cameraFor,bedroom,bedroomHeight,bedroomWidth,caughtLifetime,webLifetime,windowAnchor,stepWindowHunt,type CornerInput,type WindowRun} from '../src/window-hunt.ts';
-import {createSpiderSpeech,enqueueDialogue,idleDelay,spiderLessons,updateSpiderSpeech} from '../src/gnat-dialogue.ts';
+import {createSpiderSpeech,dialogueFade,enqueueDialogue,idleDelay,spiderLessons,updateSpiderSpeech} from '../src/gnat-dialogue.ts';
 import {createCrawler} from '../src/crawler.ts';
 import {arenaLayouts} from '../src/hunt.ts';
 
@@ -117,35 +117,54 @@ test('letting go in midair removes the rope and cannot fix a web on a later land
   assert.equal(game.web.strands.length,0);
 });
 
-test('idle lessons wait for stillness and stay in the history after movement resumes',()=>{
+test('idle speech has the left side to itself and clears after it has been read',()=>{
   const speech=createSpiderSpeech();
   updateSpiderSpeech(speech,20,false);
   updateSpiderSpeech(speech,20+idleDelay-.1,true);
-  assert.equal(speech.history.length,0);
+  assert.equal(speech.left,undefined);
   updateSpiderSpeech(speech,20+idleDelay,true);
-  assert.equal(speech.history[0]?.text,spiderLessons[0]);
-  assert.ok(speech.visibleUntil>=37);
+  assert.equal(speech.left?.text,spiderLessons[0]);
+  assert.equal(speech.right,undefined);
   updateSpiderSpeech(speech,28,false);
-  updateSpiderSpeech(speech,55,false);
-  assert.equal(speech.history.length,1);
+  assert.equal(speech.left?.text,spiderLessons[0]);
+  updateSpiderSpeech(speech,speech.visibleUntil+dialogueFade,false);
+  assert.equal(speech.left,undefined);
 });
 
-test('important dialogue waits in order, drops stale events and preserves the transcript',()=>{
+test('the reply starts promptly and new lines replace only their own side',()=>{
   const speech=createSpiderSpeech();
   assert.ok(enqueueDialogue(speech,1,'nearPrey','dart',()=>true));
   updateSpiderSpeech(speech,1,false);
-  assert.ok(enqueueDialogue(speech,3,'hunter','hunter',()=>false));
-  assert.ok(enqueueDialogue(speech,4,'caughtPrey','pip',()=>true));
-  assert.ok(enqueueDialogue(speech,4,'escaped','hunter',()=>true));
-  for (const speaker of ['spider','dart','spider']) {
-    assert.equal(speech.history.at(-1)?.speaker,speaker);
-    const count=speech.history.length;
-    updateSpiderSpeech(speech,speech.next-.1,false);
-    assert.equal(speech.history.length,count);
-    updateSpiderSpeech(speech,speech.next,false);
-  }
-  assert.deepEqual(speech.history.map(line=>line.speaker),['spider','dart','spider','hunter']);
-  assert.ok(speech.history[3].text.includes('restraint'));
+  const first=speech.left;
+  assert.equal(first?.speaker,'spider');
+  assert.equal(speech.right,undefined);
+  assert.ok(speech.next<4.5);
+  updateSpiderSpeech(speech,speech.next,false);
+  const reply=speech.right;
+  assert.equal(reply?.speaker,'dart');
+  assert.equal(speech.left,first);
+  assert.ok(speech.next>=speech.readUntil.left);
+  updateSpiderSpeech(speech,speech.next,false);
+  assert.notEqual(speech.left,first);
+  assert.equal(speech.right,reply);
+  updateSpiderSpeech(speech,speech.visibleUntil+dialogueFade,false);
+  assert.equal(speech.left,undefined);
+  assert.equal(speech.right,undefined);
+});
+
+test('a new exchange drops the previous speaker and prioritizes relevant events',()=>{
+  const speech=createSpiderSpeech();
+  enqueueDialogue(speech,1,'nearPrey','dart',()=>true);
+  updateSpiderSpeech(speech,1,false);
+  enqueueDialogue(speech,3,'hunter','hunter',()=>false);
+  enqueueDialogue(speech,4,'caughtPrey','pip',()=>true);
+  enqueueDialogue(speech,4,'escaped','hunter',()=>true);
+  updateSpiderSpeech(speech,speech.next,false);
+  updateSpiderSpeech(speech,speech.next,false);
+  updateSpiderSpeech(speech,speech.next,false);
+  assert.equal(speech.left,undefined);
+  assert.equal(speech.right?.speaker,'hunter');
+  assert.ok(speech.right?.text.includes('restraint'));
   assert.deepEqual(speech.queue.map(request=>request.event),['caughtPrey']);
 });
 

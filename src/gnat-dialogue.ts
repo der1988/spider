@@ -111,13 +111,14 @@ export type DialogueLine={speaker:Speaker;text:string};
 type Request={speaker:Exclude<Speaker,'spider'>;event:Encounter;clock:number;priority:number;relevant:()=>boolean};
 
 export const idleDelay=7;
-export const panelLinger=10;
+export const dialogueFade=.35;
 const silence=12;
 const priority:Record<Encounter,number>={nearPrey:1,hunter:3,freedPrey:4,caughtPrey:5,boundHunter:6,escaped:7};
 
 export function createSpiderSpeech() {
   return {
-    history:[] as DialogueLine[],pending:[] as DialogueLine[],
+    left:undefined as DialogueLine|undefined,right:undefined as DialogueLine|undefined,
+    readUntil:{left:0,right:0},pending:[] as DialogueLine[],
     queue:[] as Request[],turns:new Map<string,number>(),
     next:0,visibleUntil:-Infinity,idleSince:0,nextLesson:0,lesson:0,
   };
@@ -125,10 +126,20 @@ export function createSpiderSpeech() {
 
 type Speech=ReturnType<typeof createSpiderSpeech>;
 
+function sideFor(line:DialogueLine) {
+  return line.speaker==='spider' ? 'left' : 'right';
+}
+
 function speak(speech:Speech,clock:number,line:DialogueLine) {
-  speech.history.push(line);
-  speech.next=clock+Math.max(6,2+line.text.split(/\s+/).length/2.8);
-  speech.visibleUntil=Math.max(clock+panelLinger,speech.next);
+  const side=sideFor(line);
+  const words=line.text.split(/\s+/).length;
+  speech[side]=line;
+  speech.readUntil[side]=clock+Math.max(6,2+words/2.8);
+  speech.visibleUntil=Math.max(speech.readUntil.left,speech.readUntil.right);
+  const reply=speech.pending[0];
+  speech.next=reply
+    ? Math.max(clock+Math.min(3.5,Math.max(1.8,.75+words/8)),speech.readUntil[sideFor(reply)])
+    : speech.visibleUntil+dialogueFade;
 }
 
 export function enqueueDialogue(speech:Speech,clock:number,event:Encounter,speaker:Request['speaker'],relevant:()=>boolean) {
@@ -139,6 +150,10 @@ export function enqueueDialogue(speech:Speech,clock:number,event:Encounter,speak
 
 export function updateSpiderSpeech(speech:Speech,clock:number,idle:boolean) {
   if (!idle) speech.idleSince=clock;
+  if (clock>=speech.visibleUntil+dialogueFade) {
+    speech.left=undefined;
+    speech.right=undefined;
+  }
   if (clock<speech.next) return;
   const reply=speech.pending.shift();
   if (reply) {
@@ -159,8 +174,8 @@ export function updateSpiderSpeech(speech:Speech,clock:number,idle:boolean) {
     speech.turns.set(key,turn+1);
     const [first,second]=event==='nearPrey' || event==='freedPrey' ? ['spider',speaker] as const : [speaker,'spider'] as const;
     const [opening,...responses]=script;
-    speak(speech,clock,{speaker:first,text:opening});
     speech.pending=responses.map((text,index)=>({speaker:index%2 ? first : second,text}));
+    speak(speech,clock,{speaker:first,text:opening});
   } else if (idle && clock-speech.idleSince>=idleDelay && clock>=speech.nextLesson) {
     speak(speech,clock,{speaker:'spider',text:spiderLessons[speech.lesson++%spiderLessons.length]});
     speech.nextLesson=clock+27;

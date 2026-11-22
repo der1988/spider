@@ -263,20 +263,21 @@ dialog h2 { margin: 0; font-size: 16px; }
 .shell[data-reforming] :is(#window-hunt-mode,#practice-mode,#settings-menu) { display:none; }
 .shell[data-window-hunt=practice] .catch-count { visibility:hidden; }
 .gnat-conversation:not([hidden]) {
-  position: absolute; bottom: clamp(5px, 1.1vh, 12px); left: 50%;
-  translate: -50%; z-index: 2; width: min(650px, 75%);
+  justify-self: center; width: min(650px, 75%);
   border: 1px solid #8fa779; background: #14271df2;
   box-shadow: 0 3px 12px #0c1811a0; pointer-events: none; overflow: hidden;
-  opacity: 1; transition: opacity 420ms ease;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  opacity: 1; transition: opacity 350ms ease;
 }
 .gnat-conversation[data-fading=true] { opacity: 0; }
-.gnat-lines { list-style: none; margin: 0; padding: 0; }
+.gnat-slot { min-width: 0; }
+.gnat-slot + .gnat-slot { border-inline-start: 1px solid #8fa77955; }
 .gnat-line {
-  display: grid; grid-template-columns: auto minmax(0,1fr); align-items: start; gap: 8px;
-  padding: 4px 8px; border-bottom: 1px solid #61744d66;
+  display: grid; grid-template-columns: auto minmax(0,1fr); align-items: start; gap: clamp(4px, 1vw, 8px);
+  padding: 7px clamp(5px, 1vw, 12px);
   color: #f6f7de; font: 500 clamp(13px, 1.32vw, 17px)/1.25 system-ui, sans-serif;
+  text-align: center;
 }
-.gnat-line:last-child { border-bottom: 0; }
 .gnat-line b { color: #f7dd91; margin-inline-end: .4em; }
 .gnat-line[data-speaker=hunter] b { color: #ffb88c; }
 .gnat-line[data-speaker=midge] b { color: #bce6a2; }
@@ -287,13 +288,8 @@ dialog h2 { margin: 0; font-size: 16px; }
   background: #2f4734;
 }
 .shell[data-subtitles=large] .gnat-line { font-size: clamp(15px, 1.55vw, 20px); }
-#gnat-history { width: min(710px, calc(100% - 24px)); max-height: 90dvh; }
-#gnat-history-scroll { max-height: min(64dvh, 560px); overflow: auto; overscroll-behavior: contain; }
-#gnat-history-scroll:focus-visible { outline: 1px solid #e1e7b6; outline-offset: -1px; }
-#gnat-history .gnat-line { padding-block: 9px; }
 @media (max-width: 650px), (max-height: 500px) {
   .gnat-conversation:not([hidden]) { width: min(650px, 92%); }
-  #gnat-recent .gnat-line:nth-last-child(n+3) { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .gnat-conversation { transition: none !important; } }
 .gnat-conversation[data-reduced=true] { transition: none; }

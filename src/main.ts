@@ -70,8 +70,8 @@ const leaderboard = bindLeaderboard();
 const endlessBoard=bindEndlessBoard();
 const pausePanel=get<HTMLDialogElement>('pause-panel');
 const settingsPanel=get<HTMLDialogElement>('settings-panel');
-const dialogueView=bindGnatDialogueView();
-const dialogOpen=()=>dialogueView.journal.open || leaderboard.open || endlessBoard.open || settingsPanel.open;
+const renderGnatDialogue=bindGnatDialogueView();
+const dialogOpen=()=>leaderboard.open || endlessBoard.open || settingsPanel.open;
 get('defeat-top').onclick=()=>void endlessBoard.view();
 let contextAudio: AudioContext|undefined;
 let mode: HuntMode|undefined;
@@ -105,11 +105,7 @@ function bindChoices(items: readonly (readonly [string,()=>void])[],vertical=fal
   });
   function move(direction: number) {
     const index=vertical ? (selected+direction+buttons.length)%buttons.length : direction<0 ? 0 : buttons.length-1;
-    let next=index;
-    for (let attempts=0;buttons[next].hidden && attempts<buttons.length;attempts++) {
-      next=(next+direction+buttons.length)%buttons.length;
-    }
-    select(next,true);
+    select(index,true);
   }
   return {select,move,get selected(){return selected;},confirm:()=>buttons[selected].click()};
 }
@@ -123,7 +119,7 @@ const menuChoices=bindChoices([
   ['settings-menu',openSettings],
   ['menu-top',()=>void endlessBoard.view()],
 ],true);
-const pauseChoices=bindChoices([['resume',togglePause],['pause-settings',openSettings],['pause-history',openDialogueHistory],['pause-menu',showMenu]],true);
+const pauseChoices=bindChoices([['resume',togglePause],['pause-settings',openSettings],['pause-menu',showMenu]],true);
 const windowDefeat=get<HTMLDialogElement>('window-hunt-defeat');
 const windowChoices=bindChoices([['window-hunt-menu',showMenu],['window-hunt-retry',startWindowHunt]]);
 
@@ -275,7 +271,6 @@ function showMenu() {
   roomMapOpen=false;
   storyCheckpoint=undefined;
   escapeCheckpoint=undefined;
-  dialogueView.journal.close();
   pausePanel.close();
   windowDefeat.close();
   setWindowView();
@@ -322,7 +317,6 @@ function togglePause() {
   if (!(windowHunt || mode && song.started) || !defeat.hidden || windowDefeat.open) return;
   paused = !paused;
   if (paused) {
-    pauseHistory.hidden=!windowHunt || windowHunt.practice;
     pausePanel.showModal();
     pauseChoices.select(0,true);
   } else pausePanel.close();
@@ -341,7 +335,7 @@ function beginFly(resume=false) {
 }
 
 window.addEventListener('keydown',event => {
-  if (settingsPanel.open || dialogueView.journal.open) return;
+  if (settingsPanel.open) return;
   if (event.code==='KeyM' && !event.repeat && windowHunt && !windowHunt.practice && !paused && windowHunt.phase==='play') {
     roomMapOpen=!roomMapOpen;
     remainder=0;
@@ -562,14 +556,8 @@ function keyboardInput() {
 }
 
 const windowInfo=get('window-hunt-info');
-const pauseHistory=get<HTMLButtonElement>('pause-history');
-function openDialogueHistory() {
-  if (windowHunt && !windowHunt.practice) dialogueView.open(windowHunt.speech.history);
-}
-get('gnat-history-close').onclick=()=>dialogueView.journal.close();
-dialogueView.journal.onclose=()=>{if (pausePanel.open) pauseHistory.focus();};
 function showWindowDialogue(run?:WindowRun) {
-  dialogueView.render(run?.speech.history,run ? run.clock-run.speech.visibleUntil : Infinity,
+  renderGnatDialogue(run?.speech.left,run?.speech.right,run ? run.clock-run.speech.visibleUntil : Infinity,
     !!run && !run.practice && !roomMapOpen && run.phase!=='over' && subtitleMode.selectedIndex!==2,reduced());
 }
 
@@ -703,12 +691,8 @@ function frame(time: number) {
     }
     crossPressed=cross && !crossHeld;
     crossHeld=cross;
-    const direction=navigationDirection(gamepad,atMenu || pausePanel.open || settingsPanel.open || dialogueView.journal.open);
+    const direction=navigationDirection(gamepad,atMenu || pausePanel.open || settingsPanel.open);
     if (settingsPanel.open) settingsPad(gamepad,crossPressed,cancel && !cancelHeld,direction);
-    if (dialogueView.journal.open) {
-      if (crossPressed || cancel && !cancelHeld) dialogueView.journal.close();
-      else if (direction && direction!==padDirection) dialogueView.scroll(direction,reduced());
-    }
     cancelHeld=cancel;
     if (navigation && !boardWasOpen && direction && direction!==padDirection) {
       navigation.move(direction);

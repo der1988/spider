@@ -1,4 +1,4 @@
-import {speakerNames,type DialogueLine,type Speaker} from './gnat-dialogue';
+import {dialogueFade,speakerNames,type DialogueLine,type Speaker} from './gnat-dialogue';
 
 const portraits:Record<Speaker,readonly [string,string][]>={
   spider:[
@@ -28,7 +28,7 @@ const portraits:Record<Speaker,readonly [string,string][]>={
 };
 
 function dialogueRow(line:DialogueLine) {
-  const row=document.createElement('li');
+  const row=document.createElement('div');
   row.className='gnat-line';
   row.dataset.speaker=line.speaker;
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
@@ -51,48 +51,24 @@ function dialogueRow(line:DialogueLine) {
 
 export function bindGnatDialogueView() {
   const panel=document.querySelector<HTMLElement>('#gnat-conversation')!;
-  const recent=document.querySelector<HTMLOListElement>('#gnat-recent')!;
-  const journal=document.querySelector<HTMLDialogElement>('#gnat-history')!;
-  const entries=document.querySelector<HTMLOListElement>('#gnat-history-lines')!;
-  const scroll=document.querySelector<HTMLElement>('#gnat-history-scroll')!;
-  const empty=document.querySelector<HTMLElement>('#gnat-history-empty')!;
-  let source:readonly DialogueLine[]|undefined;
-  let displayed=0;
+  const left=document.querySelector<HTMLElement>('#gnat-dialogue-left')!;
+  const right=document.querySelector<HTMLElement>('#gnat-dialogue-right')!;
+  let displayedLeft:DialogueLine|undefined;
+  let displayedRight:DialogueLine|undefined;
 
-  function render(history:readonly DialogueLine[]|undefined,afterReading:number,enabled:boolean,reduced:boolean) {
-    if (source!==history) {
-      recent.replaceChildren();
-      displayed=0;
-      source=history;
-    }
-    const visible=enabled && afterReading<.45 && !!history?.length;
-    const animate=visible && !reduced && !panel.hidden;
+  return function render(leftLine:DialogueLine|undefined,rightLine:DialogueLine|undefined,
+    afterReading:number,enabled:boolean,reduced:boolean) {
+    const visible=enabled && afterReading<dialogueFade && !!(leftLine || rightLine);
     panel.hidden=!visible;
     panel.dataset.fading=String(afterReading>=0);
     panel.dataset.reduced=String(reduced);
-    if (!visible || !history || displayed===history.length) return;
-    const previous=new Map([...recent.children].map(element=>[element,element.getBoundingClientRect().top]));
-    const start=Math.max(displayed,history.length-3);
-    for (const line of history.slice(start)) recent.append(dialogueRow(line));
-    while (recent.childElementCount>3) recent.firstElementChild?.remove();
-    displayed=history.length;
-    if (animate) for (const element of recent.children) {
-      const y=previous.get(element);
-      const offset=y===undefined ? 12 : y===0 ? 0 : y-element.getBoundingClientRect().top;
-      if (offset) element.animate([{transform:`translateY(${offset}px)`},{transform:'translateY(0)'}],
-        {duration:215,easing:'ease-out'});
+    if (displayedLeft!==leftLine) {
+      left.replaceChildren(...(leftLine ? [dialogueRow(leftLine)] : []));
+      displayedLeft=leftLine;
     }
-  }
-
-  function open(history:readonly DialogueLine[]) {
-    entries.replaceChildren(...history.map(dialogueRow));
-    empty.hidden=history.length>0;
-    journal.showModal();
-    scroll.focus();
-    scroll.scrollTop=scroll.scrollHeight;
-  }
-
-  return {journal,render,open,scroll:(direction:number,reduced:boolean)=>scroll.scrollBy({
-    top:direction*Math.max(45,scroll.clientHeight*.34),behavior:reduced ? 'auto' : 'smooth',
-  })};
+    if (displayedRight!==rightLine) {
+      right.replaceChildren(...(rightLine ? [dialogueRow(rightLine)] : []));
+      displayedRight=rightLine;
+    }
+  };
 }
