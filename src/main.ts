@@ -633,7 +633,7 @@ function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number) {
   const silk=String(run.silk);
   if (scoreLabel.textContent!==catches) scoreLabel.textContent=catches;
   if (silkLabel.textContent!==silk) silkLabel.textContent=silk;
-  renderWindowHunt(context,run,reduced(),roomMapOpen);
+  renderWindowHunt(context,run,reduced(),roomMapOpen,subtitleMode.selectedIndex);
   if (run.phase==='over' && !windowDefeat.open) {
     get('window-hunt-result').textContent='Catches · '+run.catches;
     windowDefeat.showModal();

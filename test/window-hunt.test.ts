@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {advanceArena,arenaStep,createArena,type ArenaInput} from '../src/arena-run.ts';
-import {createWindowHunt,cameraFor,bedroom,bedroomHeight,bedroomWidth,caughtLifetime,windowAnchor,stepWindowHunt,type CornerInput,type WindowRun} from '../src/window-hunt.ts';
+import {createWindowHunt,cameraFor,bedroom,bedroomHeight,bedroomWidth,caughtLifetime,webLifetime,windowAnchor,stepWindowHunt,type CornerInput,type WindowRun} from '../src/window-hunt.ts';
+import {createSpiderSpeech,spiderLines,updateSpiderSpeech} from '../src/gnat-dialogue.ts';
 import {createCrawler} from '../src/crawler.ts';
 import {arenaLayouts} from '../src/hunt.ts';
 
@@ -95,6 +96,42 @@ test('new webs remain alongside other webs instead of replacing them',()=>{
   run(game,1);
   assert.equal(game.web.strands.length,27);
   assert.deepEqual(game.web.strands.slice(0,26),existing);
+  assert.equal(game.web.strands[26].expiresAt,game.clock+webLifetime);
+  game.predators.length=0;
+  run(game,599);
+  assert.equal(game.web.strands.length,27);
+  run(game,2);
+  assert.equal(game.web.strands.length,26);
+});
+
+test('letting go in midair removes the rope and cannot fix a web on a later landing',()=>{
+  const game=createWindowHunt(true);
+  game.surfaces=[{x:30,y:30,w:450,h:12,grip:true},{x:30,y:245,w:450,h:12,grip:true}];
+  game.spider=createCrawler({x:200,y:155},game.surfaces);
+  run(game,1,{silk:true,aim:{x:0,y:-1}});
+  assert.ok(game.spider.rope);
+  run(game,1);
+  assert.equal(game.spider.rope,undefined);
+  run(game,150);
+  assert.ok(game.spider.grounded);
+  assert.equal(game.web.strands.length,0);
+});
+
+test('spider remarks have variety, quiet gaps and a reaction to the hunter',()=>{
+  assert.ok(new Set(Object.values(spiderLines).flat()).size>=100);
+  const speech=createSpiderSpeech();
+  const quiet={hunter:false,trapped:false,webs:0,catches:0,moving:false};
+  updateSpiderSpeech(speech,1,quiet,()=>0);
+  assert.equal(speech.line,'');
+  updateSpiderSpeech(speech,3,quiet,()=>0);
+  const first=speech.line;
+  assert.ok(first && speech.next>speech.until);
+  updateSpiderSpeech(speech,4,{...quiet,hunter:true},()=>0);
+  assert.equal(speech.line,first);
+  updateSpiderSpeech(speech,speech.next,quiet,()=>0);
+  assert.equal(speech.line,spiderLines.hunter[0]);
+  updateSpiderSpeech(speech,speech.next,quiet,()=>0);
+  assert.notEqual(speech.line,first);
 });
 
 test('contact picks up free and trapped insects, adding each to the trailing chain',()=>{
@@ -122,13 +159,13 @@ test('contact picks up free and trapped insects, adding each to the trailing cha
 test('web expiry frees an uncollected insect without granting points',()=>{
   const game=createWindowHunt();
   const insect=game.gnats.pop()!;
-  const wire={from:{x:600,y:100},to:{x:600,y:220},shakeUntil:0,expiresAt:game.clock+caughtLifetime};
+  const wire={from:{x:600,y:100},to:{x:600,y:220},shakeUntil:0,expiresAt:game.clock+webLifetime};
   game.web.strands=[wire];
   game.occupants.set(wire,[insect]);
   run(game,120);
   assert.equal(game.gnats.length,2);
   assert.equal(game.silk,0);
-  run(game,243);
+  run(game,483);
   assert.equal(game.gnats.length,3);
   assert.equal(game.silk,0);
   assert.equal(game.web.strands.length,0);

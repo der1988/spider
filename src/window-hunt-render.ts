@@ -172,7 +172,35 @@ function drawHunter(ctx:CanvasRenderingContext2D,game:WindowRun,enemy:WindowRun[
   } else if (game.clock<enemy.chaseUntil) block(ctx,body.x-1,body.y-17,3,4,amber);
 }
 
-export function renderWindowHunt(ctx:CanvasRenderingContext2D,game:WindowRun,reduced=false,mapOpen=false) {
+function drawSpiderSpeech(ctx:CanvasRenderingContext2D,text:string,spider:{x:number;y:number},large:boolean) {
+  ctx.save();
+  ctx.font=`${large ? 13 : 11}px monospace`;
+  ctx.textAlign='left';
+  ctx.textBaseline='top';
+  const rows:string[]=[];
+  let row='';
+  for (const word of text.split(' ')) {
+    const next=row ? `${row} ${word}` : word;
+    if (row && ctx.measureText(next).width>246) {
+      rows.push(row);
+      row=word;
+    } else row=next;
+  }
+  rows.push(row);
+  const width=Math.ceil(Math.max(...rows.map(value=>ctx.measureText(value).width)))+14;
+  const lineHeight=large ? 16 : 14;
+  const height=rows.length*lineHeight+8;
+  const x=Math.round(Math.max(6,Math.min(roomWidth-width-6,spider.x-width/2)));
+  const above=spider.y-height-16;
+  const y=Math.round(above>=5 ? above : Math.max(5,spider.y+14));
+  block(ctx,x,y,width,height,'#263d30');
+  block(ctx,x+1,y+1,width-2,1,'#7e9a73');
+  ctx.fillStyle=cream;
+  rows.forEach((value,i)=>ctx.fillText(value,x+7,y+4+i*lineHeight));
+  ctx.restore();
+}
+
+export function renderWindowHunt(ctx:CanvasRenderingContext2D,game:WindowRun,reduced=false,mapOpen=false,subtitles=0) {
   if (mapOpen) {renderMap(ctx,game);return;}
   const camera=cameraFor(game);
   ctx.save();
@@ -190,16 +218,16 @@ export function renderWindowHunt(ctx:CanvasRenderingContext2D,game:WindowRun,red
 
   const {spider}=game;
   for (const wire of game.web.strands) {
-    const tone=wire===game.clinging ? cream : game.occupants.has(wire) ? '#b28d48' : '#456e55';
+    const expiring=(wire.expiresAt??Infinity)-game.clock<.75;
+    const tone=wire===game.clinging ? cream : game.occupants.has(wire) ? '#b28d48' : expiring ? '#78956c' : '#456e55';
     const shake=reduced ? 0 : Math.max(0,wire.shakeUntil-game.clock);
     if (shake) {
       const mid={x:(wire.from.x+wire.to.x)/2,y:(wire.from.y+wire.to.y)/2+Math.sin(game.clock*90)*9*shake};
       line(ctx,wire.from,mid,tone);
       line(ctx,mid,wire.to,tone);
-    } else line(ctx,wire.from,wire.to,tone,(wire.expiresAt??Infinity)-game.clock<2);
+    } else line(ctx,wire.from,wire.to,tone);
     if (!game.practice) for (const p of [wire.from,wire.to]) block(ctx,p.x-1,p.y-1,3,3,tone);
   }
-  for (const loose of game.web.loose) line(ctx,loose.from,spider,'#829660',true);
   if (spider.rope) line(ctx,spider,spider.rope,cream);
   for (const enemy of game.predators) drawHunter(ctx,game,enemy);
   for (const shot of game.shots) block(ctx,shot.p.x-2,shot.p.y-2,5,5,'#bd8151');
@@ -248,4 +276,7 @@ export function renderWindowHunt(ctx:CanvasRenderingContext2D,game:WindowRun,red
     for (let i=-6;i<=6;i+=3) line(ctx,{x:spider.x-8,y:spider.y+i},{x:spider.x+8,y:spider.y+i+1},amber);
   }
   ctx.restore();
+  if (!game.practice && game.phase!=='over' && subtitles!==2 && game.clock<game.speech.until) {
+    drawSpiderSpeech(ctx,game.speech.line,{x:spider.x-camera.x,y:spider.y-camera.y},subtitles===1);
+  }
 }

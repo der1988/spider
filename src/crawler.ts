@@ -102,11 +102,11 @@ const approach = (n: number,target: number,step: number) =>
 
 export function tickCrawler(
   spider: Crawler,surfaces: readonly Rect[],stick: Point,reel: boolean,dt: number,strands: readonly WalkLine[],
-  {crawlSpeed=CRAWL,airAcceleration=290,ropeMinimum=DEFAULT_TUNING.minLength}={},
+  {crawlSpeed=CRAWL,airAcceleration=290,ropeMinimum=DEFAULT_TUNING.minLength,reelSpeed=DEFAULT_TUNING.reelSpeed}={},
 ) {
   if (spider.rope) {
     spider.support=undefined;
-    tickSpider(spider,surfaces,{move:stick.x,reel,gripThread:false},dt,{minLength:ropeMinimum});
+    tickSpider(spider,surfaces,{move:stick.x,reel,gripThread:false},dt,{minLength:ropeMinimum,reelSpeed});
     if (supports(spider,surfaces).length) spider.airJump=true;
     return;
   }
