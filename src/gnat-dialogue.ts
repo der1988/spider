@@ -28,7 +28,7 @@ export const spiderLessons=[
 
 const hunterScenes={
   hunter:[
-    ["Hunting department. Stop for inspection.", "Ask whoever is steering. I'm on sick leave.", "Equipment dispute. Understood. Keep running."],
+    ["Inspector Webber. Routine inspection.", "Ask whoever is steering. I'm on sick leave.", "Equipment dispute. Keep running for the record."],
     ["Stop. I only want a word.", "Is the word lunch?", "Inspection. Lunch is a separate form."],
     ["I can see you under there.", "Lovely. I was starting to feel overlooked.", "Try looking a little less edible."],
     ["The shelf is closed. I posted a notice.", "I used the notice as a bridge.", "Then I have to notify Transport."],
@@ -38,7 +38,7 @@ const hunterScenes={
     ["You're slower today. Progress.", "I spent yesterday being your training exercise.", "Excellent. Tomorrow we'll time it."],
     ["We discussed trespassing.", "I thought you were out of breath.", "I saved enough for the word stop."],
     ["Good jump.", "Thank you. Please applaud from farther away.", "The next one is the one I'm grading."],
-    ["I know every corner of this room.", "Which one has the day off?", "Mine. Thursdays only."],
+    ["I know every corner of this room.", "Which one has the day off?", "Mine. Thursdays only. Bring your own silence."],
   ],
   boundHunter:[
     ["Your web obstructs an authorized pursuit.", "It's temporary. Like my resistance.", "I'll file it as a scheduled delay."],
@@ -72,7 +72,7 @@ const preyScenes={
   },
   dart:{
     nearPrey:[
-      ["Could you hold still for one question?", "Ask me on the next lap.", "I'll make it brief. The floor is expecting me."],
+      ["Zip, is there an off switch?", "There is. It only works at the finish line.", "Mine is the floor. I seem to hit it every lap."],
       ["You're flying in circles again.", "Qualifying laps. I'm ahead, whatever the prize.", "Try a straight line. I have a medal in mind."],
     ],
     caughtPrey:[
@@ -85,7 +85,7 @@ const preyScenes={
   },
   pip:{
     nearPrey:[
-      ["What's in the crumb?", "Lunch for three. Four if you let me pass.", "My species has a restrictive catering contract."],
+      ["Crumb, what are you carrying?", "Lunch for three. Four if you let me pass.", "My species has a restrictive catering contract."],
       ["Do you usually fly here?", "Are you a customer or a competitor?", "A tired private citizen. Do you take credit?"],
     ],
     caughtPrey:[
@@ -104,7 +104,7 @@ type Encounter=HunterEvent|PreyEvent;
 export type PreySpeaker=keyof typeof preyScenes;
 export type Speaker='spider'|'hunter'|PreySpeaker;
 export const speakerNames:Record<Speaker,string>={
-  spider:'Spidey',midge:'Gwen Gnatsby',dart:'Buzzy McZoom',pip:'Count Crumbula',hunter:'Inspector Webber',
+  spider:'Spidey',midge:'Gwen',dart:'Zip',pip:'Crumb',hunter:'Inspector Webber',
 };
 export type CastState='active'|'away'|'eliminated';
 export type DialogueLine={speaker:Speaker;text:string};
@@ -117,8 +117,7 @@ const priority:Record<Encounter,number>={nearPrey:1,hunter:3,freedPrey:4,caughtP
 
 export function createSpiderSpeech() {
   return {
-    left:undefined as DialogueLine|undefined,right:undefined as DialogueLine|undefined,
-    readUntil:{left:0,right:0},pending:[] as DialogueLine[],
+    line:undefined as DialogueLine|undefined,slowAt:-Infinity,pending:[] as DialogueLine[],
     queue:[] as Request[],turns:new Map<string,number>(),
     next:0,visibleUntil:-Infinity,idleSince:0,nextLesson:0,lesson:0,
   };
@@ -126,20 +125,21 @@ export function createSpiderSpeech() {
 
 type Speech=ReturnType<typeof createSpiderSpeech>;
 
-function sideFor(line:DialogueLine) {
-  return line.speaker==='spider' ? 'left' : 'right';
+export const slowMotionSeconds=1.25;
+
+export function dialogueRate(speech:Speech,clock:number) {
+  const t=clock-speech.slowAt;
+  if (t<0 || t>=slowMotionSeconds) return 1;
+  const blend=Math.min(1,t/.20,(slowMotionSeconds-t)/.34);
+  return 1-.42*blend*blend*(3-2*blend);
 }
 
-function speak(speech:Speech,clock:number,line:DialogueLine) {
-  const side=sideFor(line);
+function speak(speech:Speech,clock:number,line:DialogueLine,conversation:boolean) {
+  speech.line=line;
+  speech.slowAt=conversation ? clock : -Infinity;
   const words=line.text.split(/\s+/).length;
-  speech[side]=line;
-  speech.readUntil[side]=clock+Math.max(6,2+words/2.8);
-  speech.visibleUntil=Math.max(speech.readUntil.left,speech.readUntil.right);
-  const reply=speech.pending[0];
-  speech.next=reply
-    ? Math.max(clock+Math.min(3.5,Math.max(1.8,.75+words/8)),speech.readUntil[sideFor(reply)])
-    : speech.visibleUntil+dialogueFade;
+  speech.visibleUntil=clock+Math.max(3.8,1.85+words/2.55);
+  speech.next=speech.visibleUntil+dialogueFade;
 }
 
 export function enqueueDialogue(speech:Speech,clock:number,event:Encounter,speaker:Request['speaker'],relevant:()=>boolean) {
@@ -150,19 +150,16 @@ export function enqueueDialogue(speech:Speech,clock:number,event:Encounter,speak
 
 export function updateSpiderSpeech(speech:Speech,clock:number,idle:boolean,canSpeak:(speaker:Speaker)=>boolean=()=>true) {
   if (!idle) speech.idleSince=clock;
-  if (clock>=speech.visibleUntil+dialogueFade) {
-    speech.left=undefined;
-    speech.right=undefined;
-  }
+  if (clock>=speech.visibleUntil+dialogueFade) speech.line=undefined;
   if (clock<speech.next) return;
   const reply=speech.pending.shift();
   if (reply) {
     if (!canSpeak(reply.speaker)) {
       speech.pending=[];
-      speech.next=speech.visibleUntil+dialogueFade+silence;
+      speech.next=clock+silence;
       return;
     }
-    speak(speech,clock,reply);
+    speak(speech,clock,reply,true);
     if (!speech.pending.length) speech.next+=silence;
     return;
   }
@@ -182,10 +179,10 @@ export function updateSpiderSpeech(speech:Speech,clock:number,idle:boolean,canSp
       ? ['spider',speaker] as const : [speaker,'spider'] as const;
     const [opening,...responses]=script;
     speech.pending=responses.map((text,index)=>({speaker:index%2 ? first : second,text}));
-    speak(speech,clock,{speaker:first,text:opening});
+    speak(speech,clock,{speaker:first,text:opening},script.length>1);
     if (!speech.pending.length) speech.next+=silence;
   } else if (idle && clock-speech.idleSince>=idleDelay && clock>=speech.nextLesson) {
-    speak(speech,clock,{speaker:'spider',text:spiderLessons[speech.lesson++%spiderLessons.length]});
+    speak(speech,clock,{speaker:'spider',text:spiderLessons[speech.lesson++%spiderLessons.length]},false);
     speech.nextLesson=clock+27;
   }
 }

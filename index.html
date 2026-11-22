@@ -56,6 +56,7 @@
   </header>
   <section class="stage" aria-label="Hunting arena">
     <canvas id="world" width="360" height="204" aria-label="Spider, fly and webs"></canvas>
+    <div id="gnat-caption" class="gnat-caption" role="status" aria-atomic="true" hidden></div>
     <section id="loop-defeat" class="defeat" aria-labelledby="defeat-title" hidden>
       <div class="defeat-panel">
         <h2 id="defeat-title">Time ran out</h2>
@@ -75,10 +76,6 @@
   <footer>
     <section id="gnat-conversation" class="gnat-conversation" aria-label="Dialogue" hidden>
       <ul id="gnat-cast" class="gnat-cast" aria-label="Characters"></ul>
-      <div class="gnat-lines">
-        <div id="gnat-dialogue-left" class="gnat-slot" role="status" aria-label="Spidey" aria-atomic="true"></div>
-        <div id="gnat-dialogue-right" class="gnat-slot" role="status" aria-label="Other character" aria-atomic="true"></div>
-      </div>
     </section>
     <p id="window-hunt-info" hidden>L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower</p>
     <p id="message" role="status"></p>

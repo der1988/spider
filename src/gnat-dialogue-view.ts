@@ -1,3 +1,5 @@
+import {roomHeight,roomWidth} from './window-hunt';
+import type {Point} from './spider';
 import {dialogueFade,speakerNames,type CastState,type DialogueLine,type Speaker} from './gnat-dialogue';
 
 const portraits:Record<Speaker,readonly [string,string][]>={
@@ -44,9 +46,12 @@ function portrait(speaker:Speaker) {
 export function bindGnatDialogueView() {
   const panel=document.querySelector<HTMLElement>('#gnat-conversation')!;
   const castList=document.querySelector<HTMLUListElement>('#gnat-cast')!;
-  const lines=document.querySelector<HTMLElement>('.gnat-lines')!;
-  const left=document.querySelector<HTMLElement>('#gnat-dialogue-left')!;
-  const right=document.querySelector<HTMLElement>('#gnat-dialogue-right')!;
+  const caption=document.querySelector<HTMLElement>('#gnat-caption')!;
+  const canvas=document.querySelector<HTMLCanvasElement>('#world')!;
+  let active:DialogueLine|undefined;
+  let origin:Point={x:0,y:0},shown:Point={x:0,y:0};
+  let viewportWidth=0,viewportHeight=0;
+  const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(max,n));
   const speakers=['spider','midge','dart','pip','hunter'] as const;
   const tiles=speakers.map(speaker=>{
     const tile=document.createElement('li');
@@ -61,22 +66,71 @@ export function bindGnatDialogueView() {
     return tile;
   });
 
-  return function render(cast:Record<Speaker,CastState>|undefined,leftLine:DialogueLine|undefined,
-    rightLine:DialogueLine|undefined,afterReading:number,enabled:boolean,reduced:boolean) {
+  return function render(cast:Record<Speaker,CastState>|undefined,line:DialogueLine|undefined,
+    positions:Partial<Record<Speaker,Point>>,camera:Point,elapsed:number,
+    afterReading:number,enabled:boolean,reduced:boolean) {
     panel.hidden=!cast;
-    if (!cast) return;
-    const visible=enabled && afterReading<dialogueFade;
-    const leftVisible=visible ? leftLine : undefined;
-    const rightVisible=visible ? rightLine : undefined;
-    const leftText=leftVisible?.text??'';
-    const rightText=rightVisible?.text??'';
-    if (left.textContent!==leftText) left.textContent=leftText;
-    if (right.textContent!==rightText) {
-      right.setAttribute('aria-label',rightVisible ? speakerNames[rightVisible.speaker] : 'Other character');
-      right.textContent=rightText;
+    const speaker=line && positions[line.speaker];
+    const visible=!!cast && enabled && !!line && !!speaker && afterReading<dialogueFade;
+    caption.hidden=!visible;
+    if (visible && line && speaker) {
+      const width=canvas.clientWidth,height=canvas.clientHeight;
+      const scale=Math.min(width/roomWidth,height/roomHeight);
+      const sceneWidth=roomWidth*scale,sceneHeight=roomHeight*scale;
+      const left=(width-sceneWidth)/2,top=(height-sceneHeight)/2;
+      const inset=6;
+      const fresh=line!==active || width!==viewportWidth || height!==viewportHeight;
+      if (line!==active) {
+        caption.textContent=line.text;
+        caption.dataset.speaker=line.speaker;
+        caption.setAttribute('aria-label',speakerNames[line.speaker]+': '+line.text);
+      }
+      if (fresh) {
+        caption.style.setProperty('--caption-width',Math.floor(sceneWidth*.64)+'px');
+        viewportWidth=width;
+        viewportHeight=height;
+      }
+      const w=caption.offsetWidth,h=caption.offsetHeight;
+      const bound=(p:Point)=>({
+        x:clamp(p.x,left+inset,left+sceneWidth-w-inset),
+        y:clamp(p.y,top+inset,top+sceneHeight-h-inset),
+      });
+      const project=(p:Point)=>({x:left+(p.x-camera.x)*scale,y:top+(p.y-camera.y)*scale});
+      const actor=project(speaker);
+      const gap=Math.max(16,20*scale);
+      const obstacles=Object.values(positions).filter(p=>p!==undefined).map(project);
+      const overlaps=(p:Point)=>obstacles.filter(body=>
+        body.x>p.x-gap*.55 && body.x<p.x+w+gap*.55 &&
+        body.y>p.y-gap*.6 && body.y<p.y+h+gap*.6).length;
+      const candidates=[
+        {x:actor.x-w/2,y:actor.y-gap-h},{x:actor.x-w/2,y:actor.y+gap},
+        {x:actor.x+gap,y:actor.y-h/2},{x:actor.x-gap-w,y:actor.y-h/2},
+      ];
+      let target=bound(candidates[0]),best=Infinity;
+      candidates.forEach((candidate,index)=>{
+        const point=bound(candidate);
+        const score=overlaps(point)*250+Math.abs(candidate.y-point.y)+Math.abs(candidate.x-point.x)*.22+
+          index*8+(fresh ? 0 : Math.hypot(point.x-shown.x,point.y-shown.y)*.15);
+        if (score<best) {best=score;target=point;}
+      });
+      if (fresh) {
+        origin=shown=target;
+      } else if (!reduced) {
+        const distance=Math.hypot(target.x-origin.x,target.y-origin.y);
+        const pull=Math.min(.82,.36+Math.max(0,distance-85)/220);
+        const favored=bound({x:origin.x+(target.x-origin.x)*pull,y:origin.y+(target.y-origin.y)*pull});
+        const destination=overlaps(favored) ? target : favored;
+        const step=Math.min(.05,elapsed);
+        const blend=1-Math.exp(-step/ .58);
+        const dx=(destination.x-shown.x)*blend,dy=(destination.y-shown.y)*blend;
+        const speedLimit=Math.min(1,68*step/(Math.hypot(dx,dy)||1));
+        shown=bound({x:shown.x+dx*speedLimit,y:shown.y+dy*speedLimit});
+      }
+      caption.style.transform=`translate(${shown.x.toFixed(2)}px,${shown.y.toFixed(2)}px)`;
+      caption.style.opacity=String(afterReading<0 || reduced ? 1 : clamp(1-afterReading/dialogueFade,0,1));
     }
-    lines.dataset.fading=String(afterReading>=0);
-    lines.dataset.reduced=String(reduced);
+    active=visible ? line : undefined;
+    if (!cast) return;
     speakers.forEach((speaker,i)=>{
       const tile=tiles[i];
       const state=cast[speaker];
@@ -84,7 +138,7 @@ export function bindGnatDialogueView() {
         tile.dataset.state=state;
         tile.setAttribute('aria-label',`${speakerNames[speaker]}, ${state}`);
       }
-      const speaking=state==='active' && (leftVisible?.speaker===speaker || rightVisible?.speaker===speaker);
+      const speaking=state==='active' && visible && line?.speaker===speaker;
       if (tile.dataset.speaking!==String(speaking)) tile.dataset.speaking=String(speaking);
     });
   };

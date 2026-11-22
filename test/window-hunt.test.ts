@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {advanceArena,arenaStep,createArena,type ArenaInput} from '../src/arena-run.ts';
-import {createWindowHunt,gnatCast,cameraFor,bedroom,bedroomHeight,bedroomWidth,caughtLifetime,webLifetime,windowAnchor,stepWindowHunt,type CornerInput,type WindowRun} from '../src/window-hunt.ts';
-import {createSpiderSpeech,dialogueFade,enqueueDialogue,idleDelay,spiderLessons,updateSpiderSpeech} from '../src/gnat-dialogue.ts';
+import {advanceWindowDialogue,chasingPrey,createWindowHunt,gnatCast,cameraFor,bedroom,bedroomHeight,bedroomWidth,caughtLifetime,webLifetime,windowAnchor,stepWindowHunt,type CornerInput,type WindowRun} from '../src/window-hunt.ts';
+import {createSpiderSpeech,dialogueRate,slowMotionSeconds,dialogueFade,enqueueDialogue,idleDelay,spiderLessons,updateSpiderSpeech} from '../src/gnat-dialogue.ts';
 import {createCrawler} from '../src/crawler.ts';
 import {arenaLayouts} from '../src/hunt.ts';
 
@@ -117,39 +117,39 @@ test('letting go in midair removes the rope and cannot fix a web on a later land
   assert.equal(game.web.strands.length,0);
 });
 
-test('idle speech has the left side to itself and clears after it has been read',()=>{
+test('idle speech reads on the dialogue clock without slowing the simulation',()=>{
   const speech=createSpiderSpeech();
   updateSpiderSpeech(speech,20,false);
   updateSpiderSpeech(speech,20+idleDelay-.1,true);
-  assert.equal(speech.left,undefined);
+  assert.equal(speech.line,undefined);
   updateSpiderSpeech(speech,20+idleDelay,true);
-  assert.equal(speech.left?.text,spiderLessons[0]);
-  assert.equal(speech.right,undefined);
+  assert.equal(speech.line?.text,spiderLessons[0]);
+  assert.equal(dialogueRate(speech,27.4),1);
   updateSpiderSpeech(speech,28,false);
-  assert.equal(speech.left?.text,spiderLessons[0]);
+  assert.equal(speech.line?.text,spiderLessons[0]);
   updateSpiderSpeech(speech,speech.visibleUntil+dialogueFade,false);
-  assert.equal(speech.left,undefined);
+  assert.equal(speech.line,undefined);
 });
 
-test('the reply starts promptly and new lines replace only their own side',()=>{
+test('each exchange line has a smooth independent slowdown and finishes before the reply',()=>{
   const speech=createSpiderSpeech();
-  assert.ok(enqueueDialogue(speech,1,'nearPrey','dart',()=>true));
+  enqueueDialogue(speech,1,'nearPrey','dart',()=>true);
   updateSpiderSpeech(speech,1,false);
-  const first=speech.left;
+  const first=speech.line;
   assert.equal(first?.speaker,'spider');
-  assert.equal(speech.right,undefined);
-  assert.ok(speech.next<4.5);
-  updateSpiderSpeech(speech,speech.next,false);
-  const reply=speech.right;
-  assert.equal(reply?.speaker,'dart');
-  assert.equal(speech.left,first);
-  assert.ok(speech.next>=speech.readUntil.left);
-  updateSpiderSpeech(speech,speech.next,false);
-  assert.notEqual(speech.left,first);
-  assert.equal(speech.right,reply);
-  updateSpiderSpeech(speech,speech.visibleUntil+dialogueFade,false);
-  assert.equal(speech.left,undefined);
-  assert.equal(speech.right,undefined);
+  assert.equal(dialogueRate(speech,1),1);
+  assert.ok(dialogueRate(speech,1.1)<1);
+  assert.ok(Math.abs(dialogueRate(speech,1.5)-.58)<.001);
+  assert.ok(dialogueRate(speech,2.15)>dialogueRate(speech,1.5));
+  assert.equal(dialogueRate(speech,1+slowMotionSeconds),1);
+  updateSpiderSpeech(speech,speech.next-.2,false);
+  assert.equal(speech.line,first);
+  const next=speech.next;
+  updateSpiderSpeech(speech,next,false);
+  assert.equal(speech.line?.speaker,'dart');
+  assert.equal(speech.slowAt,next);
+  assert.ok(dialogueRate(speech,next+.45)<.6);
+  assert.equal(dialogueRate(speech,next+slowMotionSeconds),1);
 });
 
 test('a new exchange drops the previous speaker and prioritizes relevant events',()=>{
@@ -162,10 +162,24 @@ test('a new exchange drops the previous speaker and prioritizes relevant events'
   updateSpiderSpeech(speech,speech.next,false);
   updateSpiderSpeech(speech,speech.next,false);
   updateSpiderSpeech(speech,speech.next,false);
-  assert.equal(speech.left,undefined);
-  assert.equal(speech.right?.speaker,'hunter');
-  assert.ok(speech.right?.text.includes('restraint'));
+  assert.equal(speech.line?.speaker,'hunter');
+  assert.ok(speech.line?.text.includes('restraint'));
   assert.deepEqual(speech.queue.map(request=>request.event),['caughtPrey']);
+});
+
+test('prey chase requires directed movement and dialogue time advances independently',()=>{
+  const game=createWindowHunt();
+  game.predators=[];
+  game.spider=createCrawler({x:538,y:961.6},game.surfaces);
+  game.gnats[0].p={x:615,y:938};
+  game.gnats=game.gnats.slice(0,1);
+  assert.equal(chasingPrey(game,controls),false);
+  assert.equal(chasingPrey(game,{...controls,move:{x:-1,y:0}}),false);
+  assert.equal(chasingPrey(game,{...controls,move:{x:1,y:0}}),true);
+  advanceWindowDialogue(game,controls,9);
+  assert.equal(game.clock,0);
+  assert.equal(game.dialogueClock,9);
+  assert.equal(game.speech.line?.speaker,'spider');
 });
 
 test('contact picks up free and trapped insects, adding each to the trailing chain',()=>{

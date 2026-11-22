@@ -14,6 +14,8 @@ const melody=[
   [84,0,82,79,75,0,79,77], [74,0,78,81,79,78,74,0],
 ] as const;
 
+export type GnatMood='explore'|'chase'|'danger';
+const moods=['explore','chase','danger'] as const;
 type Voice='lead'|'bass'|'keys'|'pad';
 type Drum='kick'|'snare'|'hat'|'tom';
 function pulse(phase:number,width:number) {
@@ -24,7 +26,8 @@ function envelope(time:number,length:number,attack:number,release:number) {
   return Math.max(0,Math.min(1,time/attack,(length-time)/release));
 }
 
-function renderMusic(context:AudioContext,danger:boolean,accent=false) {
+function renderMusic(context:AudioContext,mood:GnatMood,accent=false) {
+  const danger=mood==='danger',chase=mood==='chase';
   const length=accent ? .27 : bar*chords.length;
   const buffer=context.createBuffer(2,Math.round(length*sampleRate),sampleRate);
   const left=buffer.getChannelData(0),right=buffer.getChannelData(1);
@@ -106,6 +109,11 @@ function renderMusic(context:AudioContext,danger:boolean,accent=false) {
         if (step===2 || step===6) drum('snare',at,danger ? .225 : .127,-.12);
         drum('hat',at+(step%2 ? 0 : eighth*.52),step%2 ? .092 : .042,.55);
         if (danger) drum('hat',at+eighth*.48,.069,-.48);
+        if (chase) {
+          if (step%2) drum('hat',at+eighth*.45,.055,-.42);
+          if (step===3 || step===7) note('bass',root+7,at,eighth*.62,.13);
+          if (step%2===0) note('keys',arp+12,at+eighth*.55,eighth*.55,.075,-.55);
+        }
         if (index%4===3 && step>=6) drum('tom',at+eighth*.56,danger ? .18 : .105,(step-6)*.4-.2);
       }
     }
@@ -118,13 +126,15 @@ function renderMusic(context:AudioContext,danger:boolean,accent=false) {
   return buffer;
 }
 
-type Playback={quiet:AudioBufferSourceNode;danger:AudioBufferSourceNode;quietGain:GainNode;dangerGain:GainNode;output:GainNode;started:number};
+type Playback={sources:AudioBufferSourceNode[];gains:GainNode[];output:GainNode;started:number};
 
 export class GnatMusic {
-  private tracks?: {quiet:AudioBuffer;danger:AudioBuffer;accent:AudioBuffer;volume:GainNode};
+  private tracks?: {loops:AudioBuffer[];accent:AudioBuffer;volume:GainNode};
   private playing?:Playback;
   private offset=0;
-  private alerted=false;
+  private mood:GnatMood='explore';
+  private releaseAt?:number;
+  private releaseMood?:GnatMood;
   private volume=.6;
 
   setVolume(value:number) {
@@ -133,9 +143,10 @@ export class GnatMusic {
     if (gain) gain.gain.setTargetAtTime(this.volume,gain.context.currentTime,.025);
   }
 
-  sync(context:AudioContext|undefined,alerted:boolean,frozen:boolean) {
+  sync(context:AudioContext|undefined,requested:GnatMood,frozen:boolean) {
     if (frozen) {
       this.pause();
+      this.releaseAt=undefined;
       return;
     }
     if (!context || context.state!=='running') return;
@@ -143,38 +154,48 @@ export class GnatMusic {
       const volume=context.createGain();
       volume.gain.value=this.volume;
       volume.connect(context.destination);
-      this.tracks={quiet:renderMusic(context,false),danger:renderMusic(context,true),accent:renderMusic(context,true,true),volume};
+      this.tracks={loops:moods.map(mood=>renderMusic(context,mood)),accent:renderMusic(context,'danger',true),volume};
     }
     const tracks=this.tracks;
     if (!this.playing) {
       const time=context.currentTime+.012;
       const output=context.createGain();
-      const quietGain=context.createGain();
-      const dangerGain=context.createGain();
-      const loop=(buffer:AudioBuffer,gain:GainNode,value:number)=>{
-        gain.gain.value=value;
+      const gains=moods.map(mood=>{
+        const gain=context.createGain();
+        gain.gain.value=mood===this.mood ? 1 : 0;
         gain.connect(output);
+        return gain;
+      });
+      const sources=tracks.loops.map((buffer,index)=>{
         const source=context.createBufferSource();
         source.buffer=buffer;
         source.loop=true;
-        source.connect(gain);
+        source.connect(gains[index]);
         source.start(time,this.offset);
         return source;
-      };
+      });
       output.gain.setValueAtTime(0,time);
       output.gain.linearRampToValueAtTime(1,time+.018);
       output.connect(tracks.volume);
-      this.playing={quiet:loop(tracks.quiet,quietGain,this.alerted ? 0 : 1),
-        danger:loop(tracks.danger,dangerGain,this.alerted ? 1 : 0),quietGain,dangerGain,output,started:time};
+      this.playing={sources,gains,output,started:time};
     }
-    if (alerted===this.alerted) return;
-    this.alerted=alerted;
-    const {quietGain,dangerGain,output,started}=this.playing;
+    if (requested===this.mood) {
+      this.releaseAt=undefined;
+      return;
+    }
+    if (moods.indexOf(requested)<moods.indexOf(this.mood)) {
+      if (this.releaseAt===undefined || this.releaseMood!==requested) {
+        this.releaseMood=requested;
+        this.releaseAt=context.currentTime+1.55;
+      }
+      if (context.currentTime<this.releaseAt) return;
+    }
+    this.releaseAt=undefined;
+    this.mood=requested;
+    const {gains,output,started}=this.playing;
     const time=Math.max(context.currentTime,started);
-    const transition=alerted ? .065 : .28;
-    quietGain.gain.setTargetAtTime(alerted ? 0 : 1,time,transition);
-    dangerGain.gain.setTargetAtTime(alerted ? 1 : 0,time,transition);
-    if (alerted) {
+    gains.forEach((gain,index)=>gain.gain.setTargetAtTime(moods[index]===requested ? 1 : 0,time,requested==='danger' ? .13 : .33));
+    if (requested==='danger') {
       const hit=context.createBufferSource();
       hit.buffer=tracks.accent;
       hit.connect(output);
@@ -184,20 +205,20 @@ export class GnatMusic {
 
   private pause() {
     if (!this.playing || !this.tracks) return;
-    const {quiet,danger,output,started}=this.playing;
+    const {sources,output,started}=this.playing;
     const time=output.context.currentTime;
-    this.offset=(this.offset+Math.max(0,time-started))%this.tracks.quiet.duration;
+    this.offset=(this.offset+Math.max(0,time-started))%this.tracks.loops[0].duration;
     output.gain.cancelScheduledValues(time);
     output.gain.setTargetAtTime(0,time,.003);
-    quiet.stop(time+.015);
-    danger.stop(time+.015);
-    quiet.onended=()=>output.disconnect();
+    for (const source of sources) source.stop(time+.015);
+    sources[0].onended=()=>output.disconnect();
     this.playing=undefined;
   }
 
   reset() {
     this.pause();
     this.offset=0;
-    this.alerted=false;
+    this.mood='explore';
+    this.releaseAt=undefined;
   }
 }

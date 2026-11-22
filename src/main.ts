@@ -1,6 +1,7 @@
 import {bindGnatDialogueView} from './gnat-dialogue-view';
+import {dialogueRate} from './gnat-dialogue';
 import './style.css';
-import {createWindowHunt,gnatCast,stepWindowHunt,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
+import {advanceWindowDialogue,cameraFor,chasingPrey,createWindowHunt,gnatCast,gnatPositions,stepWindowHunt,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
 import {renderWindowHunt} from './window-hunt-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
@@ -556,8 +557,9 @@ function keyboardInput() {
 }
 
 const windowInfo=get('window-hunt-info');
-function showWindowDialogue(run?:WindowRun) {
-  renderGnatDialogue(run && !run.practice ? gnatCast(run) : undefined,run?.speech.left,run?.speech.right,run ? run.clock-run.speech.visibleUntil : Infinity,
+function showWindowDialogue(run?:WindowRun,elapsed=0) {
+  renderGnatDialogue(run && !run.practice ? gnatCast(run) : undefined,run?.speech.line,run ? gnatPositions(run) : {},
+    run ? cameraFor(run) : neutralStick,elapsed,run ? run.dialogueClock-run.speech.visibleUntil : Infinity,
     !!run && !run.practice && !roomMapOpen && run.phase!=='over' && subtitleMode.selectedIndex!==2,reduced());
 }
 
@@ -583,6 +585,7 @@ function startWindowHunt(practice=false) {
   windowHunt.escapeHeld=crossHeld;
   roomMapOpen=false;
   huntNoticeUntil=0;
+  preyChase=false;
   setWindowView();
   shell.dataset.screen='game';
   launch.inert=true;
@@ -596,6 +599,7 @@ function startWindowHunt(practice=false) {
 
 const silkLabel=get('silk-points');
 let huntNoticeUntil=0;
+let preyChase=false;
 function syncGnatMusic(run:WindowRun) {
   if (run.practice) {
     gnatMusic.reset();
@@ -603,12 +607,15 @@ function syncGnatMusic(run:WindowRun) {
   }
   const alerted=run.phase==='play' && (run.trapped || run.predators.some(predator=>
     run.clock>=predator.boundUntil && run.clock<predator.chaseUntil));
-  gnatMusic.sync(contextAudio,alerted,paused || document.hidden);
+  gnatMusic.sync(contextAudio,alerted ? 'danger' : preyChase && run.phase==='play' ? 'chase' : 'explore',paused || document.hidden);
 }
 
-function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number) {
+function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number,realElapsed:number) {
+  let captionElapsed=0;
   if (!paused && !roomMapOpen && !document.hidden && run.phase==='play') {
-    remainder+=elapsed;
+    advanceWindowDialogue(run,input,realElapsed);
+    captionElapsed=elapsed;
+    remainder+=elapsed*dialogueRate(run.speech,run.dialogueClock);
     while (remainder>=arenaStep && run.phase==='play') {
       remainder-=arenaStep;
       stepWindowHunt(run,input,arenaStep,event=>{
@@ -624,6 +631,7 @@ function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number) {
         }
       });
     }
+    preyChase=!run.practice && chasingPrey(run,input);
   }
   syncGnatMusic(run);
   if (run.practice) {
@@ -639,7 +647,7 @@ function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number) {
   if (scoreLabel.textContent!==catches) scoreLabel.textContent=catches;
   if (silkLabel.textContent!==silk) silkLabel.textContent=silk;
   renderWindowHunt(context,run,reduced(),roomMapOpen);
-  showWindowDialogue(run);
+  showWindowDialogue(run,captionElapsed);
   if (run.phase==='over' && !windowDefeat.open) {
     get('window-hunt-result').textContent='Catches · '+run.catches;
     windowDefeat.showModal();
@@ -658,7 +666,8 @@ function navigationDirection(gamepad: Gamepad,vertical: boolean) {
 }
 
 function frame(time: number) {
-  const elapsed=Math.min(.05,(time-(lastFrame||time))/1000);
+  const realElapsed=(time-(lastFrame||time))/1000;
+  const elapsed=Math.min(.05,realElapsed);
   lastFrame=time;
   const gamepad=pad();
   let input: ReturnType<typeof samplePlayStation>|undefined;
@@ -726,7 +735,7 @@ function frame(time: number) {
       grip:keyboard.has('KeyG') || !!gamepad?.buttons[7]?.pressed || (gamepad?.buttons[7]?.value??0)>.3,
       escape:keyboard.has('KeyC') || crossHeld,
       remove:keyboard.has('KeyV') || !!gamepad?.buttons[2]?.pressed,
-    },elapsed);
+    },elapsed,realElapsed);
     requestAnimationFrame(frame);
     return;
   }
