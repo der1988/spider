@@ -1,4 +1,4 @@
-import {HEIGHT, LIMIT, platforms, WIDTH, type Hunt} from './hunt.ts';
+import {HEIGHT, LIMIT, WIDTH, type Hunt} from './hunt.ts';
 import type {Point,Rect} from './spider';
 import type {Crawler,Support} from './crawler';
 import type {OpeningShot} from './song-cues';
@@ -54,6 +54,12 @@ export function drawBackground(ctx: CanvasRenderingContext2D,beat: number,detail
     block(ctx,x-7+sway,16+x%25,23,5,'#a5b97d');
     block(ctx,x+4-sway,159-x%18,13,4,'#a5b97d');
   }
+  // Short branches stay off the flight lanes so the silhouettes remain clear.
+  for (const [x,y] of [[24,121],[99,33],[171,156],[248,116],[300,42],[338,163]]) {
+    line(ctx,{x,y:y+5},{x:x+5,y},'#a9bd83');
+    block(ctx,x+5,y-1,6,2,'#a9bd83');
+    block(ctx,x+8,y-2,3,1,'#b5c88d');
+  }
   for (const y of [79,129]) {
     for (let x=14; x<WIDTH-10; x+=9) block(ctx,x,y,2,1,'#b2c189');
   }
@@ -65,12 +71,14 @@ export function drawPlatform(ctx: CanvasRenderingContext2D,r: Rect,beat: number)
   block(ctx,r.x,r.y,r.w,r.h,ink);
   block(ctx,r.x+1,r.y+2,r.w-2,2,'#638155');
   for (let n=8;n<r.w-4;n+=13) block(ctx,r.x+n,r.y+2,3,1,beat>.38 ? cream : '#d6e3ab');
-  if (r.w>40 && r.w<WIDTH) {
-    for (let dx=6;dx<r.w-5;dx+=12) {
-      const lift=beat>.42 ? 2 : 0;
+  if (r.w>25 && r.w<WIDTH && r.h<25) {
+    for (let dx=8;dx<r.w-4;dx+=17) {
+      const lift=beat>.42 ? 1 : 0;
       block(ctx,r.x+dx,r.y-2-lift,1,2+lift,'#638155');
-      block(ctx,r.x+dx+1,r.y-3-lift,2,1,'#82945f');
+      block(ctx,r.x+dx+1,r.y-3-lift,3,2,'#82945f');
+      if (dx%2===0) block(ctx,r.x+dx,r.y+r.h-1,2,3,ink);
     }
+    block(ctx,r.x+r.w*.55,r.y+r.h-3,6,1,'#638155');
   }
 }
 
@@ -90,7 +98,7 @@ export function renderHunt(ctx: CanvasRenderingContext2D,hunt: Hunt,spider: Craw
   const pressure = hunt.phase==='caught' ? 0 : 1-Math.min(1,hunt.time/20);
   block(ctx,0,0,WIDTH,HEIGHT,`rgb(${Math.round(194-pressure*25)},${Math.round(207-pressure*20)},${Math.round(146-pressure*10)})`);
   drawBackground(ctx,beat);
-  for (const r of platforms) drawPlatform(ctx,r,beat);
+  for (const r of hunt.surfaces) drawPlatform(ctx,r,beat);
   hunt.strands.forEach((strand,index) => {
     const shake = Math.max(0,strand.shakeUntil-hunt.clock);
     const fading = (strand.expiresAt??Infinity)-hunt.clock < 1;
@@ -180,9 +188,13 @@ export function drawSpider(
   }
   const crouch=braced || pose==='yield' || (idle && music.beat>.58);
   ctx.translate(Math.round((acting?.lean??0)*facing),crouch ? 1 : 0);
-  block(ctx,-5,-3,9,6,ink);
-  block(ctx,-4,-2,5,4,'#638155');
-  block(ctx,facing*3,-2,3,4,ink);
-  block(ctx,facing*4,-1,1,1,acting?.accent??cream);
+  ctx.scale(facing,1);
+  block(ctx,-6,-2,8,5,ink);
+  block(ctx,-5,-3,6,1,ink);
+  block(ctx,-5,3,6,1,ink);
+  block(ctx,-5,-2,4,3,'#638155');
+  block(ctx,-4,-2,2,1,'#8ca674');
+  block(ctx,1,-2,5,5,ink);
+  block(ctx,4,-1,1,1,acting?.accent??cream);
   ctx.restore();
 }

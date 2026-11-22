@@ -1,6 +1,6 @@
 import {
   createSpider, DEFAULT_TUNING, detach, moveAxis, shoot, SPIDER_HALF_HEIGHT, SPIDER_HALF_WIDTH, tickSpider,
-  type Point, type Rect, type Spider, type WalkLine,
+  type Point, type Rect, type Spider, type WalkLine, type Tuning,
 } from './spider.ts';
 import {anchorSilk,type Strand} from './threads.ts';
 
@@ -54,9 +54,9 @@ export function createCrawler(point: Point,surfaces: readonly Rect[]) {
   return spider;
 }
 
-export function castCrawler(spider: Crawler,surfaces: readonly Rect[],target: Point) {
+export function castCrawler(spider: Crawler,surfaces: readonly Rect[],target: Point,tuning?: Partial<Tuning>) {
   const previous=spider.rope;
-  if (!shoot(spider,surfaces,target)) return false;
+  if (!shoot(spider,surfaces,target,tuning)) return false;
   if (previous && !spider.firstAnchor) spider.firstAnchor={x:previous.x,y:previous.y};
   spider.support=undefined;
   return true;
@@ -69,11 +69,11 @@ export function closeCrawlerRopes(spider: Crawler) {
   return old;
 }
 
-export function anchorCrawlerRope(spider: Crawler,surfaces: readonly Rect[],strands: Strand[]) {
+export function anchorCrawlerRope(spider: Crawler,surfaces: readonly Rect[],strands: Strand[],range=DEFAULT_TUNING.range) {
   const rope=spider.rope;
   if (!rope) return false;
   const face=supports(spider,surfaces)[0];
-  if (!face || !anchorSilk(strands,rope,DEFAULT_TUNING.range+SPIDER_HALF_HEIGHT,spider,surfaces)) return false;
+  if (!face || !anchorSilk(strands,rope,range+SPIDER_HALF_HEIGHT,spider,surfaces)) return false;
   closeCrawlerRopes(spider);
   grip(spider,face);
   return true;

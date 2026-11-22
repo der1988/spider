@@ -25,6 +25,7 @@ export class Soundtrack {
   private epoch = 0;
   private paused = false;
   started = false;
+  private volume=.76;
 
   constructor(
     private readonly bytes: readonly [TrackBytes,TrackBytes,TrackBytes],
@@ -37,13 +38,27 @@ export class Soundtrack {
   get waiting() { return this.program!==undefined && !this.started; }
   get failed() { return this.ready && !this.buffer; }
 
-  play(program: Program,context?: AudioContext) {
+  setVolume(volume:number) {
+    this.volume=.76*volume;
+    if (this.output) this.output.gain.value=this.volume;
+  }
+
+  stop() {
+    this.stopSource();
+    this.generation++;
+    this.program=undefined;
+    this.buffer=undefined;
+    this.ready=false;
+    this.started=false;
+  }
+
+  play(program: Program,context?: AudioContext,offset=0) {
     this.stopSource();
     this.program=program;
     this.buffer=undefined;
     this.started=false;
     this.ready=!context;
-    this.offset=0;
+    this.offset=offset;
     const generation=++this.generation;
     if (!context) {
       this.connect();
@@ -51,7 +66,7 @@ export class Soundtrack {
     }
     if (!this.output) {
       this.output=context.createGain();
-      this.output.gain.value=.76;
+      this.output.gain.value=this.volume;
       this.output.connect(context.destination);
     }
     void this.prepare(program,context).then(buffer=>{

@@ -9,6 +9,12 @@ export class Soundscape {
   private context?: AudioContext;
   private master?: GainNode;
   private paused = false;
+  private volume=.72;
+
+  setVolume(volume:number) {
+    this.volume=.72*volume;
+    this.updateVolume();
+  }
   private pending: {effect:Sound; delay:number; at:number}[] = [];
 
   setPaused(paused: boolean) {
@@ -18,7 +24,7 @@ export class Soundscape {
 
   private updateVolume() {
     if (this.master && this.context) {
-      this.master.gain.setTargetAtTime(!this.paused ? .72 : 0,this.context.currentTime,.025);
+      this.master.gain.setTargetAtTime(!this.paused ? this.volume : 0,this.context.currentTime,.025);
     }
   }
 
@@ -47,7 +53,7 @@ export class Soundscape {
     const ctx = new Type();
     this.context = ctx;
     const master = ctx.createGain();
-    master.gain.value = !this.paused ? .72 : 0;
+    master.gain.value = !this.paused ? this.volume : 0;
     master.connect(ctx.destination);
     this.master = master;
 

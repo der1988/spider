@@ -29,6 +29,9 @@
     <div class="mode-choices">
       <button id="story" type="button" data-selected="true"><span>STORY</span><code aria-hidden="true">story()</code></button>
       <button id="loop" type="button" data-selected="false"><span>ENDLESS</span><code aria-hidden="true">loop()</code></button>
+      <button id="platform-mode" type="button" data-selected="false">Platform</button>
+      <button id="swarm-mode" type="button" data-selected="false">Swarm</button>
+      <button id="settings-menu" type="button" data-selected="false">Settings</button>
       <button id="menu-top" type="button" data-selected="false" aria-haspopup="dialog"><span>Top 10</span></button>
     </div>
     <p id="start-status" role="status"></p>
@@ -37,7 +40,7 @@
     <div class="hunt-info">
       <h1>Spider vs Fly</h1>
       <div class="catch-count">
-        <label for="score">Catches</label>
+        <label id="score-label" for="score">Catches</label>
         <output id="score">0</output>
       </div>
     </div>
@@ -69,6 +72,7 @@
     </section>
   </section>
   <footer>
+    <p id="extra-info" hidden></p>
     <p id="message" role="status"></p>
     <p id="lyric" class="lyric" lang="en"></p>
   </footer>
@@ -99,6 +103,36 @@
   </form>
   <p id="endless-board-status" role="status"></p>
   <button id="endless-again" type="button" hidden>Try Again</button>
+</dialog>
+<dialog id="swarm-defeat" aria-labelledby="swarm-title">
+  <h2 id="swarm-title">Time ran out</h2>
+  <p id="swarm-result"></p>
+  <div class="mode-choices">
+    <button id="swarm-menu" type="button">Main Menu</button>
+    <button id="swarm-retry" type="button">Retry</button>
+  </div>
+</dialog>
+<dialog id="pause-panel" aria-labelledby="pause-title">
+  <h2 id="pause-title">Paused</h2>
+  <div class="pause-choices mode-choices">
+    <button id="resume" type="button">Resume</button>
+    <button id="pause-settings" type="button">Settings &amp; Controls</button>
+    <button id="pause-menu" type="button">Main Menu</button>
+  </div>
+</dialog>
+<dialog id="settings-panel" aria-labelledby="settings-title">
+  <h2 id="settings-title">Settings &amp; Controls</h2>
+  <div class="settings-fields">
+    <label for="music-volume">Music</label><input id="music-volume" type="range" min="0" max="100" step="10">
+    <label for="effects-volume">Effects</label><input id="effects-volume" type="range" min="0" max="100" step="10">
+    <label for="subtitle-mode">Subtitles</label><select id="subtitle-mode"><option>Normal</option><option>Large</option><option>Off</option></select>
+    <label for="motion-mode">Reduced motion</label><input id="motion-mode" type="checkbox">
+    <label for="escape-mode">Hold to escape webs</label><input id="escape-mode" type="checkbox">
+    <label for="keyboard-mode">Keyboard layout</label><select id="keyboard-mode"><option>WASD move</option><option>Arrows move</option></select>
+  </div>
+  <p>Controller · Left stick moves, right stick aims. L1 jumps, R1 fires. Options pauses.</p>
+  <p>Keyboard · WASD and arrows move or aim. Z jumps, X fires or escapes webs. Esc pauses.</p>
+  <button id="settings-close" type="button">Back</button>
 </dialog>
 <script type="module" src="/src/main.ts"></script>
 </body>

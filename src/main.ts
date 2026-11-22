@@ -1,4 +1,7 @@
 import './style.css';
+import {createExtra,stepExtra,swarmHeight,swarmWidth,type ExtraMode,type ExtraRun} from './extra-modes';
+import {renderExtra} from './extra-render';
+import {trackStarts} from './playlist';
 import type {Point} from './spider';
 import {advanceArena,arenaInput,arenaStep,createArena,type ArenaEvent} from './arena-run';
 import {endlessArena,newEndlessId,recordReplay} from './endless-replay';
@@ -18,7 +21,8 @@ import {flyCues,flyDoubtAt,flyDuration,flyFinalStart,flyMenuStart,flyRoomEffect}
 import {infiniteHuntStart} from './infinite-timing';
 
 const get = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
-const context = get<HTMLCanvasElement>('world').getContext('2d',{alpha:false})!;
+const worldCanvas=get<HTMLCanvasElement>('world');
+const context = worldCanvas.getContext('2d',{alpha:false})!;
 const message = get('message');
 const timeLabel = get('time');
 const clock = get('clock');
@@ -61,7 +65,9 @@ const song = new Soundtrack([
 ],timing.loopStart,fetchTrack('tamago-fly'),fetchTrack('tamago-loop'),fetchTrack('tamago-menu'));
 const leaderboard = bindLeaderboard();
 const endlessBoard=bindEndlessBoard();
-const dialogOpen=()=>leaderboard.open || endlessBoard.open;
+const pausePanel=get<HTMLDialogElement>('pause-panel');
+const settingsPanel=get<HTMLDialogElement>('settings-panel');
+const dialogOpen=()=>leaderboard.open || endlessBoard.open || settingsPanel.open;
 get('defeat-top').onclick=()=>void endlessBoard.view();
 let contextAudio: AudioContext|undefined;
 let mode: HuntMode|undefined;
@@ -69,6 +75,15 @@ let padDirection = 0;
 let opening = true;
 let paused = false;
 let escape: FlyEscape|undefined;
+let extra: ExtraRun|undefined;
+let storyCheckpoint: {offset:number; arena:typeof arena}|undefined;
+let escapeCheckpoint: FlyEscape|undefined;
+const keyboard=new Set<string>();
+let keyboardButtons=0;
+let holdEscape=0;
+let triangleHeld=false;
+const canSwitchPerspective=()=>mode==='story' && !escape && !opening && !paused &&
+  hunt.phase!=='over' && song.started && song.position.track==='room';
 let spaceHeld = false;
 
 function bindChoices(items: readonly (readonly [string,()=>void])[],vertical=false) {
@@ -90,12 +105,90 @@ function bindChoices(items: readonly (readonly [string,()=>void])[],vertical=fal
   return {select,move,get selected(){return selected;},confirm:()=>buttons[selected].click()};
 }
 
-const topTenIndex=2;
+const topTenIndex=5;
 const menuChoices=bindChoices([
   ['story',()=>requestMode('story')],
   ['loop',()=>requestMode('loop')],
+  ['platform-mode',()=>startExtra('platform')],
+  ['swarm-mode',()=>startExtra('swarm')],
+  ['settings-menu',openSettings],
   ['menu-top',()=>void endlessBoard.view()],
 ],true);
+const pauseChoices=bindChoices([['resume',togglePause],['pause-settings',openSettings],['pause-menu',showMenu]],true);
+const extraDefeat=get<HTMLDialogElement>('swarm-defeat');
+const extraChoices=bindChoices([['swarm-menu',showMenu],['swarm-retry',()=>startExtra('swarm')]]);
+
+const musicVolume=get<HTMLInputElement>('music-volume');
+const effectsVolume=get<HTMLInputElement>('effects-volume');
+const subtitleMode=get<HTMLSelectElement>('subtitle-mode');
+const motionMode=get<HTMLInputElement>('motion-mode');
+const escapeMode=get<HTMLInputElement>('escape-mode');
+const keyboardMode=get<HTMLSelectElement>('keyboard-mode');
+const settingsFields=[musicVolume,effectsVolume,subtitleMode,motionMode,escapeMode,keyboardMode,get<HTMLButtonElement>('settings-close')];
+type Preferences={music:number;effects:number;subtitles:number;reduced:boolean;hold:boolean;keyboard:number};
+const preferences:Preferences={music:100,effects:100,subtitles:0,reduced:false,hold:false,keyboard:0};
+try {
+  const saved=JSON.parse(localStorage.getItem('spider-v2-settings')??'{}') as Partial<Preferences>;
+  if (Number.isFinite(saved.music)) preferences.music=Math.min(100,Math.max(0,saved.music!));
+  if (Number.isFinite(saved.effects)) preferences.effects=Math.min(100,Math.max(0,saved.effects!));
+  if (saved.subtitles===1 || saved.subtitles===2) preferences.subtitles=saved.subtitles;
+  preferences.reduced=saved.reduced===true;
+  preferences.hold=saved.hold===true;
+  preferences.keyboard=saved.keyboard===1 ? 1 : 0;
+} catch { /* Storage is optional. */ }
+musicVolume.value=String(preferences.music);
+effectsVolume.value=String(preferences.effects);
+subtitleMode.selectedIndex=preferences.subtitles;
+motionMode.checked=preferences.reduced;
+escapeMode.checked=preferences.hold;
+keyboardMode.selectedIndex=preferences.keyboard;
+function applySettings() {
+  song.setVolume(Number(musicVolume.value)/100);
+  audio.setVolume(Number(effectsVolume.value)/100);
+  shell.dataset.subtitles=['normal','large','off'][subtitleMode.selectedIndex];
+}
+applySettings();
+const reduced=()=>motionMode.checked || reduceMotion.matches;
+for (const field of settingsFields) field.oninput=()=>{
+  applySettings();
+  try {
+    localStorage.setItem('spider-v2-settings',JSON.stringify({
+      music:Number(musicVolume.value),effects:Number(effectsVolume.value),subtitles:subtitleMode.selectedIndex,
+      reduced:motionMode.checked,hold:escapeMode.checked,keyboard:keyboardMode.selectedIndex,
+    }));
+  } catch { /* Storage is optional. */ }
+};
+let settingsReturn:HTMLElement|undefined;
+function openSettings() {
+  settingsReturn=document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
+  settingsPanel.showModal();
+  musicVolume.focus();
+}
+get('settings-close').onclick=()=>settingsPanel.close();
+settingsPanel.onclose=()=>settingsReturn?.focus();
+pausePanel.oncancel=event=>{event.preventDefault();togglePause();};
+extraDefeat.oncancel=event=>{event.preventDefault();showMenu();};
+function settingsPad(gamepad:Gamepad,cross:boolean,cancel:boolean,direction:number) {
+  if (cancel) {settingsPanel.close();return;}
+  const index=Math.max(0,settingsFields.findIndex(field=>field===document.activeElement));
+  if (direction && direction!==padDirection) settingsFields[(index+direction+settingsFields.length)%settingsFields.length].focus();
+  const field=settingsFields[index];
+  if (cross && (field instanceof HTMLButtonElement || field instanceof HTMLInputElement && field.type==='checkbox')) field.click();
+  const left=gamepad.buttons[14]?.pressed,right=gamepad.buttons[15]?.pressed;
+  const horizontal=left ? -1 : right ? 1 : 0;
+  if (horizontal && horizontal!==settingsHorizontal) {
+    if (field instanceof HTMLSelectElement) field.selectedIndex=Math.max(0,Math.min(field.options.length-1,field.selectedIndex+horizontal));
+    if (field instanceof HTMLInputElement && field.type==='range') {
+      if (horizontal>0) field.stepUp();
+      else field.stepDown();
+    }
+    field.dispatchEvent(new Event('input'));
+  }
+  settingsHorizontal=horizontal;
+}
+let settingsHorizontal=0;
+let cancelHeld=false;
+
 const defeatChoices=bindChoices([['main-menu',showMenu],['retry',retryLoop]]);
 get<HTMLDialogElement>('endless-board').addEventListener('close',()=>{
   if (shell.dataset.screen==='start') menuChoices.select(topTenIndex,true);
@@ -103,6 +196,8 @@ get<HTMLDialogElement>('endless-board').addEventListener('close',()=>{
 
 function activeChoices() {
   if (dialogOpen()) return;
+  if (pausePanel.open) return pauseChoices;
+  if (extraDefeat.open) return extraChoices;
   if (shell.dataset.screen==='start') return menuChoices;
   if (!defeat.hidden) return defeatChoices;
 }
@@ -112,6 +207,8 @@ function requestMode(next: HuntMode) {
   contextAudio=audio.audioContext();
   audio.unlock();
   if (mode===next && song.waiting) return;
+  storyCheckpoint=undefined;
+  escapeCheckpoint=undefined;
   startStatus.textContent='Loading soundtrack…';
   startIntro(next);
 }
@@ -137,20 +234,36 @@ function clearFlyScene() {
   endingCode.textContent='';
 }
 
-function startIntro(next: HuntMode) {
+function startIntro(next: HuntMode,resume=false) {
   mode=next;
   opening=true;
   paused=false;
   clearFlyScene();
   resetHunt();
-  clock.dataset.phase='ready';
+  const checkpoint=resume ? storyCheckpoint : undefined;
+  if (checkpoint) {
+    arena=structuredClone(checkpoint.arena);
+    hunt=arena.hunt;
+    spider=arena.spider;
+    opening=false;
+    // Give the resumed hunt a fresh round with the saved chapter's score and difficulty.
+    updateHud(Math.ceil(hunt.time),hunt.difficulty.duration);
+  }
+  clock.dataset.phase=opening ? 'ready' : 'running';
   captions('');
-  song.play(next,contextAudio);
+  song.play(next,contextAudio,checkpoint?.offset);
   syncPause();
 }
 
 function showMenu() {
   const priorMode=mode;
+  const priorExtra=extra?.mode;
+  extra=undefined;
+  storyCheckpoint=undefined;
+  escapeCheckpoint=undefined;
+  pausePanel.close();
+  extraDefeat.close();
+  setExtraView();
   mode=undefined;
   song.play('menu',contextAudio);
   paused=false;
@@ -160,10 +273,11 @@ function showMenu() {
   endlessBoard.clear();
   shell.dataset.screen='start';
   launch.inert=false;
-  menuChoices.select(priorMode==='loop' ? 1 : 0,true);
+  menuChoices.select(priorExtra==='platform' ? 2 : priorExtra==='swarm' ? 3 : priorMode==='loop' ? 1 : 0,true);
   startStatus.textContent='';
   captions('');
   say('');
+  syncPause();
 }
 
 function showDefeat() {
@@ -189,42 +303,61 @@ function syncPause() {
   if (!frozen) audio.unlock();
 }
 function togglePause() {
-  if (!mode || !song.started || !defeat.hidden) return;
+  if (!(extra || mode && song.started) || !defeat.hidden || extraDefeat.open) return;
   paused = !paused;
+  if (paused) {
+    pausePanel.showModal();
+    pauseChoices.select(0,true);
+  } else pausePanel.close();
   syncPause();
 }
-function beginFly() {
-  escape=createFlyEscape(spider,hunt.fly.p);
+function beginFly(resume=false) {
+  escape=resume && escapeCheckpoint ? structuredClone(escapeCheckpoint) : createFlyEscape(spider,hunt.fly.p);
+  if (!resume) escapeCheckpoint=structuredClone(escape);
   flyCross=false;
+  holdEscape=0;
   shell.dataset.flyPhase='intro';
   paused=false;
-  song.play('fly',contextAudio);
+  song.play('fly',contextAudio,resume ? flyCues.play : 0);
   syncPause();
   say('');
 }
 
 window.addEventListener('keydown',event => {
+  if (settingsPanel.open) return;
+  if (!pausePanel.open && shell.dataset.screen==='game' && !dialogOpen() && !extraDefeat.open && defeat.hidden) {
+    if (/^(Key[WASDZX]|Arrow(Up|Down|Left|Right))$/.test(event.code)) {
+      keyboard.add(event.code);
+      if (!event.repeat && event.code==='KeyZ') keyboardButtons|=1;
+      if (!event.repeat && event.code==='KeyX') keyboardButtons|=2;
+      event.preventDefault();
+    }
+  }
   if (shell.dataset.screen==='start') enableMenuSound();
   else if (song.waiting) audio.unlock();
   if (dialogOpen()) return;
   const choices=activeChoices();
-  if (choices && (choices===menuChoices ? /^Arrow(Up|Down)$/ : /^Arrow(Left|Right|Up|Down)$/).test(event.code)) {
+  if (choices && ((choices===menuChoices || choices===pauseChoices) ? /^Arrow(Up|Down)$/ : /^Arrow(Left|Right|Up|Down)$/).test(event.code)) {
     event.preventDefault();
     choices.move(event.code==='ArrowLeft' || event.code==='ArrowUp' ? -1 : 1);
   }
-  if (event.code==='Escape' && !event.repeat && !dialogOpen()) togglePause();
+  if (event.code==='Escape' && !event.repeat && !dialogOpen() && !extraDefeat.open) {
+    event.preventDefault();
+    togglePause();
+  }
   if (event.code!=='Space') return;
   const freshPress=!spaceHeld && !event.repeat;
   spaceHeld=true;
   if (mode!=='story' || !song.started || opening || dialogOpen() || hunt.phase==='over') return;
   event.preventDefault();
-  if (!freshPress || escape || song.position.track!=='room') return;
+  if (!freshPress || !canSwitchPerspective()) return;
   beginFly();
 });
 window.addEventListener('keyup',event => {
+  keyboard.delete(event.code);
   if (event.code==='Space') spaceHeld=false;
 });
-window.addEventListener('blur',()=>{ spaceHeld=false; });
+window.addEventListener('blur',()=>{ spaceHeld=false; keyboard.clear(); keyboardButtons=0; });
 document.addEventListener('visibilitychange',syncPause);
 
 let arena=createArena('story');
@@ -242,7 +375,7 @@ function say(text: string) { if(message.textContent!==text) message.textContent=
 
 function resetHunt() {
   endlessBoard.clear();
-  endlessRun=mode==='loop' ? {id:newEndlessId(),record:recordReplay()} : undefined;
+  endlessRun=mode==='loop' ? {id:newEndlessId(),record:recordReplay(true)} : undefined;
   arena=endlessRun ? endlessArena(endlessRun.id) : createArena('story');
   hunt=arena.hunt;
   spider=arena.spider;
@@ -287,6 +420,7 @@ function arenaFeedback(result:ArenaEvent) {
       difficultyNotice = {text:base+' The fly is '+changes.join(', ')+'.',until:hunt.clock+3};
       say(difficultyNotice.text);
     } else say(base);
+    if (mode==='loop' && hunt.score%10===0) say('Arena changed · '+hunt.score+' catches.');
   }
   if (difficultyNotice && hunt.clock>=difficultyNotice.until) {
     if (message.textContent===difficultyNotice.text) say('');
@@ -336,7 +470,7 @@ function flyFrame(game: FlyEscape,time: number,elapsed: number,move: Point,cross
         say('');
       } else if (event==='timeout') {
         audio.play('miss');
-        startIntro('story');
+        beginFly(true);
         return;
       } else if (event==='attach') {
         audio.play('attach');
@@ -353,11 +487,11 @@ function flyFrame(game: FlyEscape,time: number,elapsed: number,move: Point,cross
     time>=flyCues.room ? 'room' : time>=flyCues.you ? 'you' :
     time>=flyCues.fly ? 'fly' : time>=flyCues.take ? 'take' : 'spider';
   if (shell.dataset.flyShot!==(shot??'')) shell.dataset.flyShot=shot??'';
-  const beat=reduceMotion.matches ? 0 : beatAt({track:'fly',time});
+  const beat=reduced() ? 0 : beatAt({track:'fly',time});
   const ending=finale ? clamp01((time-flyFinalStart)/20) : undefined;
   const {details}=flyRoomEffect(time);
   renderFlyEscape(context,game,{
-    time,beat,shot,intro:!playing,shotProgress:clamp01((time-flyCues.room)/.9),details,ending,reducedMotion:reduceMotion.matches,
+    time,beat,shot,intro:!playing,shotProgress:clamp01((time-flyCues.room)/.9),details,ending,reducedMotion:reduced(),
   });
 
   const displayTime=Math.ceil(game.time);
@@ -381,6 +515,95 @@ function flyFrame(game: FlyEscape,time: number,elapsed: number,move: Point,cross
   }
 }
 
+function saveStoryCheckpoint(track:string) {
+  const offset=track==='upgrade' ? trackStarts[1] : track==='room' ? trackStarts[2] : 0;
+  if (!offset || offset<=(storyCheckpoint?.offset??0)) return;
+  const snapshot=structuredClone(arena);
+  snapshot.hunt.time=snapshot.hunt.difficulty.duration;
+  snapshot.hunt.strands=[];
+  snapshot.hunt.loose=[];
+  snapshot.hunt.retired=undefined;
+  snapshot.spider.rope=undefined;
+  snapshot.spider.firstAnchor=undefined;
+  snapshot.spider.thread=undefined;
+  storyCheckpoint={offset,arena:snapshot};
+}
+
+function keyboardInput() {
+  const axes=(a:string,b:string,c:string,d:string)=>({
+    x:Number(keyboard.has(b))-Number(keyboard.has(a)),y:Number(keyboard.has(d))-Number(keyboard.has(c)),
+  });
+  const letters=axes('KeyA','KeyD','KeyW','KeyS');
+  const arrows=axes('ArrowLeft','ArrowRight','ArrowUp','ArrowDown');
+  const [move,aim]=keyboardMode.selectedIndex===0 ? [letters,arrows] : [arrows,letters];
+  return {move,aim:aim.x || aim.y ? aim : undefined};
+}
+
+const extraInfo=get('extra-info');
+function setExtraView() {
+  if (extra) shell.dataset.extra=extra.mode;
+  else delete shell.dataset.extra;
+  worldCanvas.width=extra?.mode==='swarm' ? swarmWidth : 360;
+  worldCanvas.height=extra?.mode==='swarm' ? swarmHeight : 204;
+  extraInfo.hidden=!extra;
+}
+
+function startExtra(next:ExtraMode) {
+  contextAudio=audio.audioContext();
+  audio.unlock();
+  song.stop();
+  mode=undefined;
+  extraDefeat.close();
+  clearFlyScene();
+  extra=createExtra(next);
+  setExtraView();
+  shell.dataset.screen='game';
+  launch.inert=true;
+  paused=false;
+  pendingButtons=0;
+  keyboardButtons=0;
+  captions('');
+  say('');
+  syncPause();
+}
+
+function playExtraFrame(run:ExtraRun,move:Point,aim:Point|undefined,elapsed:number) {
+  if (!paused && !document.hidden && run.phase==='play') {
+    const controls=arenaInput(move,aim);
+    remainder+=elapsed;
+    while (remainder>=arenaStep && run.phase==='play') {
+      remainder-=arenaStep;
+      controls[4]=pendingButtons;
+      pendingButtons=0;
+      stepExtra(run,controls,arenaStep,event=>{
+        if (event==='wave') {
+          audio.play('discovery');
+          say('Wave '+run.wave+' · '+run.wave+' flies.');
+        } else audio.play(event);
+      });
+    }
+  }
+  if (run.phase==='complete') {
+    showMenu();
+    return;
+  }
+  scoreLabel.textContent=String(run.score);
+  clock.style.setProperty('--pulse','0');
+  clock.dataset.reset='false';
+  clock.dataset.phase=run.time<=5 ? 'urgent' : 'running';
+  timeLabel.textContent=Math.ceil(run.time)+' s';
+  roundLabel.textContent='35 s';
+  clockMeter.style.setProperty('--remaining',String(run.time/35));
+  extraInfo.textContent=run.mode==='platform' ? 'Silk points '+run.silk+' · Head right to the exit' :
+    'Wave '+run.wave+' · '+run.flies.filter(fly=>!fly.caught).length+'/'+run.wave+' flies remaining';
+  renderExtra(context,run);
+  if (run.phase==='over' && !extraDefeat.open) {
+    get('swarm-result').textContent=run.score+' catches · Wave '+run.wave;
+    extraDefeat.showModal();
+    extraChoices.select(1,true);
+  }
+}
+
 let crossHeld=false;
 let optionsHeld=false;
 function navigationDirection(gamepad: Gamepad,vertical: boolean) {
@@ -401,10 +624,14 @@ function frame(time: number) {
   const atMenu=shell.dataset.screen==='start';
   endlessBoard.handlePad(gamepad,time,(atMenu && menuChoices.selected===1) || !defeat.hidden);
   const navigation=activeChoices();
-  if (!navigation && !escape && mode==='story') leaderboard.handlePad(gamepad);
+  if (!navigation && !escape && mode==='story' && !canSwitchPerspective()) leaderboard.handlePad(gamepad);
   if (gamepad) {
     const cross=!!gamepad.buttons[0]?.pressed;
     const options=!!gamepad.buttons[9]?.pressed;
+    const triangle=!!gamepad.buttons[3]?.pressed;
+    const cancel=!!gamepad.buttons[1]?.pressed;
+    if (triangle && !triangleHeld && !navigation && !dialogOpen() && canSwitchPerspective()) beginFly();
+    triangleHeld=triangle;
     if (activePad!==gamepad.index) {
       activePad=gamepad.index;
       previous=undefined;
@@ -413,7 +640,9 @@ function frame(time: number) {
     }
     crossPressed=cross && !crossHeld;
     crossHeld=cross;
-    const direction=navigationDirection(gamepad,atMenu);
+    const direction=navigationDirection(gamepad,atMenu || pausePanel.open || settingsPanel.open);
+    if (settingsPanel.open) settingsPad(gamepad,crossPressed,cancel && !cancelHeld,direction);
+    cancelHeld=cancel;
     if (navigation && !boardWasOpen && direction && direction!==padDirection) {
       navigation.move(direction);
       if (atMenu) enableMenuSound();
@@ -427,15 +656,28 @@ function frame(time: number) {
       input=samplePlayStation(gamepad,previous);
       previous=input.shoulders;
     }
-    if (options && !optionsHeld && !navigation && !dialogOpen()) togglePause();
+    if (options && !optionsHeld && (!navigation || pausePanel.open) && !dialogOpen()) togglePause();
     optionsHeld=options;
   } else {
     previous=undefined;
     activePad=undefined;
     crossHeld=false;
+    triangleHeld=false;
+    cancelHeld=false;
     padDirection=0;
   }
 
+  const keys=keyboardInput();
+  const actions=keyboardButtons;
+  keyboardButtons=0;
+  const move=keys.move.x || keys.move.y ? keys.move : gamepad ? readLeftStick(gamepad) : neutralStick;
+  if (extra) {
+    if (input?.jump || actions&1) pendingButtons|=1;
+    if (input?.fire || actions&2) pendingButtons|=2;
+    playExtraFrame(extra,move,keys.aim??input?.aim,elapsed);
+    requestAnimationFrame(frame);
+    return;
+  }
   song.connect(contextAudio);
   const menu=shell.dataset.screen==='start';
   if (menu && (!mode || !song.started)) {
@@ -466,10 +708,17 @@ function frame(time: number) {
   const position = song.position;
   if (escape && position.track==='fly') {
     if (position.time>=flyDuration) showMenu();
-    else flyFrame(escape,position.time,elapsed,gamepad ? readLeftStick(gamepad) : neutralStick,crossPressed);
+    else {
+      const held=(crossHeld || keyboard.has('KeyX')) && escape.trapped && !paused && !document.hidden;
+      holdEscape=held ? holdEscape+elapsed : 0;
+      const repeat=escapeMode.checked && holdEscape>=.17;
+      if (repeat) holdEscape=0;
+      flyFrame(escape,position.time,elapsed,move,crossPressed || !!(actions&2) || repeat);
+    }
     requestAnimationFrame(frame);
     return;
   }
+  if (mode==='story') saveStoryCheckpoint(position.track);
   let huntElapsed=elapsed;
   const introTrack=mode==='loop' ? 'loop' : 'first';
   const startsAt=mode==='loop' ? infiniteHuntStart : huntStartsAt;
@@ -480,10 +729,10 @@ function frame(time: number) {
   }
 
   if (!opening && !paused && !navigation && !boardWasOpen && !dialogOpen() && !document.hidden && hunt.phase!=='over') {
-    if (input?.jump) pendingButtons|=1;
-    if (input?.fire) pendingButtons|=2;
+    if (input?.jump || actions&1) pendingButtons|=1;
+    if (input?.fire || actions&2) pendingButtons|=2;
     remainder+=huntElapsed;
-    const controls=arenaInput(input?.movement??neutralStick,input?.aim);
+    const controls=arenaInput(move,keys.aim??input?.aim);
     while (remainder>=arenaStep) {
       remainder-=arenaStep;
       const command=[...controls] as typeof controls;
@@ -494,7 +743,7 @@ function frame(time: number) {
       remainder=0;
       audio.play('miss');
       if (mode==='story') {
-        startIntro('story');
+        startIntro('story',true);
         requestAnimationFrame(frame);
         return;
       }
@@ -503,11 +752,12 @@ function frame(time: number) {
     }
   }
 
-  const caption=song.started ? lyricAt(position,timing) : '';
+  const rawCaption=song.started ? lyricAt(position,timing) : '';
+  const caption=position.track==='room' && /^Press Space\b/i.test(rawCaption) ? rawCaption+' · △ on controller' : rawCaption;
   captions(caption,position.track==='room' && /^Press Space\b/i.test(caption));
   const seconds=Math.ceil(hunt.time);
   updateHud(seconds,hunt.difficulty.duration);
-  const beat = reduceMotion.matches ? 0 : beatAt(position);
+  const beat = reduced() ? 0 : beatAt(position);
   const pulse = beat.toFixed(2);
   if (clock.style.getPropertyValue('--pulse')!==pulse) clock.style.setProperty('--pulse',pulse);
   const phase = opening ? 'ready' : hunt.phase==='caught' ? 'running' :
