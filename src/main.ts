@@ -1,6 +1,6 @@
 import './style.css';
-import {createExtra,stepExtra,swarmHeight,swarmWidth,type ExtraMode,type ExtraRun} from './extra-modes';
-import {renderExtra} from './extra-render';
+import {createStealth,stepStealth,stealthHeight,stealthWidth,type StealthInput,type StealthRun} from './stealth';
+import {renderStealth} from './stealth-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
 import {advanceArena,arenaInput,arenaStep,createArena,type ArenaEvent} from './arena-run';
@@ -75,7 +75,7 @@ let padDirection = 0;
 let opening = true;
 let paused = false;
 let escape: FlyEscape|undefined;
-let extra: ExtraRun|undefined;
+let stealth: StealthRun|undefined;
 let storyCheckpoint: {offset:number; arena:typeof arena}|undefined;
 let escapeCheckpoint: FlyEscape|undefined;
 const keyboard=new Set<string>();
@@ -105,18 +105,17 @@ function bindChoices(items: readonly (readonly [string,()=>void])[],vertical=fal
   return {select,move,get selected(){return selected;},confirm:()=>buttons[selected].click()};
 }
 
-const topTenIndex=5;
+const topTenIndex=4;
 const menuChoices=bindChoices([
   ['story',()=>requestMode('story')],
   ['loop',()=>requestMode('loop')],
-  ['platform-mode',()=>startExtra('platform')],
-  ['swarm-mode',()=>startExtra('swarm')],
+  ['stealth-mode',startStealth],
   ['settings-menu',openSettings],
   ['menu-top',()=>void endlessBoard.view()],
 ],true);
 const pauseChoices=bindChoices([['resume',togglePause],['pause-settings',openSettings],['pause-menu',showMenu]],true);
-const extraDefeat=get<HTMLDialogElement>('swarm-defeat');
-const extraChoices=bindChoices([['swarm-menu',showMenu],['swarm-retry',()=>startExtra('swarm')]]);
+const stealthDefeat=get<HTMLDialogElement>('stealth-defeat');
+const stealthChoices=bindChoices([['stealth-menu',showMenu],['stealth-retry',startStealth]]);
 
 const musicVolume=get<HTMLInputElement>('music-volume');
 const effectsVolume=get<HTMLInputElement>('effects-volume');
@@ -167,7 +166,7 @@ function openSettings() {
 get('settings-close').onclick=()=>settingsPanel.close();
 settingsPanel.onclose=()=>settingsReturn?.focus();
 pausePanel.oncancel=event=>{event.preventDefault();togglePause();};
-extraDefeat.oncancel=event=>{event.preventDefault();showMenu();};
+stealthDefeat.oncancel=event=>{event.preventDefault();showMenu();};
 function settingsPad(gamepad:Gamepad,cross:boolean,cancel:boolean,direction:number) {
   if (cancel) {settingsPanel.close();return;}
   const index=Math.max(0,settingsFields.findIndex(field=>field===document.activeElement));
@@ -197,7 +196,7 @@ get<HTMLDialogElement>('endless-board').addEventListener('close',()=>{
 function activeChoices() {
   if (dialogOpen()) return;
   if (pausePanel.open) return pauseChoices;
-  if (extraDefeat.open) return extraChoices;
+  if (stealthDefeat.open) return stealthChoices;
   if (shell.dataset.screen==='start') return menuChoices;
   if (!defeat.hidden) return defeatChoices;
 }
@@ -257,13 +256,13 @@ function startIntro(next: HuntMode,resume=false) {
 
 function showMenu() {
   const priorMode=mode;
-  const priorExtra=extra?.mode;
-  extra=undefined;
+  const wasStealth=!!stealth;
+  stealth=undefined;
   storyCheckpoint=undefined;
   escapeCheckpoint=undefined;
   pausePanel.close();
-  extraDefeat.close();
-  setExtraView();
+  stealthDefeat.close();
+  setStealthView();
   mode=undefined;
   song.play('menu',contextAudio);
   paused=false;
@@ -273,7 +272,7 @@ function showMenu() {
   endlessBoard.clear();
   shell.dataset.screen='start';
   launch.inert=false;
-  menuChoices.select(priorExtra==='platform' ? 2 : priorExtra==='swarm' ? 3 : priorMode==='loop' ? 1 : 0,true);
+  menuChoices.select(wasStealth ? 2 : priorMode==='loop' ? 1 : 0,true);
   startStatus.textContent='';
   captions('');
   say('');
@@ -303,7 +302,7 @@ function syncPause() {
   if (!frozen) audio.unlock();
 }
 function togglePause() {
-  if (!(extra || mode && song.started) || !defeat.hidden || extraDefeat.open) return;
+  if (!(stealth || mode && song.started) || !defeat.hidden || stealthDefeat.open) return;
   paused = !paused;
   if (paused) {
     pausePanel.showModal();
@@ -325,7 +324,7 @@ function beginFly(resume=false) {
 
 window.addEventListener('keydown',event => {
   if (settingsPanel.open) return;
-  if (!pausePanel.open && shell.dataset.screen==='game' && !dialogOpen() && !extraDefeat.open && defeat.hidden) {
+  if (!pausePanel.open && shell.dataset.screen==='game' && !dialogOpen() && !stealthDefeat.open && defeat.hidden) {
     if (/^(Key[WASDZX]|Arrow(Up|Down|Left|Right))$/.test(event.code)) {
       keyboard.add(event.code);
       if (!event.repeat && event.code==='KeyZ') keyboardButtons|=1;
@@ -341,7 +340,7 @@ window.addEventListener('keydown',event => {
     event.preventDefault();
     choices.move(event.code==='ArrowLeft' || event.code==='ArrowUp' ? -1 : 1);
   }
-  if (event.code==='Escape' && !event.repeat && !dialogOpen() && !extraDefeat.open) {
+  if (event.code==='Escape' && !event.repeat && !dialogOpen() && !stealthDefeat.open) {
     event.preventDefault();
     togglePause();
   }
@@ -539,24 +538,25 @@ function keyboardInput() {
   return {move,aim:aim.x || aim.y ? aim : undefined};
 }
 
-const extraInfo=get('extra-info');
-function setExtraView() {
-  if (extra) shell.dataset.extra=extra.mode;
-  else delete shell.dataset.extra;
-  worldCanvas.width=extra?.mode==='swarm' ? swarmWidth : 360;
-  worldCanvas.height=extra?.mode==='swarm' ? swarmHeight : 204;
-  extraInfo.hidden=!extra;
+const stealthInfo=get('stealth-info');
+function setStealthView() {
+  if (stealth) shell.dataset.stealth='true';
+  else delete shell.dataset.stealth;
+  worldCanvas.width=stealth ? stealthWidth : 360;
+  worldCanvas.height=stealth ? stealthHeight : 204;
+  stealthInfo.hidden=!stealth;
+  get('score-label').textContent=stealth ? 'Guards bound' : 'Catches';
 }
 
-function startExtra(next:ExtraMode) {
+function startStealth() {
   contextAudio=audio.audioContext();
   audio.unlock();
   song.stop();
   mode=undefined;
-  extraDefeat.close();
+  stealthDefeat.close();
   clearFlyScene();
-  extra=createExtra(next);
-  setExtraView();
+  stealth=createStealth();
+  setStealthView();
   shell.dataset.screen='game';
   launch.inert=true;
   paused=false;
@@ -567,40 +567,33 @@ function startExtra(next:ExtraMode) {
   syncPause();
 }
 
-function playExtraFrame(run:ExtraRun,move:Point,aim:Point|undefined,elapsed:number) {
+function playStealthFrame(run:StealthRun,input:StealthInput,elapsed:number) {
   if (!paused && !document.hidden && run.phase==='play') {
-    const controls=arenaInput(move,aim);
     remainder+=elapsed;
     while (remainder>=arenaStep && run.phase==='play') {
       remainder-=arenaStep;
-      controls[4]=pendingButtons;
-      pendingButtons=0;
-      stepExtra(run,controls,arenaStep,event=>{
-        if (event==='wave') {
-          audio.play('discovery');
-          say('Wave '+run.wave+' · '+run.wave+' flies.');
-        } else audio.play(event);
+      stepStealth(run,input,arenaStep,event=>{
+        if (event==='seen') audio.play('tension');
+        else audio.play(event);
       });
     }
   }
   if (run.phase==='complete') {
+    audio.play('discovery');
     showMenu();
     return;
   }
-  scoreLabel.textContent=String(run.score);
-  clock.style.setProperty('--pulse','0');
-  clock.dataset.reset='false';
-  clock.dataset.phase=run.time<=5 ? 'urgent' : 'running';
-  timeLabel.textContent=Math.ceil(run.time)+' s';
-  roundLabel.textContent='35 s';
-  clockMeter.style.setProperty('--remaining',String(run.time/35));
-  extraInfo.textContent=run.mode==='platform' ? 'Silk points '+run.silk+' · Head right to the exit' :
-    'Wave '+run.wave+' · '+run.flies.filter(fly=>!fly.caught).length+'/'+run.wave+' flies remaining';
-  renderExtra(context,run);
-  if (run.phase==='over' && !extraDefeat.open) {
-    get('swarm-result').textContent=run.score+' catches · Wave '+run.wave;
-    extraDefeat.showModal();
-    extraChoices.select(1,true);
+  const witness=run.guards.some(guard=>guard.witnessed && !guard.caught);
+  const watching=run.guards.some(guard=>guard.alert>.08 && !guard.caught);
+  const status=witness ? 'Witness alerted · Bind it with silk before leaving' :
+    watching ? 'Guards investigating · Move slowly or climb' : 'Stay unseen · Reach the exit pipe';
+  if (message.textContent!==status) say(status);
+  const neutralized=String(run.guards.filter(guard=>guard.caught).length)+'/2';
+  if (scoreLabel.textContent!==neutralized) scoreLabel.textContent=neutralized;
+  renderStealth(context,run,reduced());
+  if (run.phase==='over' && !stealthDefeat.open) {
+    stealthDefeat.showModal();
+    stealthChoices.select(1,true);
   }
 }
 
@@ -671,10 +664,11 @@ function frame(time: number) {
   const actions=keyboardButtons;
   keyboardButtons=0;
   const move=keys.move.x || keys.move.y ? keys.move : gamepad ? readLeftStick(gamepad) : neutralStick;
-  if (extra) {
-    if (input?.jump || actions&1) pendingButtons|=1;
-    if (input?.fire || actions&2) pendingButtons|=2;
-    playExtraFrame(extra,move,keys.aim??input?.aim,elapsed);
+  if (stealth) {
+    playStealthFrame(stealth,{
+      move,aim:keys.aim??input?.aim,jump:keyboard.has('KeyZ') || !!gamepad?.buttons[4]?.pressed,
+      silk:keyboard.has('KeyX') || !!gamepad?.buttons[5]?.pressed,
+    },elapsed);
     requestAnimationFrame(frame);
     return;
   }

@@ -29,8 +29,7 @@
     <div class="mode-choices">
       <button id="story" type="button" data-selected="true"><span>STORY</span><code aria-hidden="true">story()</code></button>
       <button id="loop" type="button" data-selected="false"><span>ENDLESS</span><code aria-hidden="true">loop()</code></button>
-      <button id="platform-mode" type="button" data-selected="false">Platform</button>
-      <button id="swarm-mode" type="button" data-selected="false">Swarm</button>
+      <button id="stealth-mode" type="button" data-selected="false">Stealth</button>
       <button id="settings-menu" type="button" data-selected="false">Settings</button>
       <button id="menu-top" type="button" data-selected="false" aria-haspopup="dialog"><span>Top 10</span></button>
     </div>
@@ -72,7 +71,7 @@
     </section>
   </section>
   <footer>
-    <p id="extra-info" hidden></p>
+    <p id="stealth-info" hidden>Hold L1 / Z to charge a jump · Hold R1 / X for silk · Up to reel</p>
     <p id="message" role="status"></p>
     <p id="lyric" class="lyric" lang="en"></p>
   </footer>
@@ -104,12 +103,11 @@
   <p id="endless-board-status" role="status"></p>
   <button id="endless-again" type="button" hidden>Try Again</button>
 </dialog>
-<dialog id="swarm-defeat" aria-labelledby="swarm-title">
-  <h2 id="swarm-title">Time ran out</h2>
-  <p id="swarm-result"></p>
+<dialog id="stealth-defeat" aria-labelledby="stealth-title">
+  <h2 id="stealth-title">The guards caught you</h2>
   <div class="mode-choices">
-    <button id="swarm-menu" type="button">Main Menu</button>
-    <button id="swarm-retry" type="button">Retry</button>
+    <button id="stealth-menu" type="button">Main Menu</button>
+    <button id="stealth-retry" type="button">Retry</button>
   </div>
 </dialog>
 <dialog id="pause-panel" aria-labelledby="pause-title">

@@ -260,9 +260,9 @@ dialog h2 { margin: 0; font-size: 16px; }
 .board-actions { display: flex; gap: 6px; }
 #name-controls { margin: 0; color: #b8ca94; }
 
-.shell[data-reforming] :is(#platform-mode,#swarm-mode,#settings-menu) { display:none; }
-.shell[data-extra=platform] .clock { visibility:hidden; }
-#extra-info { color:#c9dda5; }
+.shell[data-reforming] :is(#stealth-mode,#settings-menu) { display:none; }
+.shell[data-stealth] .clock { visibility:hidden; }
+#stealth-info { color:#c9dda5; }
 .pause-choices { grid-template-columns:1fr; width:100%; margin-top:14px; }
 .settings-fields { display:grid; grid-template-columns:1fr minmax(110px,1fr); gap:12px; align-items:center; margin-block:16px; }
 #settings-panel, #pause-panel { max-height:90dvh; overflow:auto; }
