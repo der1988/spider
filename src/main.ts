@@ -554,6 +554,26 @@ function keyboardInput() {
 }
 
 const windowInfo=get('window-hunt-info');
+const conversation=get('gnat-conversation');
+const interlocutor=get('gnat-interlocutor');
+const dialogueSpeaker=get('gnat-dialogue-speaker');
+const dialogueText=get('gnat-dialogue-text');
+
+function showWindowDialogue(run?:WindowRun) {
+  conversation.hidden=!run || run.practice || roomMapOpen || run.phase==='over' || subtitleMode.selectedIndex===2;
+  const speech=conversation.hidden ? undefined : run?.speech;
+  const cue=speech?.cue;
+  const kind=speech?.interlocutor;
+  interlocutor.hidden=!kind;
+  if (kind && interlocutor.dataset.kind!==kind) interlocutor.dataset.kind=kind;
+  const side=cue ? cue.speaker==='spider' ? 'left' : 'right' : '';
+  if (conversation.dataset.side!==side) conversation.dataset.side=side;
+  const label=cue ? {spider:'Spider',prey:'Insect',hunter:'Hunter'}[cue.speaker]+': ' : '';
+  if (dialogueSpeaker.textContent!==label) dialogueSpeaker.textContent=label;
+  const line=cue?.text??'';
+  if (dialogueText.textContent!==line) dialogueText.textContent=line;
+}
+
 function setWindowView() {
   if (windowHunt) shell.dataset.windowHunt=windowHunt.practice ? 'practice' : 'true';
   else delete shell.dataset.windowHunt;
@@ -561,6 +581,7 @@ function setWindowView() {
   worldCanvas.height=windowHunt ? roomHeight : 204;
   windowInfo.hidden=!windowHunt;
   get('silk-count').hidden=!windowHunt || windowHunt.practice;
+  showWindowDialogue(windowHunt);
   windowInfo.textContent=windowHunt?.practice
     ? 'L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower'
     : 'L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower · R2 / G grip · △ / M map · □ / V remove nearest empty web · × / C escape';
@@ -633,7 +654,8 @@ function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number) {
   const silk=String(run.silk);
   if (scoreLabel.textContent!==catches) scoreLabel.textContent=catches;
   if (silkLabel.textContent!==silk) silkLabel.textContent=silk;
-  renderWindowHunt(context,run,reduced(),roomMapOpen,subtitleMode.selectedIndex);
+  renderWindowHunt(context,run,reduced(),roomMapOpen);
+  showWindowDialogue(run);
   if (run.phase==='over' && !windowDefeat.open) {
     get('window-hunt-result').textContent='Catches · '+run.catches;
     windowDefeat.showModal();

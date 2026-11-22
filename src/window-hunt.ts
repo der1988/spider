@@ -250,7 +250,7 @@ function steerGnat(game:WindowRun,gnat:Gnat,threat:Point|undefined) {
 
 function collectInsect(game:WindowRun,gnat:Gnat,replacements:Gnat[],emit:(event:WindowEvent)=>void) {
   game.carried.push(gnat);
-  startExchange(game.speech,game.clock,'caughtPrey',{kind:'prey',position:()=>gnat.p});
+  startExchange(game.speech,game.clock,'caughtPrey');
   game.silk++;
   game.catches++;
   const occupied=game.gnats.filter(other=>other!==gnat).map(other=>other.p);
@@ -434,7 +434,7 @@ function stepPredator(game:WindowRun,enemy:Predator,dt:number,emit:(event:Window
     if (!enemy.spokeInChase && !game.speech.cue && game.clock>=game.speech.next) {
       const camera=cameraFor(game);
       if (body.x>=camera.x && body.x<=camera.x+roomWidth && body.y>=camera.y && body.y<=camera.y+roomHeight) {
-        enemy.spokeInChase=startExchange(game.speech,game.clock,'hunter',{kind:'hunter',position:()=>body});
+        enemy.spokeInChase=startExchange(game.speech,game.clock,'hunter');
       }
     }
     enemy.lastKnown={x:target.x,y:target.y};
@@ -495,7 +495,7 @@ function stepPredator(game:WindowRun,enemy:Predator,dt:number,emit:(event:Window
       enemy.immuneUntil=enemy.boundUntil+.6;
       enemy.shot=undefined;
       hit.wire.shakeUntil=game.clock+.4;
-      startExchange(game.speech,game.clock,'boundHunter',{kind:'hunter',position:()=>body});
+      startExchange(game.speech,game.clock,'boundHunter');
       emit('caught-predator');
       return;
     }
@@ -603,7 +603,7 @@ export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(
   if (!game.trapped && !game.speech.cue && game.clock>=game.speech.next) {
     const nearby=game.gnats.find(gnat=>!game.greeted.has(gnat) &&
       distance(gnat.p,spider)<76 && clear(game,spider,gnat.p));
-    if (nearby && startExchange(game.speech,game.clock,'nearPrey',{kind:'prey',position:()=>nearby.p})) {
+    if (nearby && startExchange(game.speech,game.clock,'nearPrey')) {
       game.greeted.add(nearby);
     }
   }

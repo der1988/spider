@@ -133,22 +133,29 @@ test('idle lessons need sustained stillness and stop when the player moves',()=>
 
 test('characters trade lines in order with a shared quiet gap between exchanges',()=>{
   const speech=createSpiderSpeech();
-  const hunter={kind:'hunter' as const,position:()=>({x:50,y:40})};
-  const prey={kind:'prey' as const,position:()=>({x:30,y:35})};
-  assert.ok(startExchange(speech,1,'hunter',hunter));
-  assert.equal(speech.cue?.speaker,hunter);
+  assert.ok(startExchange(speech,1,'hunter'));
+  assert.equal(speech.cue?.speaker,'hunter');
+  assert.equal(speech.interlocutor,'hunter');
   assert.equal(speech.cue?.text,exchanges.hunter[0][0]);
-  assert.equal(startExchange(speech,2,'nearPrey',prey),false);
+  updateSpiderSpeech(speech,4.5,false);
+  assert.equal(speech.cue?.text,exchanges.hunter[0][0]);
+  assert.equal(startExchange(speech,2,'nearPrey'),false);
   updateSpiderSpeech(speech,speech.until,false);
+  assert.equal(speech.interlocutor,'hunter');
   updateSpiderSpeech(speech,speech.next,false);
-  assert.equal(speech.cue?.speaker.kind,'spider');
+  assert.equal(speech.cue?.speaker,'spider');
   assert.equal(speech.cue?.text,exchanges.hunter[0][1]);
   updateSpiderSpeech(speech,speech.until,false);
-  assert.equal(startExchange(speech,speech.next-.1,'nearPrey',prey),false);
-  assert.ok(startExchange(speech,speech.next,'nearPrey',prey));
+  updateSpiderSpeech(speech,speech.next,false);
+  assert.equal(speech.cue?.speaker,'hunter');
+  assert.equal(speech.cue?.text,exchanges.hunter[0][2]);
+  updateSpiderSpeech(speech,speech.until,false);
+  assert.equal(speech.interlocutor,undefined);
+  assert.equal(startExchange(speech,speech.next-.1,'nearPrey'),false);
+  assert.ok(startExchange(speech,speech.next,'nearPrey'));
   updateSpiderSpeech(speech,speech.until,false);
   updateSpiderSpeech(speech,speech.next,false);
-  assert.equal(speech.cue?.speaker,prey);
+  assert.equal(speech.cue?.speaker,'prey');
 });
 
 test('contact picks up free and trapped insects, adding each to the trailing chain',()=>{

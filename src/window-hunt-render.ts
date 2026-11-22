@@ -172,39 +172,7 @@ function drawHunter(ctx:CanvasRenderingContext2D,game:WindowRun,enemy:WindowRun[
   } else if (game.clock<enemy.chaseUntil) block(ctx,body.x-1,body.y-17,3,4,amber);
 }
 
-function drawDialogue(ctx:CanvasRenderingContext2D,text:string,point:{x:number;y:number},color:string,large:boolean) {
-  ctx.save();
-  ctx.font=`bold ${large ? 10 : 7}px monospace`;
-  ctx.textAlign='center';
-  ctx.textBaseline='top';
-  const rows:string[]=[];
-  let row='';
-  for (const word of text.split(' ')) {
-    const next=row ? `${row} ${word}` : word;
-    if (row && ctx.measureText(next).width>186) {
-      rows.push(row);
-      row=word;
-    } else row=next;
-  }
-  rows.push(row);
-  const halfWidth=Math.ceil(Math.max(...rows.map(value=>ctx.measureText(value).width))/2);
-  const lineHeight=large ? 12 : 9;
-  const x=Math.round(Math.max(halfWidth+6,Math.min(roomWidth-halfWidth-6,point.x)));
-  const above=point.y-rows.length*lineHeight-15;
-  const y=Math.round(above>=4 ? above : point.y+14);
-  ctx.lineWidth=2;
-  ctx.lineJoin='round';
-  ctx.strokeStyle='#1b2c24';
-  ctx.fillStyle=color;
-  rows.forEach((value,i)=>{
-    const lineY=y+i*lineHeight;
-    ctx.strokeText(value,x,lineY);
-    ctx.fillText(value,x,lineY);
-  });
-  ctx.restore();
-}
-
-export function renderWindowHunt(ctx:CanvasRenderingContext2D,game:WindowRun,reduced=false,mapOpen=false,subtitles=0) {
+export function renderWindowHunt(ctx:CanvasRenderingContext2D,game:WindowRun,reduced=false,mapOpen=false) {
   if (mapOpen) {renderMap(ctx,game);return;}
   const camera=cameraFor(game);
   ctx.save();
@@ -280,14 +248,4 @@ export function renderWindowHunt(ctx:CanvasRenderingContext2D,game:WindowRun,red
     for (let i=-6;i<=6;i+=3) line(ctx,{x:spider.x-8,y:spider.y+i},{x:spider.x+8,y:spider.y+i+1},amber);
   }
   ctx.restore();
-  const cue=game.speech.cue;
-  if (cue && game.phase!=='over' && subtitles!==2 && game.clock<game.speech.until) {
-    const {speaker,text}=cue;
-    const position=speaker.kind==='spider' ? spider : speaker.position();
-    const point={x:position.x-camera.x,y:position.y-camera.y};
-    if (point.x>=0 && point.x<=roomWidth && point.y>=0 && point.y<=roomHeight) {
-      const color=speaker.kind==='spider' ? '#f9e995' : speaker.kind==='hunter' ? '#f4b980' : '#d6f3c2';
-      drawDialogue(ctx,text,point,color,subtitles===1);
-    }
-  }
 }
