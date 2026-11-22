@@ -1,169 +1,136 @@
-export const spiderLines={
-  nature:[
-    'Nature gave me eight legs. I distinctly remember asking for a day off.',
-    'Born to hunt. Would have settled for a desk job.',
-    'Survival of the fittest. Nobody mentioned the paperwork.',
-    'I asked for a sign. Nature sent a larger spider.',
-    'The circle of life could use a side exit.',
-    "With eight feet, you'd think I'd have a leg to stand on.",
-    'I could have been a rock. Rocks never work lunch.',
-    'My natural habitat is apparently a state of mild resentment.',
-    'Evolution took millions of years to give me this shift.',
-    'Nature abhors a vacuum. I have met the vacuum. The feeling is mutual.',
-    'Other creatures get to migrate. I get the underside of a shelf.',
-    'I wonder if instinct comes with a returns policy.',
-    'Surviving another day feels a lot like agreeing to another shift.',
-    'They call it the food chain. Guess which part is stuck in the middle.',
-    'Eight legs, and not one of them will take me on holiday.',
-    'I have a lot of questions for whoever designed the food chain.',
-    "Nature says I'm adaptable. That's how it keeps getting away with this.",
-    "I'd like to go extinct for the afternoon. Just the afternoon.",
-    'I thought this was rock bottom. Then it grew legs.',
+import type {Point} from './spider.ts';
+
+export const spiderLessons=[
+  "Left stick to walk. It has two settings: my pace and your appointment.",
+  "L1 jumps. Press it again in midair. The first jump is apparently advisory.",
+  "Gravity adds to vertical speed every step. It has never once asked how my day is going.",
+  "Right stick to aim. R1 to fire. Wait for the bright tip unless you like firing at an idea.",
+  "Hold R1 to keep the rope. Up reels in. Down pays it out. I've drawn you a diagram. It's the rope.",
+  "Release on a second surface to fix a web. Release in midair to resume our dealings with gravity.",
+  "Apparently the room was vibe coded. I was told that meant fewer meetings. Nobody said anything about more gravity.",
+  "Hold R2 to grab a fixed web. Otherwise you'll pass straight through, which saves them animating a complaint.",
+  "Triangle opens the map. The big dot with the bad intentions is exactly who you think it is.",
+  "Square removes the nearest empty web. Emphasis on empty. We do have a complaints department.",
+  "Webbed by the big one? Tap Cross five times. He can tie a knot but apparently can't count.",
+  "Touch an insect to collect it. It follows you home. I use the term 'home' under protest.",
+  "The aim checks for the first solid thing along a line. The code calls it a ray. I call it checking before jumping.",
+  "When the rope goes taut, the game trims the velocity pulling away from the anchor. You call it swinging. I call it being edited.",
+  "The left stick also picks the jump direction. If you point down, please have a reason.",
+  "The simulation takes 120 steps a second. Most of them are me waiting for you to pick a direction.",
+  "A web gets five seconds when it goes up. The timer starts at installation, which explains the warranty.",
+  "An insect crosses a web between steps? The game checks the whole flight segment. I asked for travel expenses. They checked those, too.",
+  "The bugs I carry follow old points on my route. I was hoping to leave the past behind. It's seventeen pixels away.",
+  "We shipped with three visible bugs. I can only hope the others are hiding somewhere interesting.",
+] as const;
+
+export const exchanges={
+  nearPrey:[
+    ["Oh. Were you going somewhere?", "Yes. The appointment just became urgent."],
+    ["Could you fly in a straight line for a minute?", "Could you become a windowsill for a minute?"],
+    ["I take it that's your escape route.", "It was. Thank you for the feedback."],
+    ["I'm taking the afternoon off.", "Then why are all eight of your shoes on?"],
+    ["Have you seen a fly around here?", "Lovely fellow. Left town. Incredible resemblance."],
+    ["You can stop buzzing. I've seen you.", "That's exactly when I prefer to buzz."],
+    ["I have a question about your flight plan.", "Send it to my previous location."],
+    ["Is that a shortcut?", "It is if you have the correct number of wings."],
+    ["You look familiar.", "I used to pass this shelf when you were worse at jumping."],
+    ["How long can you keep that up?", "Longer than a conversation, if that's what you're counting on."],
+    ["I could do with a quiet lunch.", "So could I. Let's both get one somewhere else."],
   ],
-  control:[
-    "Was that your idea? I'd like it on the record that it wasn't mine.",
-    'I was thinking about taking a break. You were thinking about gravity.',
-    "If you're going to jump, at least let me say something heroic first.",
-    'Someone up there has thumbs and very little respect for knees.',
-    'Can I have the legs back for a second? All eight, ideally.',
-    'I get the feeling my opinions are decorative.',
-    'I had a plan. It involved staying right here.',
-    'Try the other direction. That one still has my dignity in it.',
-    "I hope you've done this before. Actually, don't answer that.",
-    "What a clever route. I wouldn't have picked it with my own legs.",
-    'Funny how the one holding the controller never lands on their face.',
-    'Do you ever take your hand off that thing? Purely a medical question.',
-    "I'd file a complaint, but you'd just make me walk away from the desk.",
-    'Yes, technically we are both helping.',
-    "If this is a partnership, I'd like a turn with the thumbs.",
-    'I thought I made that decision. What a lovely half second.',
-    "One day I'll decide where to go. Don't make any plans around it.",
-    'Are you looking for something, or is this just how you relax?',
-    "I can feel a bad decision coming. It's nice that we share things.",
-  ],
-  room:[
-    'A ceiling is just a floor with very strict admissions.',
-    'That bed could sleep a thousand spiders. Apparently it sleeps one human.',
-    'The dust has been here longer than me. It knows when to keep quiet.',
-    'Somebody put my entire horizon on a shelf.',
-    "The plant gets watered for standing still. I'd like a word with its agent.",
-    'A desk that size ought to have a halfway inn.',
-    'Lovely window. Pity all the scenery is on the wrong side.',
-    'Books. All those pages and not one map out of here.',
-    'This room is bigger when you count it in footsteps.',
-    'The wallpaper is starting to recognize me.',
-    'A wardrobe is a cave with laundry in it.',
-    "I'd knock, but the door starts a mile above my head.",
-    'That leaf looks sturdy. So did the last leaf.',
-    'Dust: affordable housing for the very small and the very tired.',
-    "I'd admire the view if it would stop rushing toward me.",
-    'Four legs on that chair. Not one of them has ever missed lunch.',
-    'If we ever stop at the window, wake me up for it.',
-    "I've crossed a continent. The bed is still there.",
-    'No sign of civilization up here. There is, however, a sock.',
+  caughtPrey:[
+    ["Is the tether really necessary?", "The last one said that and then demonstrated why it is."],
+    ["Can you slow down? I'm luggage, not a kite.", "You should have said so while I was chasing you."],
+    ["Where are we going?", "That depends entirely on whoever's operating my legs."],
+    ["Do I get a window seat?", "You are the window seat. Don't lean out."],
+    ["You could have just introduced yourself.", "I did. You left at impressive speed."],
+    ["Is there a lost property office?", "There is now. I'm towing it."],
+    ["Does this get more dignified?", "If you find out, tell the one in front."],
+    ["I want to speak to whoever's in charge.", "Get in line. Oh. You have."],
+    ["Could you put me down for a moment?", "That's what the last windowsill said. I didn't trust it either."],
+    ["You know I can still see you.", "Good. Wave if the larger spider comes back."],
+    ["Where do I file a complaint?", "Just shout. You're already in the right department."],
   ],
   hunter:[
-    'Oh, good. Management has grown fangs.',
-    "He's got eight legs. Surely one of them has somewhere else to be.",
-    "He's running toward lunch. I'm running away from a promotion to lunch.",
-    'I hope he trips over his sense of entitlement.',
-    'Of all the bedrooms in the house, he had to crawl into mine.',
-    "Let's see him get his ego through that gap.",
-    "He's seen me. There goes the rest of my afternoon.",
-    'I used to hate cardio in theory.',
-    "We're both spiders. You'd think there'd be a professional courtesy.",
-    'I can hear every single one of his opinions coming down the wall.',
-    'He could at least have the decency to get bored first.',
-    'Does somebody have him on a controller, too? Their aim is better.',
-    'He can have the shelf. I was never going to retire there.',
-    "Next time I'm being born in a locked drawer.",
-    "I'll give him points for persistence. From a considerable distance.",
-    'Being the smaller spider has turned out to be a full-time job.',
-    "If I'm going to be chased, I'd like it to count as a commute.",
-    "I'd play dead, but that seems like giving him a head start.",
-    'Him again. He really needs a second hobby.',
+    ["You're a long way from your shelf.", "I was hoping you'd say the same thing and keep going."],
+    ["Stop. I only want a word.", "Is the word 'lunch'? It usually is."],
+    ["I can see you under there.", "That's lovely. I was just beginning to feel overlooked."],
+    ["This end of the room is mine.", "If you put up a sign, I'd have something to hide behind."],
+    ["Hold still. This is a routine inspection.", "Of course. Inspect my previous location."],
+    ["You've been making webs on my route.", "Funny. You've been making a route through my webs."],
+    ["Don't make me come up there.", "I don't make anyone do anything. That's the other fellow."],
+    ["You look tired.", "Thank you. I've been training by being chased."],
+    ["I thought we'd talked about trespassing.", "I thought you were out of breath. Yours came back first."],
+    ["That was a good jump.", "Thank you. I'd like to be somewhere you can't applaud it."],
+    ["I know every corner of this room.", "Then you can show me the one where I get a day off."],
   ],
-  web:[
-    'One more web. Somewhere, a very small accountant is thrilled.',
-    'I trust this thread with my life. Its warranty says otherwise.',
-    'There. Now I can stand around and call it work.',
-    'Spinning is relaxing if nothing is trying to eat you.',
-    'My five-year plan lasts about five seconds.',
-    'A web is a hammock with a rather unpleasant business model.',
-    "All that silk and I still can't afford a curtain.",
-    "Everything hangs by a thread. I've started charging for mine.",
-    'That looks almost deliberate.',
-    "Five seconds. I've had vacations shorter than that.",
-    'If this holds, I meant to do it.',
-    'Two anchor points. A little structure in an otherwise unstructured life.',
-    'The sign says free landing. The small print is woven in.',
-    'Eight tired legs and exactly one good knot.',
-    "At least the thread doesn't tell me to hurry.",
-    "I'd like to knit something that doesn't catch dinner.",
-    'If I spin enough of these, can we call it interior decorating?',
-    "One day I'll make a web just to keep the wall company.",
-    'Letting go is easy. Choosing the right wall takes practice.',
-  ],
-  prey:[
-    "Slow down. I'm trying to have a very disappointing lunch.",
-    "Nothing personal. You're just the only thing on the menu.",
-    'I wonder what lunch thinks of me. Actually, I can see its face.',
-    'Another one for the tow truck.',
-    'I could have stayed home. So could he. And here we are.',
-    "Please don't tell anyone I do this for fun.",
-    'At least one of us used to have a choice about where to fly.',
-    "I'd like to order something that arrives on a plate for once.",
-    'That one was quick. I miss not knowing that.',
-    'I got everything I wanted. This is getting uncomfortable.',
-    "Next time, stop and ask yourself why you're in such a hurry.",
-    'The longer the queue, the less it feels like lunch.',
-    'I see why some spiders skip breakfast.',
-    'I bring my work home. It trails several feet behind me.',
-    "Enjoy the scenic route. It's the same scenic route I get.",
-    'A successful hunt. I still have to make my own applause.',
-    'I have caught a gnat. Someone alert the gnat community.',
-    "The line gets longer. My enthusiasm hasn't joined it.",
-    "That'll do for today. Judging by my legs, today isn't taking requests.",
+  boundHunter:[
+    ["Could you undo this knot?", "I could. I'd rather see how you do on your own."],
+    ["How long does this last?", "Long enough for me to get a head start, if we stop chatting."],
+    ["You did that on purpose.", "I was saving that line in case it worked."],
+    ["This won't hold me.", "We agree. I'm leaving before we agree in person."],
+    ["That's my own technique.", "Then you'll appreciate the complimentary demonstration."],
+    ["A little help?", "Of course. Which way would you like me to run?"],
+    ["I had you cornered.", "I noticed. So did the corner."],
+    ["I'll remember this.", "I won't. It's been the nicest three seconds of my day."],
+    ["Are you going to stand there all day?", "Two seconds more, if you can manage it."],
+    ["What is this thread made of?", "Mostly spite. A little structural protein."],
+    ["We'll discuss this when I get loose.", "Excellent. I'll leave you my previous address."],
   ],
 } as const;
 
-type Topic=keyof typeof spiderLines;
-type Observations={hunter:boolean;trapped:boolean;webs:number;catches:number;moving:boolean};
-export type SpiderSpeech=ReturnType<typeof createSpiderSpeech>;
+type Encounter=keyof typeof exchanges;
+export type Speaker={kind:'spider'}|{kind:'prey'|'hunter';position:()=>Point};
+type Line={speaker:Speaker;text:string};
+const spider:Speaker={kind:'spider'};
+export const idleDelay=7;
+const silence=12;
+const lessonInterval=23;
 
 export function createSpiderSpeech() {
   return {
-    next:2.4,until:0,line:'',
-    unused:new Map<Topic,string[]>(),last:new Map<Topic,string>(),
-    previous:{hunter:false,trapped:false,webs:0,catches:0,moving:false} as Observations,
-    pending:undefined as Topic|undefined,
+    cue:undefined as Line|undefined,reply:undefined as Line|undefined,
+    next:0,until:0,idleSince:0,teaching:false,
+    lesson:0,turns:{nearPrey:0,caughtPrey:0,hunter:0,boundHunter:0},
   };
 }
 
-export function updateSpiderSpeech(speech:SpiderSpeech,clock:number,now:Observations,random:()=>number) {
-  const previous=speech.previous;
-  if (now.hunter && !previous.hunter || now.trapped && !previous.trapped) speech.pending='hunter';
-  else if (speech.pending!=='hunter') {
-    if (now.catches>previous.catches) speech.pending='prey';
-    else if (now.webs>previous.webs) speech.pending='web';
-  }
-  speech.previous=now;
-  if (clock<speech.next) return;
-  const alternatives:Topic[]=now.moving ? ['nature','control','room'] : ['nature','room','control'];
-  const topic=speech.pending??(now.hunter ? 'hunter' : alternatives[Math.floor(random()*alternatives.length)]);
-  speech.pending=undefined;
-  let choices=speech.unused.get(topic);
-  if (!choices?.length) {
-    choices=[...spiderLines[topic]];
-    if (choices.length>1) {
-      const last=choices.indexOf(speech.last.get(topic)??'');
-      if (last>=0) choices.splice(last,1);
+type Speech=ReturnType<typeof createSpiderSpeech>;
+
+function speak(speech:Speech,clock:number,line:Line) {
+  speech.cue=line;
+  speech.until=clock+Math.max(1.7,line.text.length*.041);
+}
+
+export function startExchange(speech:Speech,clock:number,event:Encounter,other:Speaker) {
+  if (clock<speech.next || speech.cue || speech.reply) return false;
+  const scripts=exchanges[event];
+  const [first,second]=scripts[speech.turns[event]++%scripts.length];
+  const [firstSpeaker,secondSpeaker]=event==='nearPrey' ? [spider,other] : [other,spider];
+  speak(speech,clock,{speaker:firstSpeaker,text:first});
+  speech.reply={speaker:secondSpeaker,text:second};
+  return true;
+}
+
+export function updateSpiderSpeech(speech:Speech,clock:number,idle:boolean) {
+  if (!idle) {
+    speech.idleSince=clock;
+    if (speech.teaching) {
+      speech.cue=undefined;
+      speech.teaching=false;
     }
-    speech.unused.set(topic,choices);
   }
-  const index=Math.floor(random()*choices.length);
-  speech.line=choices.splice(index,1)[0];
-  speech.last.set(topic,speech.line);
-  speech.until=clock+Math.max(2.6,Math.min(5.1,.8+speech.line.length*.046));
-  speech.next=speech.until+2.8+random()*4.4;
+  if (speech.cue && clock>=speech.until) {
+    speech.cue=undefined;
+    if (!speech.reply) speech.teaching=false;
+    speech.next=Math.max(speech.next,clock+(speech.reply ? .35 : silence));
+  }
+  if (clock<speech.next || speech.cue) return;
+  if (speech.reply) {
+    speak(speech,clock,speech.reply);
+    speech.reply=undefined;
+  } else if (idle && clock-speech.idleSince>=idleDelay) {
+    speech.teaching=true;
+    speak(speech,clock,{speaker:spider,text:spiderLessons[speech.lesson++%spiderLessons.length]});
+    speech.next=clock+lessonInterval;
+  }
 }

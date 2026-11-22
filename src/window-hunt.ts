@@ -1,7 +1,7 @@
 import {castCrawler,closeCrawlerRopes,createCrawler,jumpCrawler,type Crawler,normals,tickCrawler} from './crawler.ts';
 import {aimHit,DEFAULT_TUNING,SPIDER_HALF_HEIGHT,moveAxis,type Point,type Rect} from './spider.ts';
 import {anchorSilk,crossesSolid,sweptHit,type Strand} from './threads.ts';
-import {createSpiderSpeech,updateSpiderSpeech} from './gnat-dialogue.ts';
+import {createSpiderSpeech,startExchange,updateSpiderSpeech} from './gnat-dialogue.ts';
 
 export const roomWidth=520;
 export const roomHeight=290;
@@ -86,6 +86,7 @@ type GnatKind='common'|'swift'|'wary'|'fly';
 type Gnat={p:Point;v:Point;home:Point;direction:-1|1;kind:GnatKind;phase:number;steering:Point;decideAt:number};
 type Predator={
   body:Crawler; origin:Point; facing:-1|1; lastKnown?:Point; chaseUntil:number;
+  spokeInChase:boolean;
   boundUntil:number; immuneUntil:number; jumpAt:number; fireAt:number;
   shot?:{from:Point;to:Point;at:number};
   patrolIndex:number;swingUntil:number;planAt:number;plan?:Point;
@@ -93,7 +94,7 @@ type Predator={
 export interface CornerInput {move:Point;aim?:Point;jump:boolean;silk:boolean;grip?:boolean;escape?:boolean;remove?:boolean;}
 
 function predator(surfaces:readonly Rect[],x:number,y:number,facing:-1|1):Predator {
-  return {body:createCrawler({x,y},surfaces),origin:{x,y},facing,chaseUntil:0,boundUntil:0,immuneUntil:0,jumpAt:0,fireAt:0,patrolIndex:0,swingUntil:0,planAt:0};
+  return {body:createCrawler({x,y},surfaces),origin:{x,y},facing,chaseUntil:0,spokeInChase:false,boundUntil:0,immuneUntil:0,jumpAt:0,fireAt:0,patrolIndex:0,swingUntil:0,planAt:0};
 }
 
 export function createWindowHunt(practice=false,corner=bedroom,random=Math.random) {
@@ -107,6 +108,7 @@ export function createWindowHunt(practice=false,corner=bedroom,random=Math.rando
     practice,corner,surfaces,random,spider,
     web:{strands:[] as Strand[]},
     speech:createSpiderSpeech(),
+    greeted:new WeakSet<Gnat>(),
     occupants:new Map<Strand,Gnat[]>(),
     gnats:starts.map((p,i)=>makeGnat(p,i,random)),
     carried:[] as Gnat[],
@@ -248,6 +250,7 @@ function steerGnat(game:WindowRun,gnat:Gnat,threat:Point|undefined) {
 
 function collectInsect(game:WindowRun,gnat:Gnat,replacements:Gnat[],emit:(event:WindowEvent)=>void) {
   game.carried.push(gnat);
+  startExchange(game.speech,game.clock,'caughtPrey',{kind:'prey',position:()=>gnat.p});
   game.silk++;
   game.catches++;
   const occupied=game.gnats.filter(other=>other!==gnat).map(other=>other.p);
@@ -426,7 +429,14 @@ function stepPredator(game:WindowRun,enemy:Predator,dt:number,emit:(event:Window
   if (game.clock<enemy.boundUntil) return;
   const body=enemy.body, target=game.spider;
   const sees=distance(body,target)<275 && clear(game,body,target);
+  if (game.clock>=enemy.chaseUntil) enemy.spokeInChase=false;
   if (sees) {
+    if (!enemy.spokeInChase && !game.speech.cue && game.clock>=game.speech.next) {
+      const camera=cameraFor(game);
+      if (body.x>=camera.x && body.x<=camera.x+roomWidth && body.y>=camera.y && body.y<=camera.y+roomHeight) {
+        enemy.spokeInChase=startExchange(game.speech,game.clock,'hunter',{kind:'hunter',position:()=>body});
+      }
+    }
     enemy.lastKnown={x:target.x,y:target.y};
     enemy.chaseUntil=game.clock+7;
   }
@@ -485,6 +495,7 @@ function stepPredator(game:WindowRun,enemy:Predator,dt:number,emit:(event:Window
       enemy.immuneUntil=enemy.boundUntil+.6;
       enemy.shot=undefined;
       hit.wire.shakeUntil=game.clock+.4;
+      startExchange(game.speech,game.clock,'boundHunter',{kind:'hunter',position:()=>body});
       emit('caught-predator');
       return;
     }
@@ -589,9 +600,15 @@ export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(
   pullChain(game);
   for (const enemy of game.predators) stepPredator(game,enemy,dt,emit);
   advanceShots(game,dt,emit);
-  updateSpiderSpeech(game.speech,game.clock,{
-    hunter:game.predators.some(enemy=>game.clock>=enemy.boundUntil &&
-      (game.clock<enemy.chaseUntil || distance(enemy.body,spider)<205 && clear(game,spider,enemy.body))),
-    trapped:game.trapped,webs:web.strands.length,catches:game.catches,moving:distance(spider,beforeMove)>.15,
-  },game.random);
+  if (!game.trapped && !game.speech.cue && game.clock>=game.speech.next) {
+    const nearby=game.gnats.find(gnat=>!game.greeted.has(gnat) &&
+      distance(gnat.p,spider)<76 && clear(game,spider,gnat.p));
+    if (nearby && startExchange(game.speech,game.clock,'nearPrey',{kind:'prey',position:()=>nearby.p})) {
+      game.greeted.add(nearby);
+    }
+  }
+  const idle=!!spider.support && !game.trapped && !spider.rope && !input.silk && !input.jump &&
+    magnitude(input.move)<.1 && distance(spider,beforeMove)<.12 &&
+    !game.predators.some(enemy=>game.clock>=enemy.boundUntil && game.clock<enemy.chaseUntil);
+  updateSpiderSpeech(game.speech,game.clock,idle);
 }

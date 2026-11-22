@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {advanceArena,arenaStep,createArena,type ArenaInput} from '../src/arena-run.ts';
 import {createWindowHunt,cameraFor,bedroom,bedroomHeight,bedroomWidth,caughtLifetime,webLifetime,windowAnchor,stepWindowHunt,type CornerInput,type WindowRun} from '../src/window-hunt.ts';
-import {createSpiderSpeech,spiderLines,updateSpiderSpeech} from '../src/gnat-dialogue.ts';
+import {createSpiderSpeech,exchanges,idleDelay,spiderLessons,startExchange,updateSpiderSpeech} from '../src/gnat-dialogue.ts';
 import {createCrawler} from '../src/crawler.ts';
 import {arenaLayouts} from '../src/hunt.ts';
 
@@ -117,21 +117,38 @@ test('letting go in midair removes the rope and cannot fix a web on a later land
   assert.equal(game.web.strands.length,0);
 });
 
-test('spider remarks have variety, quiet gaps and a reaction to the hunter',()=>{
-  assert.ok(new Set(Object.values(spiderLines).flat()).size>=100);
+test('idle lessons need sustained stillness and stop when the player moves',()=>{
+  assert.ok(new Set([...spiderLessons,...Object.values(exchanges).flat(2)]).size>=100);
   const speech=createSpiderSpeech();
-  const quiet={hunter:false,trapped:false,webs:0,catches:0,moving:false};
-  updateSpiderSpeech(speech,1,quiet,()=>0);
-  assert.equal(speech.line,'');
-  updateSpiderSpeech(speech,3,quiet,()=>0);
-  const first=speech.line;
-  assert.ok(first && speech.next>speech.until);
-  updateSpiderSpeech(speech,4,{...quiet,hunter:true},()=>0);
-  assert.equal(speech.line,first);
-  updateSpiderSpeech(speech,speech.next,quiet,()=>0);
-  assert.equal(speech.line,spiderLines.hunter[0]);
-  updateSpiderSpeech(speech,speech.next,quiet,()=>0);
-  assert.notEqual(speech.line,first);
+  updateSpiderSpeech(speech,20,false);
+  updateSpiderSpeech(speech,20+idleDelay-.1,true);
+  assert.equal(speech.cue,undefined);
+  updateSpiderSpeech(speech,20+idleDelay,true);
+  assert.equal(speech.cue?.text,spiderLessons[0]);
+  updateSpiderSpeech(speech,28,false);
+  assert.equal(speech.cue,undefined);
+  updateSpiderSpeech(speech,40,true);
+  assert.equal(speech.cue,undefined);
+});
+
+test('characters trade lines in order with a shared quiet gap between exchanges',()=>{
+  const speech=createSpiderSpeech();
+  const hunter={kind:'hunter' as const,position:()=>({x:50,y:40})};
+  const prey={kind:'prey' as const,position:()=>({x:30,y:35})};
+  assert.ok(startExchange(speech,1,'hunter',hunter));
+  assert.equal(speech.cue?.speaker,hunter);
+  assert.equal(speech.cue?.text,exchanges.hunter[0][0]);
+  assert.equal(startExchange(speech,2,'nearPrey',prey),false);
+  updateSpiderSpeech(speech,speech.until,false);
+  updateSpiderSpeech(speech,speech.next,false);
+  assert.equal(speech.cue?.speaker.kind,'spider');
+  assert.equal(speech.cue?.text,exchanges.hunter[0][1]);
+  updateSpiderSpeech(speech,speech.until,false);
+  assert.equal(startExchange(speech,speech.next-.1,'nearPrey',prey),false);
+  assert.ok(startExchange(speech,speech.next,'nearPrey',prey));
+  updateSpiderSpeech(speech,speech.until,false);
+  updateSpiderSpeech(speech,speech.next,false);
+  assert.equal(speech.cue?.speaker,prey);
 });
 
 test('contact picks up free and trapped insects, adding each to the trailing chain',()=>{
