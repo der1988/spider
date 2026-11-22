@@ -1,5 +1,6 @@
+import {bindGnatDialogueView} from './gnat-dialogue-view';
 import './style.css';
-import {cameraFor,createWindowHunt,stepWindowHunt,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
+import {createWindowHunt,stepWindowHunt,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
 import {renderWindowHunt} from './window-hunt-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
@@ -69,7 +70,8 @@ const leaderboard = bindLeaderboard();
 const endlessBoard=bindEndlessBoard();
 const pausePanel=get<HTMLDialogElement>('pause-panel');
 const settingsPanel=get<HTMLDialogElement>('settings-panel');
-const dialogOpen=()=>leaderboard.open || endlessBoard.open || settingsPanel.open;
+const dialogueView=bindGnatDialogueView();
+const dialogOpen=()=>dialogueView.journal.open || leaderboard.open || endlessBoard.open || settingsPanel.open;
 get('defeat-top').onclick=()=>void endlessBoard.view();
 let contextAudio: AudioContext|undefined;
 let mode: HuntMode|undefined;
@@ -103,7 +105,11 @@ function bindChoices(items: readonly (readonly [string,()=>void])[],vertical=fal
   });
   function move(direction: number) {
     const index=vertical ? (selected+direction+buttons.length)%buttons.length : direction<0 ? 0 : buttons.length-1;
-    select(index,true);
+    let next=index;
+    for (let attempts=0;buttons[next].hidden && attempts<buttons.length;attempts++) {
+      next=(next+direction+buttons.length)%buttons.length;
+    }
+    select(next,true);
   }
   return {select,move,get selected(){return selected;},confirm:()=>buttons[selected].click()};
 }
@@ -117,7 +123,7 @@ const menuChoices=bindChoices([
   ['settings-menu',openSettings],
   ['menu-top',()=>void endlessBoard.view()],
 ],true);
-const pauseChoices=bindChoices([['resume',togglePause],['pause-settings',openSettings],['pause-menu',showMenu]],true);
+const pauseChoices=bindChoices([['resume',togglePause],['pause-settings',openSettings],['pause-history',openDialogueHistory],['pause-menu',showMenu]],true);
 const windowDefeat=get<HTMLDialogElement>('window-hunt-defeat');
 const windowChoices=bindChoices([['window-hunt-menu',showMenu],['window-hunt-retry',startWindowHunt]]);
 
@@ -269,6 +275,7 @@ function showMenu() {
   roomMapOpen=false;
   storyCheckpoint=undefined;
   escapeCheckpoint=undefined;
+  dialogueView.journal.close();
   pausePanel.close();
   windowDefeat.close();
   setWindowView();
@@ -315,6 +322,7 @@ function togglePause() {
   if (!(windowHunt || mode && song.started) || !defeat.hidden || windowDefeat.open) return;
   paused = !paused;
   if (paused) {
+    pauseHistory.hidden=!windowHunt || windowHunt.practice;
     pausePanel.showModal();
     pauseChoices.select(0,true);
   } else pausePanel.close();
@@ -333,7 +341,7 @@ function beginFly(resume=false) {
 }
 
 window.addEventListener('keydown',event => {
-  if (settingsPanel.open) return;
+  if (settingsPanel.open || dialogueView.journal.open) return;
   if (event.code==='KeyM' && !event.repeat && windowHunt && !windowHunt.practice && !paused && windowHunt.phase==='play') {
     roomMapOpen=!roomMapOpen;
     remainder=0;
@@ -554,65 +562,15 @@ function keyboardInput() {
 }
 
 const windowInfo=get('window-hunt-info');
-const conversation=get('gnat-conversation');
-const dialogueTail=get('gnat-dialogue-tail');
-const dialogueSpeaker=get('gnat-dialogue-speaker');
-const dialogueText=get('gnat-dialogue-text');
-
+const pauseHistory=get<HTMLButtonElement>('pause-history');
+function openDialogueHistory() {
+  if (windowHunt && !windowHunt.practice) dialogueView.open(windowHunt.speech.history);
+}
+get('gnat-history-close').onclick=()=>dialogueView.journal.close();
+dialogueView.journal.onclose=()=>{if (pausePanel.open) pauseHistory.focus();};
 function showWindowDialogue(run?:WindowRun) {
-  const cue=run?.speech.cue;
-  if (!run || !cue || run.practice || roomMapOpen || run.phase==='over' ||
-      run.speech.hiddenSince!==undefined || subtitleMode.selectedIndex===2) {
-    conversation.hidden=true;
-    dialogueTail.hidden=true;
-    return;
-  }
-  const speaker=cue.speaker==='spider' ? run.spider : run.speech.partner?.position();
-  if (!speaker) return;
-  conversation.hidden=false;
-  if (conversation.dataset.speaker!==cue.speaker) conversation.dataset.speaker=cue.speaker;
-  const label={spider:'Spider',prey:'Insect',hunter:'Hunter'}[cue.speaker]+': ';
-  if (dialogueSpeaker.textContent!==label) dialogueSpeaker.textContent=label;
-  if (dialogueText.textContent!==cue.text) dialogueText.textContent=cue.text;
-  const camera=cameraFor(run);
-  const scale=Math.min(worldCanvas.clientWidth/roomWidth,worldCanvas.clientHeight/roomHeight);
-  const width=roomWidth*scale,height=roomHeight*scale;
-  const left=(worldCanvas.clientWidth-width)/2,top=(worldCanvas.clientHeight-height)/2;
-  const maxWidth=Math.floor(Math.max(0,width-10))+'px';
-  if (conversation.style.getPropertyValue('--dialogue-width')!==maxWidth) {
-    conversation.style.setProperty('--dialogue-width',maxWidth);
-  }
-  const project=(point:Point)=>({x:left+(point.x-camera.x)*scale,y:top+(point.y-camera.y)*scale});
-  const anchor=project(speaker);
-  const w=conversation.offsetWidth,h=conversation.offsetHeight;
-  const gap=Math.max(15,19*scale), pad=5;
-  const keepClear=[run.spider,...run.gnats.map(insect=>insect.p),...run.predators.flatMap(enemy=>{
-    const body=enemy.body;
-    return enemy.shot ? [body,{x:body.x,y:body.y-21}] : [body];
-  })].map(project);
-  const candidates=[
-    {x:anchor.x-w/2,y:anchor.y-gap-h},{x:anchor.x-w/2,y:anchor.y+gap},
-    {x:anchor.x+gap,y:anchor.y-h/2},{x:anchor.x-gap-w,y:anchor.y-h/2},
-  ];
-  let best=candidates[0],cost=Infinity;
-  candidates.forEach((point,index)=>{
-    const x=Math.max(left+pad,Math.min(left+width-w-pad,point.x));
-    const y=Math.max(top+pad,Math.min(top+height-h-pad,point.y));
-    const covers=(p:Point)=>p.x>x-gap/2 && p.x<x+w+gap/2 && p.y>y-gap/2 && p.y<y+h+gap/2;
-    const score=Math.abs(x-point.x)*.12+Math.abs(y-point.y)+index*5+
-      keepClear.filter(covers).length*180+Number(covers(anchor))*210;
-    if (score<cost) {cost=score;best={x,y};}
-  });
-  conversation.style.transform=`translate(${Math.round(best.x)}px,${Math.round(best.y)}px)`;
-  const endX=Math.max(best.x,Math.min(best.x+w,anchor.x));
-  const endY=Math.max(best.y,Math.min(best.y+h,anchor.y));
-  const dx=anchor.x-endX,dy=anchor.y-endY;
-  const length=Math.hypot(dx,dy);
-  dialogueTail.hidden=length<=9;
-  if (!dialogueTail.hidden) {
-    dialogueTail.style.width=`${length-7}px`;
-    dialogueTail.style.transform=`translate(${endX}px,${endY}px) rotate(${Math.atan2(dy,dx)}rad)`;
-  }
+  dialogueView.render(run?.speech.history,run ? run.clock-run.speech.visibleUntil : Infinity,
+    !!run && !run.practice && !roomMapOpen && run.phase!=='over' && subtitleMode.selectedIndex!==2,reduced());
 }
 
 function setWindowView() {
@@ -745,8 +703,12 @@ function frame(time: number) {
     }
     crossPressed=cross && !crossHeld;
     crossHeld=cross;
-    const direction=navigationDirection(gamepad,atMenu || pausePanel.open || settingsPanel.open);
+    const direction=navigationDirection(gamepad,atMenu || pausePanel.open || settingsPanel.open || dialogueView.journal.open);
     if (settingsPanel.open) settingsPad(gamepad,crossPressed,cancel && !cancelHeld,direction);
+    if (dialogueView.journal.open) {
+      if (crossPressed || cancel && !cancelHeld) dialogueView.journal.close();
+      else if (direction && direction!==padDirection) dialogueView.scroll(direction,reduced());
+    }
     cancelHeld=cancel;
     if (navigation && !boardWasOpen && direction && direction!==padDirection) {
       navigation.move(direction);

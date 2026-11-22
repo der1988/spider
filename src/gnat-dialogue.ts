@@ -1,5 +1,3 @@
-import type {Point} from './spider.ts';
-
 export const spiderLessons=[
   "Left stick to walk. It has two settings: my pace and your appointment.",
   "L1 jumps. Press it again in midair. The first jump is apparently advisory.",
@@ -25,36 +23,10 @@ export const spiderLessons=[
   "The person who wrote this asked the computer for a room with atmosphere. It gave us gravity and six places to get stuck.",
   "The hunter aims ahead of where I am. It assumes I know where I'm going, which is very generous.",
   "The map uses the same furniture coordinates as the room. If a chair is wrong in both places, that's consistency.",
-  "When a character leaves the screen, the conversation timer waits. It's the closest I've come to getting paid for a break.",
+  "The dialogue log keeps every word. When I asked for a record of working conditions, this wasn't what I had in mind.",
 ] as const;
 
-export const exchanges={
-  nearPrey:[
-    ["Are you going to the window, or do you just like doing laps?", "I'm a courier. The parcel is a crumb and the address is classified.", "Fine. If these legs insist on following you, put me down as a second parcel."],
-    ["I'd appreciate one straight line. It's been a long day for the legs.", "I would if you were a windowsill. Windowsills are famously indifferent to my movements.", "Give me a flowerpot and an afternoon. I'll see what the person with the thumbs says."],
-    ["That's the third time you've passed the bookcase.", "I'm measuring it for a race. The prize is getting to measure the next bookcase.", "Put me down for the walking event. It's just me and a very optimistic drop."],
-    ["I'm taking the afternoon off.", "Then why are all eight of your shoes on?", "I put those on in case I had to leave work in a hurry."],
-    ["Have you seen a fly around here?", "Lovely fellow. Left town. Incredible resemblance.", "What a shame. I was going to compliment his absolutely stationary cousin."],
-    ["You can stop buzzing. I've seen you.", "That's exactly when I prefer to buzz.", "Ah. An alarm system with a strong grasp of irony."],
-    ["I have a question about your flight plan.", "Send it to my previous location.", "I did. It told me to forward everything to you."],
-    ["Is that a shortcut?", "It is if you have the correct number of wings.", "That's why they put the long way round in for the rest of us."],
-    ["You look familiar.", "I used to pass this shelf when you were worse at jumping.", "Please don't tell anyone. I'm still worse at landing."],
-    ["How long can you keep that up?", "Longer than a conversation, if that's what you're counting on.", "Then I'll make it brief. The window's shut."],
-    ["I could do with a quiet lunch.", "So could I. Let's both get one somewhere else.", "Finally, a proposal we can both run away with."],
-  ],
-  caughtPrey:[
-    ["Before we go anywhere, I want to negotiate the length of this leash.", "So do I. There's someone steering my legs and they won't even give me a lunch break.", "All right. Two feet of thread and we both join the union."],
-    ["I can't fill out a complaint at this speed. Do you have a lost luggage desk?", "The desk was behind the hunter. He offered to process both of us.", "In that case carry on. I'd like to arrive unprocessed."],
-    ["Where are we going?", "That depends entirely on whoever's operating my legs.", "Would you ask them to avoid the lampshade? It makes me dizzy."],
-    ["I paid for a window seat. Why am I behind your abdomen?", "That's the wing with the view. The other side has the hunter.", "I'll keep the view, then. Please stop offering upgrades."],
-    ["You could have just introduced yourself.", "I did. You left at impressive speed.", "All right. Next time try a name that sounds less like 'hold still.'"],
-    ["Is there a lost property office?", "There is now. I'm towing it.", "Please check the silk. I appear to have lost my afternoon."],
-    ["Does this get more dignified?", "If you find out, tell the one in front.", "They told me this was the dignified end of the line."],
-    ["I want to speak to whoever's in charge.", "Get in line. Oh. You have.", "I'm starting to see why this place is so badly run."],
-    ["Could you put me down for a moment?", "That's what the last windowsill said. I didn't trust it either.", "Have you considered that the windowsill might have been asking very nicely?"],
-    ["You know I can still see you.", "Good. Wave if the larger spider comes back.", "I can wave, or I can scream. Which travels better?"],
-    ["Where do I file a complaint?", "Just shout. You're already in the right department.", "Good. I'd hate for the people in charge to miss it."],
-  ],
+const hunterScenes={
   hunter:[
     ["Hunting department. I'll need you to stop moving for the inspection.", "Talk to the person steering. I've been trying to take a sick day since Tuesday.", "I'll mark that as a dispute over who operates the equipment. Keep running, please."],
     ["Stop. I only want a word.", "Is the word 'lunch'? It usually is.", "It's 'inspection'. There may be lunch afterwards."],
@@ -85,85 +57,112 @@ export const exchanges={
     ["You've left the restraint. Did you at least read the notice?", "No. Whoever controls my legs mashed the button until the notice fell off.", "I'll record the release as a successful demonstration of customer feedback."],
     ["That restraint was meant to last until the end of my shift.", "I found the release button. Several times, apparently.", "Fine. I'll call it a training exercise. Do try to keep the same route next time."],
   ],
-  freedPrey:[
-    ["Did you time that escape?", "Of course. I spent five seconds watching the thread and none watching you.", "Well, go on. If I turn around, pretend I did it on purpose."],
-    ["I assume you're going to fly straight back to the window.", "First I'm going to tell the others about your five-second lease.", "Tell them the landlord is also looking for a way out."],
-  ],
 } as const;
 
+const preyScenes={
+  midge:{
+    nearPrey:[
+      ["You keep circling the window. Is it the view?", "I'm counting exits. So far I've found one window and a remarkable number of new ways to die.", "Put me down as a window. The person moving my legs doesn't read signs."],
+      ["Are you hiding behind that leaf?", "I'm checking whether it would make a suitable emergency shelter.", "Good idea. Let me know if it takes walk-ins."],
+    ],
+    caughtPrey:[
+      ["Before you tow me anywhere, I'd like to discuss the emergency exits.", "There's a window, a gap behind the shelf and the mouth of a larger spider.", "I'll take the gap. This is the first evacuation plan we've agreed on."],
+      ["May I see the knot? I like to know what has failed in advance.", "It's my third best knot. I save the good ones for myself.", "All right. I'll schedule a work stoppage for when it comes undone."],
+    ],
+    freedPrey:[
+      ["Did you know the web would expire?", "I counted from the first tug. Five seconds is a long time when you have six feet to worry about.", "Tell me about it. I've got eight and I only get a vote on four."],
+    ],
+  },
+  dart:{
+    nearPrey:[
+      ["Could you hold still for one question?", "Sure. Ask it at the next lap. I should be back before you finish the first word.", "I'll make it a short word. I've got a standing appointment with the floor."],
+      ["You're flying in circles again.", "They're qualifying laps. I don't know what I'm qualifying for, but I'm ahead.", "Try a straight line. We could settle this with very different medals."],
+    ],
+    caughtPrey:[
+      ["Clock that. Even tied up I was faster than your last two turns.", "You've confused my steering with an organized sport.", "Fair. If we win anything, I'm still taking the podium."],
+      ["Can you swing faster? This feels like the local service.", "I'd ask the person on the controls, but they think speed is a synonym for distance from the floor.", "Fine. I'll shout the lap times. At least one of us can look ahead."],
+    ],
+    freedPrey:[
+      ["You're free. Did you have to make it look like a victory lap?", "It was a victory lap. The first five seconds were the qualifying round.", "Good. I'll be over here disqualifying the person who put that web there."],
+    ],
+  },
+  pip:{
+    nearPrey:[
+      ["What have you got in that crumb?", "Lunch for three. If you leave me alone, I can make it lunch for four.", "Tempting. Unfortunately my entire species has a very restrictive catering contract."],
+      ["Is this where you usually fly?", "Depends. Are you asking as a customer or as a competitor?", "I was hoping to ask as a tired private citizen. Third shelf, if you take credit."],
+    ],
+    caughtPrey:[
+      ["Before we go, I represent several crumbs with an interest in my safe return.", "I represent eight legs that would like to go home, and an operator who disagrees.", "Then let's invoice the operator. I'll handle the postage if you loosen the knot."],
+      ["You caught me. Would you consider a short lease instead of permanent ownership?", "I don't even own the legs I'm walking on. What are you offering?", "A crumb and a recommendation. Your transport service is terrible, but very prompt."],
+    ],
+    freedPrey:[
+      ["Leaving so soon? I thought we were negotiating.", "We were. Your five-second lease expired before I had to put anything in writing.", "I admire your paperwork. Mine has to be filed in thread."],
+    ],
+  },
+} as const;
 
-type Encounter=keyof typeof exchanges;
-export type Speaker='spider'|'prey'|'hunter';
-type Line={speaker:Speaker;text:string};
-export type DialoguePartner={position:()=>Point;isRelevant:()=>boolean};
+type HunterEvent=keyof typeof hunterScenes;
+type PreyEvent=keyof typeof preyScenes.pip;
+type Encounter=HunterEvent|PreyEvent;
+export type PreySpeaker=keyof typeof preyScenes;
+export type Speaker='spider'|'hunter'|PreySpeaker;
+export const speakerNames:Record<Speaker,string>={spider:'Spider',hunter:'Hunter',midge:'Midge',dart:'Dart',pip:'Pip'};
+export type DialogueLine={speaker:Speaker;text:string};
+type Request={speaker:Exclude<Speaker,'spider'>;event:Encounter;clock:number;priority:number;relevant:()=>boolean};
+
 export const idleDelay=7;
+export const panelLinger=10;
 const silence=12;
-const lessonInterval=23;
+const priority:Record<Encounter,number>={nearPrey:1,hunter:3,freedPrey:4,caughtPrey:5,boundHunter:6,escaped:7};
 
 export function createSpiderSpeech() {
   return {
-    cue:undefined as Line|undefined,pending:[] as Line[],
-    partner:undefined as DialoguePartner|undefined,hiddenSince:undefined as number|undefined,lastUpdate:0,
-    next:0,until:0,idleSince:0,
-    lesson:0,turns:{nearPrey:0,caughtPrey:0,hunter:0,boundHunter:0,escaped:0,freedPrey:0},
+    history:[] as DialogueLine[],pending:[] as DialogueLine[],
+    queue:[] as Request[],turns:new Map<string,number>(),
+    next:0,visibleUntil:-Infinity,idleSince:0,nextLesson:0,lesson:0,
   };
 }
 
 type Speech=ReturnType<typeof createSpiderSpeech>;
 
-function speak(speech:Speech,clock:number,line:Line) {
-  speech.cue=line;
-  speech.until=clock+Math.max(6,2+line.text.split(/\s+/).length/2.8);
+function speak(speech:Speech,clock:number,line:DialogueLine) {
+  speech.history.push(line);
+  speech.next=clock+Math.max(6,2+line.text.split(/\s+/).length/2.8);
+  speech.visibleUntil=Math.max(clock+panelLinger,speech.next);
 }
 
-export function startExchange(speech:Speech,clock:number,event:Encounter,partner:DialoguePartner) {
-  if (clock<speech.next || speech.cue || speech.pending.length) return false;
-  const scripts=exchanges[event];
-  const script=scripts[speech.turns[event]++%scripts.length];
-  const other=event==='hunter' || event==='boundHunter' || event==='escaped' ? 'hunter' : 'prey';
-  const [first,second]=event==='nearPrey' || event==='freedPrey' ? ['spider',other] as const : [other,'spider'] as const;
-  const [opening,...replies]=script;
-  speech.partner=partner;
-  speech.lastUpdate=clock;
-  speak(speech,clock,{speaker:first,text:opening});
-  speech.pending=replies.map((text,index)=>({speaker:index%2 ? first : second,text}));
+export function enqueueDialogue(speech:Speech,clock:number,event:Encounter,speaker:Request['speaker'],relevant:()=>boolean) {
+  if (speech.queue.some(request=>request.event===event && request.speaker===speaker)) return false;
+  speech.queue.push({speaker,event,clock,priority:priority[event],relevant});
   return true;
 }
 
-export function updateSpiderSpeech(speech:Speech,clock:number,idle:boolean,visible:(point:Point)=>boolean) {
-  const previous=speech.lastUpdate;
-  speech.lastUpdate=clock;
+export function updateSpiderSpeech(speech:Speech,clock:number,idle:boolean) {
   if (!idle) speech.idleSince=clock;
-  if (speech.partner) {
-    const inView=visible(speech.partner.position());
-    if (!inView) speech.hiddenSince??=previous;
-    if (!speech.partner.isRelevant() || speech.hiddenSince!==undefined && clock-speech.hiddenSince>12) {
-      speech.cue=undefined;
-      speech.pending=[];
-      speech.partner=undefined;
-      speech.hiddenSince=undefined;
-      speech.next=clock+silence;
-      return;
-    }
-    if (!inView || speech.hiddenSince!==undefined) {
-      if (speech.cue) speech.until+=clock-previous;
-      else speech.next+=clock-previous;
-      if (!inView) return;
-      speech.hiddenSince=undefined;
-    }
-  }
-  if (speech.cue && clock>=speech.until) {
-    speech.cue=undefined;
-    if (!speech.pending.length) {
-      speech.partner=undefined;
-    }
-    speech.next=Math.max(speech.next,clock+(speech.pending.length ? .35 : silence));
-  }
-  if (clock<speech.next || speech.cue) return;
+  if (clock<speech.next) return;
   const reply=speech.pending.shift();
-  if (reply) speak(speech,clock,reply);
-  else if (idle && clock-speech.idleSince>=idleDelay) {
+  if (reply) {
+    speak(speech,clock,reply);
+    if (!speech.pending.length) speech.next+=silence;
+    return;
+  }
+  speech.queue=speech.queue.filter(request=>
+    clock-request.clock<=(request.priority<4 ? 11 : 38) && request.relevant());
+  speech.queue.sort((a,b)=>b.priority-a.priority || a.clock-b.clock);
+  const request=speech.queue.shift();
+  if (request) {
+    const {speaker,event}=request;
+    const key=speaker+event;
+    const scenes=speaker==='hunter' ? hunterScenes[event as HunterEvent] : preyScenes[speaker][event as PreyEvent];
+    const turn=speech.turns.get(key)??0;
+    const script=scenes[turn%scenes.length];
+    speech.turns.set(key,turn+1);
+    const [first,second]=event==='nearPrey' || event==='freedPrey' ? ['spider',speaker] as const : [speaker,'spider'] as const;
+    const [opening,...responses]=script;
+    speak(speech,clock,{speaker:first,text:opening});
+    speech.pending=responses.map((text,index)=>({speaker:index%2 ? first : second,text}));
+  } else if (idle && clock-speech.idleSince>=idleDelay && clock>=speech.nextLesson) {
     speak(speech,clock,{speaker:'spider',text:spiderLessons[speech.lesson++%spiderLessons.length]});
-    speech.next=clock+lessonInterval;
+    speech.nextLesson=clock+27;
   }
 }

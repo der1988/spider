@@ -1,7 +1,7 @@
 import {castCrawler,closeCrawlerRopes,createCrawler,jumpCrawler,type Crawler,normals,tickCrawler} from './crawler.ts';
 import {aimHit,DEFAULT_TUNING,SPIDER_HALF_HEIGHT,moveAxis,type Point,type Rect} from './spider.ts';
 import {anchorSilk,crossesSolid,sweptHit,type Strand} from './threads.ts';
-import {createSpiderSpeech,startExchange,updateSpiderSpeech} from './gnat-dialogue.ts';
+import {createSpiderSpeech,enqueueDialogue,updateSpiderSpeech} from './gnat-dialogue.ts';
 
 export const roomWidth=520;
 export const roomHeight=290;
@@ -367,18 +367,15 @@ function expireWebs(game:WindowRun) {
 }
 
 function startInsectDialogue(game:WindowRun,insect:Gnat,event:'nearPrey'|'caughtPrey'|'freedPrey') {
-  return startExchange(game.speech,game.clock,event,{
-    position:()=>insect.p,
-    isRelevant:()=>game.carried.includes(insect) || game.gnats.includes(insect) ||
-      [...game.occupants.values()].some(occupants=>occupants.includes(insect)),
-  });
+  const speaker=insect.kind==='wary' ? 'midge' : insect.kind==='swift' ? 'dart' : 'pip';
+  return enqueueDialogue(game.speech,game.clock,event,speaker,()=>event==='caughtPrey'
+    ? game.carried.includes(insect)
+    : game.gnats.includes(insect) && (event==='freedPrey' || distance(insect.p,game.spider)<145));
 }
 
 function startHunterDialogue(game:WindowRun,enemy:Predator,event:'hunter'|'boundHunter'|'escaped') {
-  return startExchange(game.speech,game.clock,event,{
-    position:()=>enemy.body,
-    isRelevant:()=>game.predators.includes(enemy) && distance(enemy.body,game.spider)<650,
-  });
+  return enqueueDialogue(game.speech,game.clock,event,'hunter',()=>game.predators.includes(enemy) &&
+    (event!=='hunter' || game.clock<enemy.chaseUntil));
 }
 
 function pullChain(game:WindowRun) {
@@ -654,7 +651,7 @@ export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(
   pullChain(game);
   for (const enemy of game.predators) stepPredator(game,enemy,dt,emit);
   advanceShots(game,dt,emit);
-  if (!game.trapped && !game.speech.cue && game.clock>=game.speech.next) {
+  if (!game.trapped && !game.speech.queue.some(request=>request.event==='nearPrey')) {
     const nearby=game.gnats.find(gnat=>!game.greeted.has(gnat) &&
       distance(gnat.p,spider)<76 && clear(game,spider,gnat.p));
     if (nearby && inWindow(game,nearby.p) && startInsectDialogue(game,nearby,'nearPrey')) {
@@ -664,5 +661,5 @@ export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(
   const idle=!!spider.support && !game.trapped && !spider.rope && !input.silk && !input.jump &&
     magnitude(input.move)<.1 && distance(spider,beforeMove)<.12 &&
     !game.predators.some(enemy=>game.clock>=enemy.boundUntil && game.clock<enemy.chaseUntil);
-  updateSpiderSpeech(game.speech,game.clock,idle,point=>inWindow(game,point));
+  updateSpiderSpeech(game.speech,game.clock,idle);
 }

@@ -56,10 +56,9 @@
   </header>
   <section class="stage" aria-label="Hunting arena">
     <canvas id="world" width="360" height="204" aria-label="Spider, fly and webs"></canvas>
-    <div id="gnat-dialogue-tail" aria-hidden="true" hidden></div>
-    <div id="gnat-conversation" class="gnat-dialogue-line" role="status" aria-atomic="true" hidden>
-      <span id="gnat-dialogue-speaker" class="visually-hidden"></span><span id="gnat-dialogue-text"></span>
-    </div>
+    <section id="gnat-conversation" class="gnat-conversation" aria-label="Recent dialogue" hidden>
+      <ol id="gnat-recent" class="gnat-lines" role="log" aria-label="Recent dialogue"></ol>
+    </section>
     <section id="loop-defeat" class="defeat" aria-labelledby="defeat-title" hidden>
       <div class="defeat-panel">
         <h2 id="defeat-title">Time ran out</h2>
@@ -122,7 +121,18 @@
   <div class="pause-choices mode-choices">
     <button id="resume" type="button">Resume</button>
     <button id="pause-settings" type="button">Settings &amp; Controls</button>
+    <button id="pause-history" type="button" hidden>Dialogue History</button>
     <button id="pause-menu" type="button">Main Menu</button>
+  </div>
+</dialog>
+<dialog id="gnat-history" aria-labelledby="gnat-history-title">
+  <div class="board-header">
+    <h2 id="gnat-history-title">Dialogue History</h2>
+    <button id="gnat-history-close" type="button">Back</button>
+  </div>
+  <div id="gnat-history-scroll" tabindex="0" aria-label="Conversation transcript">
+    <ol id="gnat-history-lines" class="gnat-lines"></ol>
+    <p id="gnat-history-empty">No dialogue yet.</p>
   </div>
 </dialog>
 <dialog id="settings-panel" aria-labelledby="settings-title">

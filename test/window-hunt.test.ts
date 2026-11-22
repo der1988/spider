@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {advanceArena,arenaStep,createArena,type ArenaInput} from '../src/arena-run.ts';
 import {createWindowHunt,cameraFor,bedroom,bedroomHeight,bedroomWidth,caughtLifetime,webLifetime,windowAnchor,stepWindowHunt,type CornerInput,type WindowRun} from '../src/window-hunt.ts';
-import {createSpiderSpeech,exchanges,idleDelay,spiderLessons,startExchange,updateSpiderSpeech} from '../src/gnat-dialogue.ts';
+import {createSpiderSpeech,enqueueDialogue,idleDelay,spiderLessons,updateSpiderSpeech} from '../src/gnat-dialogue.ts';
 import {createCrawler} from '../src/crawler.ts';
 import {arenaLayouts} from '../src/hunt.ts';
 
@@ -117,59 +117,36 @@ test('letting go in midair removes the rope and cannot fix a web on a later land
   assert.equal(game.web.strands.length,0);
 });
 
-const visible=()=>true;
-const partner={position:()=>({x:4,y:5}),isRelevant:()=>true};
-
-test('idle lessons need sustained stillness and finish once started',()=>{
-  assert.ok(new Set([...spiderLessons,...Object.values(exchanges).flat(2)]).size>=100);
+test('idle lessons wait for stillness and stay in the history after movement resumes',()=>{
   const speech=createSpiderSpeech();
-  updateSpiderSpeech(speech,20,false,visible);
-  updateSpiderSpeech(speech,20+idleDelay-.1,true,visible);
-  assert.equal(speech.cue,undefined);
-  updateSpiderSpeech(speech,20+idleDelay,true,visible);
-  assert.equal(speech.cue?.text,spiderLessons[0]);
-  updateSpiderSpeech(speech,28,false,visible);
-  assert.equal(speech.cue?.text,spiderLessons[0]);
-  updateSpiderSpeech(speech,speech.until,false,visible);
-  assert.equal(speech.cue,undefined);
+  updateSpiderSpeech(speech,20,false);
+  updateSpiderSpeech(speech,20+idleDelay-.1,true);
+  assert.equal(speech.history.length,0);
+  updateSpiderSpeech(speech,20+idleDelay,true);
+  assert.equal(speech.history[0]?.text,spiderLessons[0]);
+  assert.ok(speech.visibleUntil>=37);
+  updateSpiderSpeech(speech,28,false);
+  updateSpiderSpeech(speech,55,false);
+  assert.equal(speech.history.length,1);
 });
 
-test('characters finish each line before the next with a shared quiet gap between exchanges',()=>{
+test('important dialogue waits in order, drops stale events and preserves the transcript',()=>{
   const speech=createSpiderSpeech();
-  assert.ok(startExchange(speech,1,'hunter',partner));
-  assert.ok(speech.until>=7);
-  assert.equal(startExchange(speech,2,'nearPrey',partner),false);
-  for (const [i,speaker] of ['hunter','spider','hunter'].entries()) {
-    assert.equal(speech.cue?.speaker,speaker);
-    assert.equal(speech.cue?.text,exchanges.hunter[0][i]);
-    updateSpiderSpeech(speech,speech.until-.05,false,visible);
-    assert.equal(speech.cue?.text,exchanges.hunter[0][i]);
-    updateSpiderSpeech(speech,speech.until,false,visible);
-    updateSpiderSpeech(speech,speech.next-.01,false,visible);
-    assert.equal(speech.cue,undefined);
-    if (i<2) updateSpiderSpeech(speech,speech.next,false,visible);
+  assert.ok(enqueueDialogue(speech,1,'nearPrey','dart',()=>true));
+  updateSpiderSpeech(speech,1,false);
+  assert.ok(enqueueDialogue(speech,3,'hunter','hunter',()=>false));
+  assert.ok(enqueueDialogue(speech,4,'caughtPrey','pip',()=>true));
+  assert.ok(enqueueDialogue(speech,4,'escaped','hunter',()=>true));
+  for (const speaker of ['spider','dart','spider']) {
+    assert.equal(speech.history.at(-1)?.speaker,speaker);
+    const count=speech.history.length;
+    updateSpiderSpeech(speech,speech.next-.1,false);
+    assert.equal(speech.history.length,count);
+    updateSpiderSpeech(speech,speech.next,false);
   }
-  assert.equal(startExchange(speech,speech.next-.1,'nearPrey',partner),false);
-  assert.ok(startExchange(speech,speech.next,'nearPrey',partner));
-});
-
-test('an offscreen interlocutor pauses reading and a stale exchange is abandoned',()=>{
-  const speech=createSpiderSpeech();
-  let relevant=true;
-  startExchange(speech,1,'nearPrey',{...partner,isRelevant:()=>relevant});
-  const until=speech.until;
-  updateSpiderSpeech(speech,2,false,visible);
-  updateSpiderSpeech(speech,3,false,()=>false);
-  updateSpiderSpeech(speech,5,false,()=>false);
-  assert.equal(speech.hiddenSince,2);
-  updateSpiderSpeech(speech,6,false,visible);
-  assert.equal(speech.hiddenSince,undefined);
-  assert.equal(speech.until,until+4);
-  assert.equal(speech.cue?.text,exchanges.nearPrey[0][0]);
-  relevant=false;
-  updateSpiderSpeech(speech,7,false,visible);
-  assert.equal(speech.cue,undefined);
-  assert.equal(speech.partner,undefined);
+  assert.deepEqual(speech.history.map(line=>line.speaker),['spider','dart','spider','hunter']);
+  assert.ok(speech.history[3].text.includes('restraint'));
+  assert.deepEqual(speech.queue.map(request=>request.event),['caughtPrey']);
 });
 
 test('contact picks up free and trapped insects, adding each to the trailing chain',()=>{
