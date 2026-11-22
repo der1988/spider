@@ -297,7 +297,7 @@ dialog h2 { margin: 0; font-size: 16px; }
   position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none;
   width: max-content; max-width: min(var(--caption-width, 65%), 34ch);
   color: #fff4bd; text-align: center; text-wrap: pretty; overflow-wrap: anywhere;
-  font: 750 clamp(14px, 1.6vw, 21px)/1.19 system-ui, sans-serif;
+  font: 750 clamp(12px, 1.3vw, 16px)/1.19 system-ui, sans-serif;
   paint-order: stroke fill; -webkit-text-stroke: 2.6px #17271d;
   text-shadow: 0 2px 3px #0e1b13;
 }
@@ -305,7 +305,7 @@ dialog h2 { margin: 0; font-size: 16px; }
 .gnat-caption[data-speaker=midge] { color: #e1ffc3; }
 .gnat-caption[data-speaker=dart] { color: #c4f7fe; }
 .gnat-caption[data-speaker=pip] { color: #f1d8ff; }
-.shell[data-subtitles=large] .gnat-caption { font-size: clamp(17px, 1.9vw, 25px); }
+.shell[data-subtitles=large] .gnat-caption { font-size: clamp(14px, 1.55vw, 20px); }
 .shell[data-window-hunt=true] #lyric { display: none; }
 .shell[data-window-hunt=true] #message {
   height: 1.5em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

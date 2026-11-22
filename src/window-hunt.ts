@@ -71,6 +71,28 @@ export const bedroom:Corner={
   flightSites:bedroomBlueprint.flightSites.map(scaled),
   hunterSites:bedroomBlueprint.hunterSites.map(scaledPerch),
 };
+// Move the furniture and its perches together. Ordered control points preserve
+// the room's connected passages and the contacts between adjoining objects.
+export function randomBedroom(random=Math.random):Corner {
+  function axis(limit:number,offset:number) {
+    const spacing=limit/4;
+    const stops=[0,...[1,2,3].map(i=>i*spacing+(random()*2-1)*offset),limit];
+    return (value:number)=>{
+      const i=Math.min(3,Math.max(0,Math.floor(value/spacing)));
+      return stops[i]+(stops[i+1]-stops[i])*(value-i*spacing)/spacing;
+    };
+  }
+  const x=axis(bedroomWidth,45),y=axis(bedroomHeight,23);
+  const point=(p:Point)=>({x:x(p.x),y:y(p.y)});
+  const perch=(p:Point)=>({x:x(p.x),y:y(p.y+SPIDER_HALF_HEIGHT)-SPIDER_HALF_HEIGHT});
+  return {
+    objects:bedroom.objects.map(r=>({...r,...point(r),w:x(r.x+r.w)-x(r.x),h:y(r.y+r.h)-y(r.y)})),
+    spawnSites:bedroom.spawnSites.map(perch),
+    hunterSites:bedroom.hunterSites.map(perch),
+    flightSites:bedroom.flightSites.map(point),
+  };
+}
+
 const practiceRoom=[
   ...boundary,
   // Three steps lead into the lower ledge and leave the ceiling lane open.

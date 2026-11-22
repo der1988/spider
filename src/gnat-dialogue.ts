@@ -125,13 +125,13 @@ export function createSpiderSpeech() {
 
 type Speech=ReturnType<typeof createSpiderSpeech>;
 
-export const slowMotionSeconds=1.25;
+export const slowMotionSeconds=1.75;
 
 export function dialogueRate(speech:Speech,clock:number) {
   const t=clock-speech.slowAt;
   if (t<0 || t>=slowMotionSeconds) return 1;
-  const blend=Math.min(1,t/.20,(slowMotionSeconds-t)/.34);
-  return 1-.42*blend*blend*(3-2*blend);
+  const blend=Math.min(1,t/.16,(slowMotionSeconds-t)/.34);
+  return 1-.72*blend*blend*(3-2*blend);
 }
 
 function speak(speech:Speech,clock:number,line:DialogueLine,conversation:boolean) {

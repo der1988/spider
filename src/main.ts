@@ -1,7 +1,7 @@
 import {bindGnatDialogueView} from './gnat-dialogue-view';
 import {dialogueRate} from './gnat-dialogue';
 import './style.css';
-import {advanceWindowDialogue,cameraFor,chasingPrey,createWindowHunt,gnatCast,gnatPositions,stepWindowHunt,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
+import {advanceWindowDialogue,cameraFor,chasingPrey,createWindowHunt,gnatCast,gnatPositions,randomBedroom,stepWindowHunt,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
 import {renderWindowHunt} from './window-hunt-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
@@ -581,7 +581,7 @@ function startWindowHunt(practice=false) {
   mode=undefined;
   windowDefeat.close();
   clearFlyScene();
-  windowHunt=createWindowHunt(practice);
+  windowHunt=createWindowHunt(practice,practice ? undefined : randomBedroom());
   windowHunt.escapeHeld=crossHeld;
   roomMapOpen=false;
   huntNoticeUntil=0;

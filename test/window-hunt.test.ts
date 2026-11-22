@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {advanceArena,arenaStep,createArena,type ArenaInput} from '../src/arena-run.ts';
-import {advanceWindowDialogue,chasingPrey,createWindowHunt,gnatCast,cameraFor,bedroom,bedroomHeight,bedroomWidth,caughtLifetime,webLifetime,windowAnchor,stepWindowHunt,type CornerInput,type WindowRun} from '../src/window-hunt.ts';
+import {advanceWindowDialogue,chasingPrey,randomBedroom,createWindowHunt,gnatCast,cameraFor,bedroom,bedroomHeight,bedroomWidth,caughtLifetime,webLifetime,windowAnchor,stepWindowHunt,type CornerInput,type WindowRun} from '../src/window-hunt.ts';
 import {createSpiderSpeech,dialogueRate,slowMotionSeconds,dialogueFade,enqueueDialogue,idleDelay,spiderLessons,updateSpiderSpeech} from '../src/gnat-dialogue.ts';
 import {createCrawler} from '../src/crawler.ts';
 import {arenaLayouts} from '../src/hunt.ts';
@@ -49,23 +49,34 @@ test('each new room distributes the player, the prey and the hunter at separated
 });
 
 test('rooms under furniture connect to the rest of the chamber for a player-sized body',()=>{
-  const step=6,width=Math.ceil(bedroomWidth/step),height=Math.ceil(bedroomHeight/step);
-  const grid=new Uint8Array(width*height);
-  for(let i=0;i<grid.length;i++) {
-    const x=i%width*step,y=Math.floor(i/width)*step;
-    if(bedroom.objects.some(r=>x>r.x-7&&x<r.x+r.w+7&&y>r.y-8&&y<r.y+r.h+8)) grid[i]=1;
-  }
-  const first=grid.indexOf(0),queue=[first];
-  grid[first]=1;
-  for(let i=0;i<queue.length;i++){
-    const cell=queue[i],x=cell%width;
-    for(const next of [x>0?cell-1:-1,x<width-1?cell+1:-1,cell-width,cell+width]){
-      if(grid[next]!==0)continue;
-      grid[next]=1;
-      queue.push(next);
+  let seed=83291;
+  const random=()=>((seed=Math.imul(seed,1664525)+1013904223>>>0)/4294967296);
+  for (let trial=0;trial<24;trial++) {
+    const corner=randomBedroom(random);
+    const game=createWindowHunt(false,corner,random);
+    assert.equal(game.gnats.length,3);
+    assert.equal(game.predators.length,1);
+    const actors=[game.spider,game.predators[0].body,...game.gnats.map(insect=>insect.p)];
+    actors.forEach((p,i)=>actors.slice(i+1).forEach(q=>assert.ok(Math.hypot(p.x-q.x,p.y-q.y)>130)));
+    assert.notDeepEqual(corner.objects,bedroom.objects);
+    const step=6,width=Math.ceil(bedroomWidth/step),height=Math.ceil(bedroomHeight/step);
+    const grid=new Uint8Array(width*height);
+    for(let i=0;i<grid.length;i++) {
+      const x=i%width*step,y=Math.floor(i/width)*step;
+      if(corner.objects.some(r=>x>r.x-7&&x<r.x+r.w+7&&y>r.y-8&&y<r.y+r.h+8)) grid[i]=1;
     }
+    const first=grid.indexOf(0),queue=[first];
+    grid[first]=1;
+    for(let i=0;i<queue.length;i++){
+      const cell=queue[i],x=cell%width;
+      for(const next of [x>0?cell-1:-1,x<width-1?cell+1:-1,cell-width,cell+width]){
+        if(grid[next]!==0)continue;
+        grid[next]=1;
+        queue.push(next);
+      }
+    }
+    assert.equal(grid.includes(0),false);
   }
-  assert.equal(grid.includes(0),false);
 });
 
 test('a fleeing insect still avoids a visible trap',()=>{
@@ -139,8 +150,8 @@ test('each exchange line has a smooth independent slowdown and finishes before t
   assert.equal(first?.speaker,'spider');
   assert.equal(dialogueRate(speech,1),1);
   assert.ok(dialogueRate(speech,1.1)<1);
-  assert.ok(Math.abs(dialogueRate(speech,1.5)-.58)<.001);
-  assert.ok(dialogueRate(speech,2.15)>dialogueRate(speech,1.5));
+  assert.ok(Math.abs(dialogueRate(speech,1.5)-.28)<.001);
+  assert.ok(dialogueRate(speech,2.65)>dialogueRate(speech,1.5));
   assert.equal(dialogueRate(speech,1+slowMotionSeconds),1);
   updateSpiderSpeech(speech,speech.next-.2,false);
   assert.equal(speech.line,first);

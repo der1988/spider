@@ -117,13 +117,13 @@ export function bindGnatDialogueView() {
         origin=shown=target;
       } else if (!reduced) {
         const distance=Math.hypot(target.x-origin.x,target.y-origin.y);
-        const pull=Math.min(.82,.36+Math.max(0,distance-85)/220);
+        const pull=Math.min(.48,.13+Math.max(0,distance-120)/420);
         const favored=bound({x:origin.x+(target.x-origin.x)*pull,y:origin.y+(target.y-origin.y)*pull});
         const destination=overlaps(favored) ? target : favored;
         const step=Math.min(.05,elapsed);
-        const blend=1-Math.exp(-step/ .58);
+        const blend=1-Math.exp(-step/ .92);
         const dx=(destination.x-shown.x)*blend,dy=(destination.y-shown.y)*blend;
-        const speedLimit=Math.min(1,68*step/(Math.hypot(dx,dy)||1));
+        const speedLimit=Math.min(1,30*step/(Math.hypot(dx,dy)||1));
         shown=bound({x:shown.x+dx*speedLimit,y:shown.y+dy*speedLimit});
       }
       caption.style.transform=`translate(${shown.x.toFixed(2)}px,${shown.y.toFixed(2)}px)`;
