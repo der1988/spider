@@ -10,7 +10,7 @@ export const bedroomWidth=2000;
 export const bedroomHeight=1008;
 export const caughtLifetime=3;
 export const webLifetime=5;
-const silkClimbSpeed=244;
+const silkClimbSpeed=152;
 export const breakFreePresses=5;
 const huntSilkRange=DEFAULT_TUNING.range*4;
 const jumpSpeed=172;
@@ -333,7 +333,7 @@ function gripWeb(game:WindowRun,previous:Point) {
 function crawlWeb(game:WindowRun,wire:Strand,stick:Point,dt:number) {
   const {spider}=game;
   const tangent=unit({x:wire.to.x-wire.from.x,y:wire.to.y-wire.from.y});
-  const speed=(stick.x*tangent.x+stick.y*tangent.y)*(94+128*Math.abs(tangent.y));
+  const speed=(stick.x*tangent.x+stick.y*tangent.y)*(94+(silkClimbSpeed-94)*Math.abs(tangent.y));
   const t=projection(spider,wire)+speed*dt/distance(wire.from,wire.to);
   const next=pointAt(wire,clamp(t,0,1));
   moveAxis(spider,game.surfaces,'x',next.x-spider.x);

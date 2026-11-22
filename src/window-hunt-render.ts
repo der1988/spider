@@ -174,8 +174,8 @@ function drawHunter(ctx:CanvasRenderingContext2D,game:WindowRun,enemy:WindowRun[
 
 function drawSpiderSpeech(ctx:CanvasRenderingContext2D,text:string,spider:{x:number;y:number},large:boolean) {
   ctx.save();
-  ctx.font=`${large ? 13 : 11}px monospace`;
-  ctx.textAlign='left';
+  ctx.font=`bold ${large ? 13 : 11}px monospace`;
+  ctx.textAlign='center';
   ctx.textBaseline='top';
   const rows:string[]=[];
   let row='';
@@ -187,16 +187,20 @@ function drawSpiderSpeech(ctx:CanvasRenderingContext2D,text:string,spider:{x:num
     } else row=next;
   }
   rows.push(row);
-  const width=Math.ceil(Math.max(...rows.map(value=>ctx.measureText(value).width)))+14;
+  const halfWidth=Math.ceil(Math.max(...rows.map(value=>ctx.measureText(value).width))/2);
   const lineHeight=large ? 16 : 14;
-  const height=rows.length*lineHeight+8;
-  const x=Math.round(Math.max(6,Math.min(roomWidth-width-6,spider.x-width/2)));
-  const above=spider.y-height-16;
-  const y=Math.round(above>=5 ? above : Math.max(5,spider.y+14));
-  block(ctx,x,y,width,height,'#263d30');
-  block(ctx,x+1,y+1,width-2,1,'#7e9a73');
-  ctx.fillStyle=cream;
-  rows.forEach((value,i)=>ctx.fillText(value,x+7,y+4+i*lineHeight));
+  const x=Math.round(Math.max(halfWidth+6,Math.min(roomWidth-halfWidth-6,spider.x)));
+  const above=spider.y-rows.length*lineHeight-13;
+  const y=Math.round(above>=5 ? above : spider.y+14);
+  ctx.lineWidth=3;
+  ctx.lineJoin='round';
+  ctx.strokeStyle='#1b2c24';
+  ctx.fillStyle='#f9e995';
+  rows.forEach((value,i)=>{
+    const lineY=y+i*lineHeight;
+    ctx.strokeText(value,x,lineY);
+    ctx.fillText(value,x,lineY);
+  });
   ctx.restore();
 }
 
