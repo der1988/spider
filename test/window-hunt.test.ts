@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {advanceArena,arenaStep,createArena,type ArenaInput} from '../src/arena-run.ts';
-import {createWindowHunt,cameraFor,bedroom,bedroomHeight,bedroomWidth,caughtLifetime,webLifetime,windowAnchor,stepWindowHunt,type CornerInput,type WindowRun} from '../src/window-hunt.ts';
+import {createWindowHunt,gnatCast,cameraFor,bedroom,bedroomHeight,bedroomWidth,caughtLifetime,webLifetime,windowAnchor,stepWindowHunt,type CornerInput,type WindowRun} from '../src/window-hunt.ts';
 import {createSpiderSpeech,dialogueFade,enqueueDialogue,idleDelay,spiderLessons,updateSpiderSpeech} from '../src/gnat-dialogue.ts';
 import {createCrawler} from '../src/crawler.ts';
 import {arenaLayouts} from '../src/hunt.ts';
@@ -181,13 +181,31 @@ test('contact picks up free and trapped insects, adding each to the trailing cha
   game.web.strands=[wire];
   game.occupants.set(wire,[second]);
   run(game,1);
-  assert.equal(game.gnats.length,3);
+  assert.equal(game.gnats.length,1);
+  assert.equal(gnatCast(game).midge,'eliminated');
+  assert.equal(gnatCast(game).dart,'eliminated');
   assert.deepEqual(game.carried,[second,first]);
   assert.equal(game.silk,2);
   assert.equal(game.catches,2);
   assert.equal(game.occupants.has(wire),false);
   run(game,36,{move:{x:1,y:0}});
   assert.ok(game.spider.x>game.carried[0].p.x && game.carried[0].p.x>game.carried[1].p.x);
+});
+
+test('cast uses the camera and never replaces a collected insect',()=>{
+  const game=createWindowHunt();
+  game.predators.length=0;
+  const [insect,...others]=game.gnats;
+  game.spider=createCrawler({x:538,y:961.6},game.surfaces);
+  insect.p={x:568,y:951};
+  for (const other of others) other.p={x:1750,y:300};
+  assert.deepEqual(gnatCast(game),{spider:'active',midge:'active',dart:'away',pip:'away',hunter:'away'});
+  insect.p={x:543,y:961.6};
+  run(game,1);
+  run(game,240);
+  assert.equal(gnatCast(game).midge,'eliminated');
+  assert.equal(game.gnats.length,2);
+  assert.equal(game.carried.length,1);
 });
 
 test('web expiry frees an uncollected insect without granting points',()=>{

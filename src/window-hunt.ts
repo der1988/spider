@@ -1,7 +1,7 @@
 import {castCrawler,closeCrawlerRopes,createCrawler,jumpCrawler,type Crawler,normals,tickCrawler} from './crawler.ts';
 import {aimHit,DEFAULT_TUNING,SPIDER_HALF_HEIGHT,moveAxis,type Point,type Rect} from './spider.ts';
 import {anchorSilk,crossesSolid,sweptHit,type Strand} from './threads.ts';
-import {createSpiderSpeech,enqueueDialogue,updateSpiderSpeech} from './gnat-dialogue.ts';
+import {createSpiderSpeech,enqueueDialogue,updateSpiderSpeech,type CastState,type PreySpeaker,type Speaker} from './gnat-dialogue.ts';
 
 export const roomWidth=520;
 export const roomHeight=290;
@@ -108,7 +108,7 @@ export function createWindowHunt(practice=false,corner=bedroom,random=Math.rando
   const hunterStart=practice ? undefined : randomSite(hunterStarts,random);
   const starts=hunterStart ? pickFlightSites(corner,spider,random,3,[hunterStart]) : [];
   return {
-    practice,corner,surfaces,random,spider,
+    practice,corner,surfaces,spider,
     web:{strands:[] as Strand[]},
     speech:createSpiderSpeech(),
     greeted:new WeakSet<Gnat>(),
@@ -251,18 +251,12 @@ function steerGnat(game:WindowRun,gnat:Gnat,threat:Point|undefined) {
   return best;
 }
 
-function collectInsect(game:WindowRun,gnat:Gnat,replacements:Gnat[],emit:(event:WindowEvent)=>void) {
+function collectInsect(game:WindowRun,gnat:Gnat,emit:(event:WindowEvent)=>void) {
   game.carried.push(gnat);
   startInsectDialogue(game,gnat,'caughtPrey');
   game.silk++;
   game.catches++;
-  const occupied=game.gnats.filter(other=>other!==gnat).map(other=>other.p);
-  const sites=pickFlightSites(game.corner,game.spider,game.random,1,[
-    ...occupied,...replacements.map(other=>other.p),...game.predators.map(enemy=>enemy.body),
-  ]);
-  const next=makeGnat(sites[0]??gnat.home,0,game.random);
-  next.kind=gnat.kind;
-  replacements.push(next);
+  if (game.speech.right?.speaker===preySpeaker(gnat)) game.speech.right=undefined;
   emit('catch');
 }
 
@@ -274,11 +268,10 @@ function touchesInsect(game:WindowRun,p:Point,previous:Point,from:Point=p) {
 }
 
 function advanceGnats(game:WindowRun,previous:Point,dt:number,emit:(event:WindowEvent)=>void) {
-  const replacements:Gnat[]=[];
   for (const [wire,occupants] of game.occupants) {
     const remaining=occupants.filter(gnat=>{
       if (!touchesInsect(game,gnat.p,previous)) return true;
-      collectInsect(game,gnat,replacements,emit);
+      collectInsect(game,gnat,emit);
       return false;
     });
     if (remaining.length) game.occupants.set(wire,remaining);
@@ -302,7 +295,7 @@ function advanceGnats(game:WindowRun,previous:Point,dt:number,emit:(event:Window
       return true;
     }
     if (touchesInsect(game,next,previous,p)) {
-      collectInsect(game,gnat,replacements,emit);
+      collectInsect(game,gnat,emit);
       return false;
     }
     const hit=firstCrossing(p,next,game.web.strands);
@@ -319,7 +312,6 @@ function advanceGnats(game:WindowRun,previous:Point,dt:number,emit:(event:Window
     if (Math.abs(v.x)>6) gnat.direction=v.x<0 ? -1 : 1;
     return true;
   });
-  game.gnats.push(...replacements);
 }
 
 function projection(p:Point,wire:Strand) {
@@ -366,9 +358,12 @@ function expireWebs(game:WindowRun) {
   });
 }
 
+function preySpeaker(insect:Gnat):PreySpeaker {
+  return insect.kind==='wary' ? 'midge' : insect.kind==='swift' ? 'dart' : 'pip';
+}
+
 function startInsectDialogue(game:WindowRun,insect:Gnat,event:'nearPrey'|'caughtPrey'|'freedPrey') {
-  const speaker=insect.kind==='wary' ? 'midge' : insect.kind==='swift' ? 'dart' : 'pip';
-  return enqueueDialogue(game.speech,game.clock,event,speaker,()=>event==='caughtPrey'
+  return enqueueDialogue(game.speech,game.clock,event,preySpeaker(insect),()=>event==='caughtPrey'
     ? game.carried.includes(insect)
     : game.gnats.includes(insect) && (event==='freedPrey' || distance(insect.p,game.spider)<145));
 }
@@ -582,6 +577,17 @@ function inWindow(game:WindowRun,point:Point) {
   return point.x>=camera.x && point.x<camera.x+roomWidth && point.y>=camera.y && point.y<camera.y+roomHeight;
 }
 
+export function gnatCast(game:WindowRun):Record<Speaker,CastState> {
+  const cast:Record<Speaker,CastState>={spider:'active',midge:'away',dart:'away',pip:'away',hunter:'away'};
+  for (const insect of game.gnats) if (inWindow(game,insect.p)) cast[preySpeaker(insect)]='active';
+  for (const occupants of game.occupants.values()) {
+    for (const insect of occupants) if (inWindow(game,insect.p)) cast[preySpeaker(insect)]='active';
+  }
+  for (const insect of game.carried) cast[preySpeaker(insect)]='eliminated';
+  if (game.predators.some(enemy=>inWindow(game,enemy.body))) cast.hunter='active';
+  return cast;
+}
+
 export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(event:WindowEvent)=>void) {
   if (game.phase==='over') return;
   const {spider,web}=game;
@@ -661,5 +667,5 @@ export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(
   const idle=!!spider.support && !game.trapped && !spider.rope && !input.silk && !input.jump &&
     magnitude(input.move)<.1 && distance(spider,beforeMove)<.12 &&
     !game.predators.some(enemy=>game.clock>=enemy.boundUntil && game.clock<enemy.chaseUntil);
-  updateSpiderSpeech(game.speech,game.clock,idle);
+  updateSpiderSpeech(game.speech,game.clock,idle,speaker=>speaker==='spider' || gnatCast(game)[speaker]==='active');
 }

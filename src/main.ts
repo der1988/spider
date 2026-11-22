@@ -1,6 +1,6 @@
 import {bindGnatDialogueView} from './gnat-dialogue-view';
 import './style.css';
-import {createWindowHunt,stepWindowHunt,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
+import {createWindowHunt,gnatCast,stepWindowHunt,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
 import {renderWindowHunt} from './window-hunt-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
@@ -557,7 +557,7 @@ function keyboardInput() {
 
 const windowInfo=get('window-hunt-info');
 function showWindowDialogue(run?:WindowRun) {
-  renderGnatDialogue(run?.speech.left,run?.speech.right,run ? run.clock-run.speech.visibleUntil : Infinity,
+  renderGnatDialogue(run && !run.practice ? gnatCast(run) : undefined,run?.speech.left,run?.speech.right,run ? run.clock-run.speech.visibleUntil : Infinity,
     !!run && !run.practice && !roomMapOpen && run.phase!=='over' && subtitleMode.selectedIndex!==2,reduced());
 }
 
@@ -566,12 +566,9 @@ function setWindowView() {
   else delete shell.dataset.windowHunt;
   worldCanvas.width=windowHunt ? roomWidth : 360;
   worldCanvas.height=windowHunt ? roomHeight : 204;
-  windowInfo.hidden=!windowHunt;
+  windowInfo.hidden=!windowHunt?.practice;
   get('silk-count').hidden=!windowHunt || windowHunt.practice;
   showWindowDialogue(windowHunt);
-  windowInfo.textContent=windowHunt?.practice
-    ? 'L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower'
-    : 'L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower · R2 / G grip · △ / M map · □ / V remove nearest empty web · × / C escape';
 }
 
 function startWindowHunt(practice=false) {
