@@ -56,31 +56,9 @@
   </header>
   <section class="stage" aria-label="Hunting arena">
     <canvas id="world" width="360" height="204" aria-label="Spider, fly and webs"></canvas>
-    <div id="gnat-conversation" class="gnat-conversation" hidden>
-      <div class="gnat-portrait" aria-hidden="true">
-        <svg viewBox="0 0 16 16" shape-rendering="crispEdges">
-          <path fill="#304737" d="M5 3h6v1h2v3h1v4h-2v2H4v-2H2V7h1V4h2z"/>
-          <path fill="#91aa72" d="M5 5h6v1h2v4h-2v2H5v-2H3V6h2z"/>
-          <path fill="#f9e995" d="M5 7h2v2H5zm4 0h2v2H9z"/>
-          <path fill="#26392c" d="M1 10h2v3H1zm3 2h2v2H4zm6 0h2v2h-2zm3-2h2v3h-2zM7 10h2v1H7z"/>
-        </svg>
-      </div>
-      <div class="gnat-dialogue-line" role="status" aria-atomic="true">
-        <span id="gnat-dialogue-speaker" class="visually-hidden"></span><span id="gnat-dialogue-text"></span>
-      </div>
-      <div id="gnat-interlocutor" class="gnat-portrait gnat-interlocutor" aria-hidden="true" hidden>
-        <svg class="gnat-hunter-face" viewBox="0 0 16 16" shape-rendering="crispEdges">
-          <path fill="#34271e" d="M4 2h8v1h2v3h1v6h-2v2H3v-2H1V6h1V3h2z"/>
-          <path fill="#aa754f" d="M4 5h8v1h2v5h-2v2H4v-2H2V6h2z"/>
-          <path fill="#ffce8c" d="M4 7h2v1h1v2H5v-1H4zm6 0h2v2h-1v1H9V8h1zM5 11h2v2H5zm4 0h2v2H9z"/>
-        </svg>
-        <svg class="gnat-prey-face" viewBox="0 0 16 16" shape-rendering="crispEdges">
-          <path fill="#b6d7aa" d="M1 3h4v1h2v3H3V6H1zm10 0h4v3h-2v1H9V4h2z"/>
-          <path fill="#344a36" d="M6 4h4v2h2v6h-2v2H6v-2H4V6h2z"/>
-          <path fill="#e2f2b5" d="M5 7h2v3H5zm4 0h2v3H9z"/>
-          <path fill="#88a666" d="M7 11h2v2H7z"/>
-        </svg>
-      </div>
+    <div id="gnat-dialogue-tail" aria-hidden="true" hidden></div>
+    <div id="gnat-conversation" class="gnat-dialogue-line" role="status" aria-atomic="true" hidden>
+      <span id="gnat-dialogue-speaker" class="visually-hidden"></span><span id="gnat-dialogue-text"></span>
     </div>
     <section id="loop-defeat" class="defeat" aria-labelledby="defeat-title" hidden>
       <div class="defeat-panel">

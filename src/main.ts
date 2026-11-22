@@ -1,5 +1,5 @@
 import './style.css';
-import {createWindowHunt,stepWindowHunt,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
+import {cameraFor,createWindowHunt,stepWindowHunt,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
 import {renderWindowHunt} from './window-hunt-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
@@ -555,23 +555,64 @@ function keyboardInput() {
 
 const windowInfo=get('window-hunt-info');
 const conversation=get('gnat-conversation');
-const interlocutor=get('gnat-interlocutor');
+const dialogueTail=get('gnat-dialogue-tail');
 const dialogueSpeaker=get('gnat-dialogue-speaker');
 const dialogueText=get('gnat-dialogue-text');
 
 function showWindowDialogue(run?:WindowRun) {
-  conversation.hidden=!run || run.practice || roomMapOpen || run.phase==='over' || subtitleMode.selectedIndex===2;
-  const speech=conversation.hidden ? undefined : run?.speech;
-  const cue=speech?.cue;
-  const kind=speech?.interlocutor;
-  interlocutor.hidden=!kind;
-  if (kind && interlocutor.dataset.kind!==kind) interlocutor.dataset.kind=kind;
-  const side=cue ? cue.speaker==='spider' ? 'left' : 'right' : '';
-  if (conversation.dataset.side!==side) conversation.dataset.side=side;
-  const label=cue ? {spider:'Spider',prey:'Insect',hunter:'Hunter'}[cue.speaker]+': ' : '';
+  const cue=run?.speech.cue;
+  if (!run || !cue || run.practice || roomMapOpen || run.phase==='over' ||
+      run.speech.hiddenSince!==undefined || subtitleMode.selectedIndex===2) {
+    conversation.hidden=true;
+    dialogueTail.hidden=true;
+    return;
+  }
+  const speaker=cue.speaker==='spider' ? run.spider : run.speech.partner?.position();
+  if (!speaker) return;
+  conversation.hidden=false;
+  if (conversation.dataset.speaker!==cue.speaker) conversation.dataset.speaker=cue.speaker;
+  const label={spider:'Spider',prey:'Insect',hunter:'Hunter'}[cue.speaker]+': ';
   if (dialogueSpeaker.textContent!==label) dialogueSpeaker.textContent=label;
-  const line=cue?.text??'';
-  if (dialogueText.textContent!==line) dialogueText.textContent=line;
+  if (dialogueText.textContent!==cue.text) dialogueText.textContent=cue.text;
+  const camera=cameraFor(run);
+  const scale=Math.min(worldCanvas.clientWidth/roomWidth,worldCanvas.clientHeight/roomHeight);
+  const width=roomWidth*scale,height=roomHeight*scale;
+  const left=(worldCanvas.clientWidth-width)/2,top=(worldCanvas.clientHeight-height)/2;
+  const maxWidth=Math.floor(Math.max(0,width-10))+'px';
+  if (conversation.style.getPropertyValue('--dialogue-width')!==maxWidth) {
+    conversation.style.setProperty('--dialogue-width',maxWidth);
+  }
+  const project=(point:Point)=>({x:left+(point.x-camera.x)*scale,y:top+(point.y-camera.y)*scale});
+  const anchor=project(speaker);
+  const w=conversation.offsetWidth,h=conversation.offsetHeight;
+  const gap=Math.max(15,19*scale), pad=5;
+  const keepClear=[run.spider,...run.gnats.map(insect=>insect.p),...run.predators.flatMap(enemy=>{
+    const body=enemy.body;
+    return enemy.shot ? [body,{x:body.x,y:body.y-21}] : [body];
+  })].map(project);
+  const candidates=[
+    {x:anchor.x-w/2,y:anchor.y-gap-h},{x:anchor.x-w/2,y:anchor.y+gap},
+    {x:anchor.x+gap,y:anchor.y-h/2},{x:anchor.x-gap-w,y:anchor.y-h/2},
+  ];
+  let best=candidates[0],cost=Infinity;
+  candidates.forEach((point,index)=>{
+    const x=Math.max(left+pad,Math.min(left+width-w-pad,point.x));
+    const y=Math.max(top+pad,Math.min(top+height-h-pad,point.y));
+    const covers=(p:Point)=>p.x>x-gap/2 && p.x<x+w+gap/2 && p.y>y-gap/2 && p.y<y+h+gap/2;
+    const score=Math.abs(x-point.x)*.12+Math.abs(y-point.y)+index*5+
+      keepClear.filter(covers).length*180+Number(covers(anchor))*210;
+    if (score<cost) {cost=score;best={x,y};}
+  });
+  conversation.style.transform=`translate(${Math.round(best.x)}px,${Math.round(best.y)}px)`;
+  const endX=Math.max(best.x,Math.min(best.x+w,anchor.x));
+  const endY=Math.max(best.y,Math.min(best.y+h,anchor.y));
+  const dx=anchor.x-endX,dy=anchor.y-endY;
+  const length=Math.hypot(dx,dy);
+  dialogueTail.hidden=length<=9;
+  if (!dialogueTail.hidden) {
+    dialogueTail.style.width=`${length-7}px`;
+    dialogueTail.style.transform=`translate(${endX}px,${endY}px) rotate(${Math.atan2(dy,dx)}rad)`;
+  }
 }
 
 function setWindowView() {

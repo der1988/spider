@@ -1,5 +1,5 @@
 import {block,drawAimMarker,drawPlatform,drawSpider,line} from './hunt-render';
-import {bedroomHeight,bedroomScale,bedroomWidth,cameraFor,roomHeight,roomWidth,windowAnchor,type Corner,type WindowRun} from './window-hunt';
+import {bedroomHeight,bedroomScale,bedroomWidth,cameraFor,hunterWindup,roomHeight,roomWidth,windowAnchor,type Corner,type WindowRun} from './window-hunt';
 
 const ink='#22392e';
 const cream='#eff3c8';
@@ -160,12 +160,20 @@ function renderMap(ctx:CanvasRenderingContext2D,game:WindowRun) {
 function drawHunter(ctx:CanvasRenderingContext2D,game:WindowRun,enemy:WindowRun['predators'][number]) {
   const body=enemy.body;
   const bound=game.clock<enemy.boundUntil;
-  if (enemy.shot) line(ctx,enemy.shot.from,enemy.shot.to,'#bd8151',true);
+  if (body.rope) line(ctx,body,body.rope,'#f2c189');
+  if (enemy.shot) {
+    const {from,to,at}=enemy.shot;
+    line(ctx,from,to,'#4c3429');
+    line(ctx,from,to,'#ffc585',true);
+    const progress=Math.max(0,Math.min(1,1-(at-game.clock)/hunterWindup));
+    block(ctx,body.x-11,body.y-22,22,4,'#4c3429');
+    block(ctx,body.x-10,body.y-21,20*progress,2,'#ffd296');
+  }
   ctx.save();
   ctx.translate(body.x,body.y);
   ctx.scale(1.52,1.52);
   drawSpider(ctx,{...body,x:0,y:0},game.clock,{time:game.clock,beat:0},
-    bound ? 'yield' : 'normal',{accent:'#e3ad70'});
+    bound ? 'yield' : enemy.shot ? 'aim' : 'normal',{accent:'#e3ad70'});
   ctx.restore();
   if (bound) {
     for (let i=-6;i<=6;i+=3) line(ctx,{x:body.x-10,y:body.y+i},{x:body.x+10,y:body.y+i+2},cream);

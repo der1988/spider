@@ -117,45 +117,59 @@ test('letting go in midair removes the rope and cannot fix a web on a later land
   assert.equal(game.web.strands.length,0);
 });
 
-test('idle lessons need sustained stillness and stop when the player moves',()=>{
+const visible=()=>true;
+const partner={position:()=>({x:4,y:5}),isRelevant:()=>true};
+
+test('idle lessons need sustained stillness and finish once started',()=>{
   assert.ok(new Set([...spiderLessons,...Object.values(exchanges).flat(2)]).size>=100);
   const speech=createSpiderSpeech();
-  updateSpiderSpeech(speech,20,false);
-  updateSpiderSpeech(speech,20+idleDelay-.1,true);
+  updateSpiderSpeech(speech,20,false,visible);
+  updateSpiderSpeech(speech,20+idleDelay-.1,true,visible);
   assert.equal(speech.cue,undefined);
-  updateSpiderSpeech(speech,20+idleDelay,true);
+  updateSpiderSpeech(speech,20+idleDelay,true,visible);
   assert.equal(speech.cue?.text,spiderLessons[0]);
-  updateSpiderSpeech(speech,28,false);
-  assert.equal(speech.cue,undefined);
-  updateSpiderSpeech(speech,40,true);
+  updateSpiderSpeech(speech,28,false,visible);
+  assert.equal(speech.cue?.text,spiderLessons[0]);
+  updateSpiderSpeech(speech,speech.until,false,visible);
   assert.equal(speech.cue,undefined);
 });
 
-test('characters trade lines in order with a shared quiet gap between exchanges',()=>{
+test('characters finish each line before the next with a shared quiet gap between exchanges',()=>{
   const speech=createSpiderSpeech();
-  assert.ok(startExchange(speech,1,'hunter'));
-  assert.equal(speech.cue?.speaker,'hunter');
-  assert.equal(speech.interlocutor,'hunter');
-  assert.equal(speech.cue?.text,exchanges.hunter[0][0]);
-  updateSpiderSpeech(speech,4.5,false);
-  assert.equal(speech.cue?.text,exchanges.hunter[0][0]);
-  assert.equal(startExchange(speech,2,'nearPrey'),false);
-  updateSpiderSpeech(speech,speech.until,false);
-  assert.equal(speech.interlocutor,'hunter');
-  updateSpiderSpeech(speech,speech.next,false);
-  assert.equal(speech.cue?.speaker,'spider');
-  assert.equal(speech.cue?.text,exchanges.hunter[0][1]);
-  updateSpiderSpeech(speech,speech.until,false);
-  updateSpiderSpeech(speech,speech.next,false);
-  assert.equal(speech.cue?.speaker,'hunter');
-  assert.equal(speech.cue?.text,exchanges.hunter[0][2]);
-  updateSpiderSpeech(speech,speech.until,false);
-  assert.equal(speech.interlocutor,undefined);
-  assert.equal(startExchange(speech,speech.next-.1,'nearPrey'),false);
-  assert.ok(startExchange(speech,speech.next,'nearPrey'));
-  updateSpiderSpeech(speech,speech.until,false);
-  updateSpiderSpeech(speech,speech.next,false);
-  assert.equal(speech.cue?.speaker,'prey');
+  assert.ok(startExchange(speech,1,'hunter',partner));
+  assert.ok(speech.until>=7);
+  assert.equal(startExchange(speech,2,'nearPrey',partner),false);
+  for (const [i,speaker] of ['hunter','spider','hunter'].entries()) {
+    assert.equal(speech.cue?.speaker,speaker);
+    assert.equal(speech.cue?.text,exchanges.hunter[0][i]);
+    updateSpiderSpeech(speech,speech.until-.05,false,visible);
+    assert.equal(speech.cue?.text,exchanges.hunter[0][i]);
+    updateSpiderSpeech(speech,speech.until,false,visible);
+    updateSpiderSpeech(speech,speech.next-.01,false,visible);
+    assert.equal(speech.cue,undefined);
+    if (i<2) updateSpiderSpeech(speech,speech.next,false,visible);
+  }
+  assert.equal(startExchange(speech,speech.next-.1,'nearPrey',partner),false);
+  assert.ok(startExchange(speech,speech.next,'nearPrey',partner));
+});
+
+test('an offscreen interlocutor pauses reading and a stale exchange is abandoned',()=>{
+  const speech=createSpiderSpeech();
+  let relevant=true;
+  startExchange(speech,1,'nearPrey',{...partner,isRelevant:()=>relevant});
+  const until=speech.until;
+  updateSpiderSpeech(speech,2,false,visible);
+  updateSpiderSpeech(speech,3,false,()=>false);
+  updateSpiderSpeech(speech,5,false,()=>false);
+  assert.equal(speech.hiddenSince,2);
+  updateSpiderSpeech(speech,6,false,visible);
+  assert.equal(speech.hiddenSince,undefined);
+  assert.equal(speech.until,until+4);
+  assert.equal(speech.cue?.text,exchanges.nearPrey[0][0]);
+  relevant=false;
+  updateSpiderSpeech(speech,7,false,visible);
+  assert.equal(speech.cue,undefined);
+  assert.equal(speech.partner,undefined);
 });
 
 test('contact picks up free and trapped insects, adding each to the trailing chain',()=>{
@@ -230,12 +244,42 @@ test('a hunter can still bind with silk and escape requires five distinct presse
   const hunter=game.predators[0],y=961.6;
   hunter.body=createCrawler({x:425,y},game.surfaces);
   game.spider=createCrawler({x:610,y},game.surfaces);
+  run(game,1);
+  assert.ok((hunter.shot?.at??0)-game.clock>=.74);
+  run(game,70);
+  assert.equal(game.shots.length,0);
   for(let i=0;i<175&&!game.trapped;i++)run(game,1);
   assert.ok(game.trapped);
   run(game,6,{escape:true});
   assert.equal(game.escapeCount,1);
   for(let i=0;i<4;i++) {run(game,1);run(game,1,{escape:true});}
   assert.equal(game.trapped,false);
+});
+
+test('hunter reels far above the bedroom floor and can route around a solid shelf',()=>{
+  const scenarios=[
+    {start:{x:740,y:961.6},goal:{x:620,y:470},range:500,highest:500},
+    {start:{x:1045,y:961.6},goal:{x:1050,y:420},range:380,highest:400},
+  ];
+  for (const {start,goal,range,highest} of scenarios) {
+    const game=createWindowHunt(false,bedroom,()=>.5);
+    game.gnats=[];
+    game.spider=createCrawler(goal,game.surfaces);
+    const hunter=game.predators[0];
+    hunter.body=createCrawler(start,game.surfaces);
+    hunter.fireAt=Infinity;
+    hunter.lastKnown=goal;
+    hunter.chaseUntil=40;
+    let longest=0,top=start.y;
+    for (let i=0;i<960 && game.phase==='play';i++) {
+      Object.assign(game.spider,goal,{vx:0,vy:0});
+      run(game,1);
+      longest=Math.max(longest,hunter.body.rope?.length??0);
+      top=Math.min(top,hunter.body.y);
+    }
+    assert.ok(longest>range,`longest rope: ${longest}`);
+    assert.ok(top<highest,`highest point: ${top}`);
+  }
 });
 
 test('camera follows both axes and solid walls keep the player in the smaller room',()=>{

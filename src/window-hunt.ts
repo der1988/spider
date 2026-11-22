@@ -10,6 +10,8 @@ export const bedroomWidth=2000;
 export const bedroomHeight=1008;
 export const caughtLifetime=3;
 export const webLifetime=5;
+export const hunterSilkRange=620;
+export const hunterWindup=.75;
 const silkClimbSpeed=152;
 export const breakFreePresses=5;
 const huntSilkRange=DEFAULT_TUNING.range*4;
@@ -90,6 +92,7 @@ type Predator={
   boundUntil:number; immuneUntil:number; jumpAt:number; fireAt:number;
   shot?:{from:Point;to:Point;at:number};
   patrolIndex:number;swingUntil:number;planAt:number;plan?:Point;
+  bypass?:{roof:Rect;exit:number};
 };
 export interface CornerInput {move:Point;aim?:Point;jump:boolean;silk:boolean;grip?:boolean;escape?:boolean;remove?:boolean;}
 
@@ -250,7 +253,7 @@ function steerGnat(game:WindowRun,gnat:Gnat,threat:Point|undefined) {
 
 function collectInsect(game:WindowRun,gnat:Gnat,replacements:Gnat[],emit:(event:WindowEvent)=>void) {
   game.carried.push(gnat);
-  startExchange(game.speech,game.clock,'caughtPrey');
+  startInsectDialogue(game,gnat,'caughtPrey');
   game.silk++;
   game.catches++;
   const occupied=game.gnats.filter(other=>other!==gnat).map(other=>other.p);
@@ -356,9 +359,25 @@ function expireWebs(game:WindowRun) {
       insect.v={x:0,y:0};
       insect.decideAt=0;
       game.gnats.push(insect);
+      if (distance(insect.p,game.spider)<110 && inWindow(game,insect.p)) startInsectDialogue(game,insect,'freedPrey');
     }
     game.occupants.delete(wire);
     return false;
+  });
+}
+
+function startInsectDialogue(game:WindowRun,insect:Gnat,event:'nearPrey'|'caughtPrey'|'freedPrey') {
+  return startExchange(game.speech,game.clock,event,{
+    position:()=>insect.p,
+    isRelevant:()=>game.carried.includes(insect) || game.gnats.includes(insect) ||
+      [...game.occupants.values()].some(occupants=>occupants.includes(insect)),
+  });
+}
+
+function startHunterDialogue(game:WindowRun,enemy:Predator,event:'hunter'|'boundHunter'|'escaped') {
+  return startExchange(game.speech,game.clock,event,{
+    position:()=>enemy.body,
+    isRelevant:()=>game.predators.includes(enemy) && distance(enemy.body,game.spider)<650,
   });
 }
 
@@ -410,32 +429,37 @@ function hunterRoute(game:WindowRun,body:Point,goal:Point) {
 
 function swingToward(game:WindowRun,enemy:Predator,goal:Point) {
   const {body}=enemy;
-  if (!body.support || goal.y>body.y-52) return false;
-  const dx=goal.x-body.x;
-  for (const offset of [0,-41,41]) {
-    const target={x:body.x+clamp(dx,-105,105)+offset,y:body.y-110};
-    const anchor=aimHit(body,game.surfaces,target);
-    if (!anchor || anchor.y>body.y-36 || distance(anchor,goal)>distance(body,goal)+8 ||
+  if (goal.y>body.y-45) return false;
+  let best:Point|undefined,score=Infinity;
+  const baseline=distance(body,goal);
+  const slope=(goal.x-body.x)/(body.y-goal.y);
+  for (const angle of [slope,0,-.35,.35,-.75,.75,-1.3,1.3,-2.1,2.1]) {
+    const target={x:body.x+angle*110,y:body.y-110};
+    const anchor=aimHit(body,game.surfaces,target,{range:hunterSilkRange});
+    if (!anchor || anchor.y>body.y-50 || distance(anchor,goal)>baseline-18 ||
         firstCrossing(body,anchor,game.web.strands)) continue;
-    if (castCrawler(body,game.surfaces,target)) {
-      enemy.swingUntil=game.clock+.8;
-      return true;
+    const roof=enemy.bypass?.roof;
+    if (roof && anchor.x>=roof.x-.1 && anchor.x<=roof.x+roof.w+.1 &&
+        anchor.y>=roof.y-.1 && anchor.y<=roof.y+roof.h+.1) continue;
+    const cost=distance(anchor,goal)+distance(body,anchor)*.24;
+    if (cost<score) {
+      best=target;
+      score=cost;
     }
   }
-  return false;
+  if (!best || !castCrawler(body,game.surfaces,best,{range:hunterSilkRange,minLength:8})) return false;
+  enemy.swingUntil=game.clock+body.rope!.length/138+1;
+  return true;
 }
 
 function stepPredator(game:WindowRun,enemy:Predator,dt:number,emit:(event:WindowEvent)=>void) {
   if (game.clock<enemy.boundUntil) return;
   const body=enemy.body, target=game.spider;
-  const sees=distance(body,target)<275 && clear(game,body,target);
+  const sees=distance(body,target)<365 && clear(game,body,target);
   if (game.clock>=enemy.chaseUntil) enemy.spokeInChase=false;
   if (sees) {
-    if (!enemy.spokeInChase && !game.speech.cue && game.clock>=game.speech.next) {
-      const camera=cameraFor(game);
-      if (body.x>=camera.x && body.x<=camera.x+roomWidth && body.y>=camera.y && body.y<=camera.y+roomHeight) {
-        enemy.spokeInChase=startExchange(game.speech,game.clock,'hunter');
-      }
+    if (!enemy.spokeInChase && inWindow(game,body)) {
+      enemy.spokeInChase=startHunterDialogue(game,enemy,'hunter');
     }
     enemy.lastKnown={x:target.x,y:target.y};
     enemy.chaseUntil=game.clock+7;
@@ -455,34 +479,57 @@ function stepPredator(game:WindowRun,enemy:Predator,dt:number,emit:(event:Window
     game.shots.push({p:from,to});
     enemy.shot=undefined;
     emit('launch');
-  } else if (sees && !game.trapped && !body.rope && game.clock>=enemy.fireAt && distance(body,target)>35 && distance(body,target)<201) {
+  } else if (sees && !game.trapped && !body.rope && game.clock>=enemy.fireAt && distance(body,target)>35 &&
+      distance(body,target)<330 && (goal.y>body.y-65 || !tracking)) {
     const from={x:body.x,y:body.y};
     const lead=clamp(distance(body,target)/470,.12,.38);
     const future={x:target.x+target.vx*lead,y:target.y+target.vy*lead};
     const predicted=clear(game,from,future) ? future : target;
     const vector=unit({x:predicted.x-from.x,y:predicted.y-from.y});
-    const to={x:from.x+vector.x*220,y:from.y+vector.y*220};
-    enemy.shot={from,to:aimHit(from,game.surfaces,to,{range:220})??to,at:game.clock+.36};
-    enemy.fireAt=game.clock+2.7;
+    const to={x:from.x+vector.x*330,y:from.y+vector.y*330};
+    enemy.shot={from,to:aimHit(from,game.surfaces,to,{range:330})??to,at:game.clock+hunterWindup};
+    enemy.fireAt=game.clock+3.4;
     return;
   }
-  if (body.rope && game.clock>=enemy.swingUntil) closeCrawlerRopes(body);
-  const dx=waypoint.x-body.x,dy=waypoint.y-body.y;
+  if (body.rope && (game.clock>=enemy.swingUntil || distance(body,body.rope)<16)) {
+    const support=createCrawler(body,game.surfaces).support;
+    if (support || game.clock>=enemy.swingUntil) {
+      closeCrawlerRopes(body);
+      body.support=support;
+      enemy.jumpAt=game.clock+.35;
+      enemy.planAt=0;
+    }
+  }
+  const roof=body.support==='ceiling' && goal.y<body.y-30 && game.surfaces.find(rect=>
+    Math.abs(body.y-SPIDER_HALF_HEIGHT-rect.y-rect.h)<.03 && body.x>rect.x-6 && body.x<rect.x+rect.w+6);
+  let dx=waypoint.x-body.x;
+  const dy=waypoint.y-body.y;
+  if (roof && enemy.bypass?.roof!==roof) {
+    const west=roof.x-28,east=roof.x+roof.w+28;
+    const exit=Math.abs(west-body.x)+Math.abs(west-goal.x)*.6<Math.abs(east-body.x)+Math.abs(east-goal.x)*.6 ? west : east;
+    enemy.bypass={roof,exit};
+  }
+  if (enemy.bypass) {
+    const {roof:obstacle,exit}=enemy.bypass;
+    if (body.y<obstacle.y || goal.y>=obstacle.y || Math.abs(body.x-exit)>obstacle.w+120) enemy.bypass=undefined;
+    else dx=exit-body.x;
+  }
   const wall=body.support==='left' || body.support==='right';
   const previous={x:body.x,y:body.y};
   const ahead={x:body.x+Math.sign(dx)*52,y:body.y};
   const wire=firstCrossing(body,ahead,game.web.strands);
-  if (!body.rope && game.clock>=enemy.jumpAt && body.support) {
+  if (!roof && !body.rope && game.clock>=enemy.jumpAt && (body.support || tracking)) {
     const hop=wire && wire.t>.26 && clear(game,body,{x:ahead.x,y:body.y-35});
-    if (swingToward(game,enemy,waypoint)) enemy.jumpAt=game.clock+1.65;
-    else if (hop || dy<-32 && !wall || wall && Math.abs(dy)<16 && Math.abs(dx)>23) {
+    if (swingToward(game,enemy,waypoint)) enemy.jumpAt=game.clock+1;
+    else if (body.support && (hop || dy<-32 && !wall || wall && Math.abs(dy)<16 && Math.abs(dx)>23)) {
       if (jumpCrawler(body,158) && !wall) body.vx=clamp(dx*3,-120,120);
       enemy.jumpAt=game.clock+1.1;
     }
   }
-  const vy=wall ? (dy<-8 ? -1 : 1) : 0;
-  tickCrawler(body,game.surfaces,{x:clamp(dx/24,-1,1),y:vy},!!body.rope,dt,[],
-    {crawlSpeed:tracking ? 99 : 65,airAcceleration:205});
+  const vy=wall ? clamp(dy/22,-1,1) : 0;
+  const pull=body.rope ? body.rope.x-body.x : dx;
+  tickCrawler(body,game.surfaces,{x:clamp(pull/24,-1,1),y:vy},!!body.rope,dt,[],
+    {crawlSpeed:tracking ? 99 : 65,airAcceleration:205,ropeMinimum:8,reelSpeed:138});
   if (!tracking && body.support && distance(previous,body)<.02 && game.clock>=enemy.jumpAt) {
     enemy.patrolIndex=(enemy.patrolIndex+1)%posts.length;
     enemy.planAt=0;
@@ -495,7 +542,7 @@ function stepPredator(game:WindowRun,enemy:Predator,dt:number,emit:(event:Window
       enemy.immuneUntil=enemy.boundUntil+.6;
       enemy.shot=undefined;
       hit.wire.shakeUntil=game.clock+.4;
-      startExchange(game.speech,game.clock,'boundHunter');
+      if (inWindow(game,body)) startHunterDialogue(game,enemy,'boundHunter');
       emit('caught-predator');
       return;
     }
@@ -533,6 +580,11 @@ export function cameraFor(game:WindowRun) {
   };
 }
 
+function inWindow(game:WindowRun,point:Point) {
+  const camera=cameraFor(game);
+  return point.x>=camera.x && point.x<camera.x+roomWidth && point.y>=camera.y && point.y<camera.y+roomHeight;
+}
+
 export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(event:WindowEvent)=>void) {
   if (game.phase==='over') return;
   const {spider,web}=game;
@@ -553,6 +605,8 @@ export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(
     if (input.escape && !game.escapeHeld && ++game.escapeCount>=breakFreePresses) {
       game.trapped=false;
       game.safeUntil=game.clock+1;
+      const hunter=game.predators.find(enemy=>inWindow(game,enemy.body));
+      if (hunter) startHunterDialogue(game,hunter,'escaped');
       emit('escaped');
     }
   } else {
@@ -603,12 +657,12 @@ export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(
   if (!game.trapped && !game.speech.cue && game.clock>=game.speech.next) {
     const nearby=game.gnats.find(gnat=>!game.greeted.has(gnat) &&
       distance(gnat.p,spider)<76 && clear(game,spider,gnat.p));
-    if (nearby && startExchange(game.speech,game.clock,'nearPrey')) {
+    if (nearby && inWindow(game,nearby.p) && startInsectDialogue(game,nearby,'nearPrey')) {
       game.greeted.add(nearby);
     }
   }
   const idle=!!spider.support && !game.trapped && !spider.rope && !input.silk && !input.jump &&
     magnitude(input.move)<.1 && distance(spider,beforeMove)<.12 &&
     !game.predators.some(enemy=>game.clock>=enemy.boundUntil && game.clock<enemy.chaseUntil);
-  updateSpiderSpeech(game.speech,game.clock,idle);
+  updateSpiderSpeech(game.speech,game.clock,idle,point=>inWindow(game,point));
 }
