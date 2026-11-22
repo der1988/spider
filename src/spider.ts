@@ -104,7 +104,7 @@ function rayDistance(origin: Point, direction: Point, surface: Rect): number {
   return near
 }
 
-export function aimHit(spider: Spider, surfaces: readonly Rect[], target: Point, tuning?: Partial<Tuning>): Point | undefined {
+export function aimHit(spider: Point, surfaces: readonly Rect[], target: Point, tuning?: Partial<Tuning>): Point | undefined {
   const dx = target.x - spider.x
   const dy = target.y - spider.y
   const magnitude = Math.hypot(dx, dy)

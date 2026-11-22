@@ -1,6 +1,6 @@
 import {castCrawler,closeCrawlerRopes,createCrawler,jumpCrawler,normals,tickCrawler} from './crawler.ts';
 import {aimHit,DEFAULT_TUNING,SPIDER_HALF_HEIGHT,type Point,type Rect} from './spider.ts';
-import {anchorSilk,crossesSolid,fixSilk,leaveSilk,type Web} from './threads.ts';
+import {anchorSilk,crossesSolid,fixSilk,leaveSilk,sweptHit,type Strand,type Web} from './threads.ts';
 
 export const stealthWidth=520;
 export const stealthHeight=290;
@@ -8,41 +8,57 @@ export const floorY=270;
 export const entry={x:32,y:floorY-8};
 export const exit={x:490,y:floorY-8};
 export const sightRange=83;
-export const sightHeight=24;
+export const sightSlope=.33;
+export const escapePresses=5;
+const shotSpeed=240;
 export const chargeTime=.68;
 export const quietSpeed=35;
-const minSilkRange=42;
 const wireLifetime=18;
 const grip=(x:number,y:number,w:number,h:number):Rect=>({x,y,w,h,grip:true});
 export const room=[
   grip(0,0,520,16),grip(0,floorY,520,20),grip(0,16,9,254),grip(511,16,9,254),
-  grip(62,243,23,27),grip(237,230,43,40),grip(452,244,21,26),
-  grip(40,184,77,9),grip(142,127,100,10),grip(276,178,75,10),
-  grip(362,114,70,9),grip(449,186,25,9),grip(236,60,56,9),
+  grip(145,16,18,218), grip(331,82,18,188),
+  grip(59,233,24,7), grip(183,208,64,9), grip(257,150,56,8),
+  grip(217,91,58,8), grip(366,137,67,8), grip(447,190,38,8),
 ];
 
+type EnemyWeb=Strand & {expiresAt:number};
+type Attack={from:Point;to:Point;at:number;web:boolean};
 export type Guard={
-  x:number; y:number; low:number; high:number; facing:-1|1; alert:number;
+  x:number; y:number; low:number; high:number; facing:-1|1; alert:number; speed:number;
   lastKnown?:number; searchesUntil:number; witnessed:boolean; caught:boolean;
+  attack?:Attack; nextAttack:number; trap?:{from:Point;to:Point};
 };
 
-export interface StealthInput {move:Point;aim?:Point;jump:boolean;silk:boolean;}
+export interface StealthInput {move:Point;aim?:Point;jump:boolean;silk:boolean;escape?:boolean;}
 
-function patrol(x:number,low:number,high:number,facing:-1|1):Guard {
-  return {x,y:floorY-8,low,high,facing,alert:0,witnessed:false,caught:false,searchesUntil:0};
+function patrol(x:number,y:number,low:number,high:number,facing:-1|1,speed:number,trap?:Guard['trap']):Guard {
+  return {x,y,low,high,facing,speed,trap,alert:0,witnessed:false,caught:false,searchesUntil:0,nextAttack:0};
 }
 
 export function createStealth() {
   return {
-    spider:createCrawler(entry,room), guards:[patrol(155,94,222,1),patrol(401,292,443,-1)],
+    spider:createCrawler(entry,room),
+    guards:[
+      patrol(108,262,87,134,1,21),
+      patrol(231,262,178,312,-1,27,{from:{x:206,y:217},to:{x:206,y:270}}),
+      patrol(285,142,285,285,-1,0),
+      patrol(250,83,227,265,1,20),
+      patrol(399,129,377,423,-1,23),
+      patrol(421,262,421,421,-1,0,{from:{x:455,y:198},to:{x:455,y:270}}),
+    ],
     web:{loose:[],strands:[]} as Pick<Web,'loose'|'strands'>,
-    aim:{x:.56,y:-.828}, clock:0, jumpCharge:0, silkCharge:0, usedSilk:false,
+    enemyWebs:[] as EnemyWeb[],
+    shots:[] as {p:Point;to:Point}[],
+    trapped:undefined as {until:number;presses:number}|undefined,
+    safeUntil:0,escapeHeld:false,
+    aim:{x:.56,y:-.828}, clock:0, jumpCharge:0, silkHeld:false,
     noise:undefined as {x:number;y:number;strength:number;until:number}|undefined,
     phase:'play' as 'play'|'over'|'complete',
   };
 }
 export type StealthRun=ReturnType<typeof createStealth>;
-export type StealthEvent='jump'|'launch'|'attach'|'fix'|'release'|'miss'|'catch'|'seen'|'land';
+export type StealthEvent='jump'|'launch'|'attach'|'fix'|'release'|'miss'|'catch'|'seen'|'land'|'trap'|'escaped';
 const clamp=(n:number,min:number,max:number)=>Math.min(max,Math.max(min,n));
 const magnitude=(p:Point)=>Math.hypot(p.x,p.y);
 const distance=(a:Point,b:Point)=>Math.hypot(a.x-b.x,a.y-b.y);
@@ -59,8 +75,9 @@ export function stealthStick(raw:Point):Point {
   return {x:direction.x*strength,y:direction.y*strength};
 }
 
-export function silkReach(charge:number) {
-  return minSilkRange+(DEFAULT_TUNING.range-minSilkRange)*clamp(charge/chargeTime,0,1);
+export function stealthAnchor(game:StealthRun) {
+  const {spider,aim}=game;
+  return aimHit(spider,room,{x:spider.x+aim.x,y:spider.y+aim.y});
 }
 
 function releaseJump(game:StealthRun,raw:Point) {
@@ -90,9 +107,9 @@ function expose(game:StealthRun,guard:Guard,emit:(event:StealthEvent)=>void) {
 
 function castSilk(game:StealthRun,emit:(event:StealthEvent)=>void) {
   const {spider,aim}=game;
-  const range=silkReach(game.silkCharge);
-  const target={x:spider.x+aim.x*range,y:spider.y+aim.y*range};
-  const solid=aimHit(spider,room,target,{range});
+  const range=DEFAULT_TUNING.range;
+  const target={x:spider.x+aim.x,y:spider.y+aim.y};
+  const solid=stealthAnchor(game);
   let nearest=solid ? distance(spider,solid) : range;
   let targetGuard:Guard|undefined;
   for (const guard of game.guards) {
@@ -105,19 +122,17 @@ function castSilk(game:StealthRun,emit:(event:StealthEvent)=>void) {
   }
   if (targetGuard) {
     targetGuard.caught=true;
-    game.usedSilk=true;
     game.noise={x:targetGuard.x,y:targetGuard.y,strength:68,until:game.clock+.38};
     emit('catch');
   } else if (solid && castCrawler(spider,room,target,{range,minLength:8})) {
-    game.usedSilk=true;
     emit('attach');
-  }
+  } else emit('miss');
 }
 
 function releaseSilk(game:StealthRun,emit:(event:StealthEvent)=>void) {
   const rope=closeCrawlerRopes(game.spider);
   if (rope) {
-    const reach=silkReach(game.silkCharge)+SPIDER_HALF_HEIGHT;
+    const reach=DEFAULT_TUNING.range+SPIDER_HALF_HEIGHT;
     if (!anchorSilk(game.web.strands,rope,reach,game.spider,room)) leaveSilk(game.web,rope,reach);
     const contact=createCrawler(game.spider,room).support;
     if (contact) {
@@ -125,20 +140,49 @@ function releaseSilk(game:StealthRun,emit:(event:StealthEvent)=>void) {
       game.spider.grounded=true;
     }
     emit('release');
-  } else if (!game.usedSilk) emit('miss');
-  game.usedSilk=false;
+  }
 }
 
 export function guardSees(guard:Guard,p:Point) {
-  return p.y>=floorY-sightHeight && (p.x-guard.x)*guard.facing>=0 &&
-    Math.abs(p.x-guard.x)<sightRange && !room.some(surface=>crossesSolid(guard,p,surface));
+  if (p.x<48 && p.y>floorY-34) return false;
+  const ahead=(p.x-guard.x)*guard.facing;
+  return ahead>=0 && ahead<sightRange && Math.abs(p.y-guard.y)<=8+ahead*sightSlope &&
+    !room.some(surface=>crossesSolid(guard,p,surface));
+}
+
+function bindPlayer(game:StealthRun,emit:(event:StealthEvent)=>void) {
+  if (game.trapped || game.clock<game.safeUntil) return;
+  game.trapped={presses:0,until:game.clock+7};
+  game.jumpCharge=0;
+  closeCrawlerRopes(game.spider);
+  game.spider.vx=0;
+  game.spider.vy=0;
+  emit('trap');
+}
+
+function enemySilk(game:StealthRun,dt:number,emit:(event:StealthEvent)=>void) {
+  game.shots=game.shots.filter(shot=>{
+    const remaining=distance(shot.p,shot.to);
+    const travel=Math.min(remaining,shotSpeed*dt);
+    const direction=unit({x:shot.to.x-shot.p.x,y:shot.to.y-shot.p.y});
+    const next={x:shot.p.x+direction.x*travel,y:shot.p.y+direction.y*travel};
+    const offset={x:game.spider.x-shot.p.x,y:game.spider.y-shot.p.y};
+    const along=clamp(offset.x*direction.x+offset.y*direction.y,0,travel);
+    if (Math.hypot(offset.x-direction.x*along,offset.y-direction.y*along)<8 &&
+        !room.some(surface=>crossesSolid(shot.p,game.spider,surface))) {
+      bindPlayer(game,emit);
+      return false;
+    }
+    shot.p=next;
+    return travel<remaining;
+  });
 }
 
 function advanceGuard(game:StealthRun,guard:Guard,dt:number,emit:(event:StealthEvent)=>void) {
   if (guard.caught) return;
   const {spider,noise}=game;
   const sees=guardSees(guard,spider);
-  const hears=noise && distance(guard,noise)<noise.strength &&
+  const hears=noise && noise.until>game.clock && distance(guard,noise)<noise.strength &&
     !room.some(surface=>crossesSolid(guard,noise,surface));
   if (sees || hears) {
     guard.lastKnown=sees ? spider.x : noise?.x;
@@ -150,10 +194,29 @@ function advanceGuard(game:StealthRun,guard:Guard,dt:number,emit:(event:StealthE
   } else {
     guard.alert=hears ? Math.min(.75,guard.alert+dt*.9) : Math.max(0,guard.alert-dt*.62);
   }
-  if (guard.witnessed && sees && distance(guard,spider)<17) {
-    game.phase='over';
+  if (guard.attack) {
+    if (game.clock<guard.attack.at) return;
+    const {from,to,web}=guard.attack;
+    if (web) game.enemyWebs.push({from,to,shakeUntil:0,expiresAt:game.clock+14});
+    else game.shots.push({p:from,to});
+    guard.attack=undefined;
+    guard.nextAttack=game.clock+2.8;
+    emit('launch');
     return;
   }
+  if (game.clock>=guard.nextAttack && !game.trapped && (guard.witnessed && sees || guard.trap && sees && guard.alert>.56)) {
+    const trap=guard.trap;
+    const useTrap=trap && !game.enemyWebs.some(wire=>wire.from===trap.from);
+    const from={x:guard.x,y:guard.y};
+    if (useTrap) guard.attack={...trap,at:game.clock+.48,web:true};
+    else {
+      const direction=unit({x:spider.x-from.x,y:spider.y-from.y});
+      const end={x:from.x+direction.x*123,y:from.y+direction.y*123};
+      guard.attack={from,to:aimHit(from,room,end,{range:123})??end,at:game.clock+.38,web:false};
+    }
+    return;
+  }
+  if (!guard.speed) return;
   const investigating=guard.lastKnown!==undefined && game.clock<guard.searchesUntil;
   if (investigating) {
     const delta=clamp(guard.lastKnown!,guard.low,guard.high)-guard.x;
@@ -162,7 +225,7 @@ function advanceGuard(game:StealthRun,guard:Guard,dt:number,emit:(event:StealthE
       guard.x+=guard.facing*Math.min(Math.abs(delta),dt*(guard.witnessed ? 77 : 45));
     }
   } else {
-    guard.x+=guard.facing*27*dt;
+    guard.x+=guard.facing*guard.speed*dt;
     if (guard.x<=guard.low || guard.x>=guard.high) {
       guard.x=clamp(guard.x,guard.low,guard.high);
       guard.facing=guard.facing===1 ? -1 : 1;
@@ -174,6 +237,29 @@ export function stepStealth(game:StealthRun,input:StealthInput,dt:number,emit:(e
   if (game.phase!=='play') return;
   const {spider,web}=game;
   game.clock+=dt;
+  const freshEscape=input.escape && !game.escapeHeld;
+  game.escapeHeld=!!input.escape;
+  game.enemyWebs=game.enemyWebs.filter(wire=>wire.expiresAt>game.clock);
+  if (game.trapped) {
+    if (freshEscape) game.trapped.presses++;
+    if (game.trapped.presses>=escapePresses) {
+      game.trapped=undefined;
+      game.safeUntil=game.clock+1.15;
+      emit('escaped');
+    } else if (game.clock>=game.trapped.until) game.phase='over';
+    game.silkHeld=input.silk;
+  } else {
+    moveStealth(game,input,dt,emit);
+  }
+  for (const guard of game.guards) advanceGuard(game,guard,dt,emit);
+  enemySilk(game,dt,emit);
+  if (game.phase==='play' && !game.trapped && distance(spider,exit)<17 &&
+    !game.guards.some(guard=>guard.witnessed && !guard.caught)) game.phase='complete';
+  web.strands=web.strands.filter(strand=>(strand.expiresAt??Infinity)>game.clock).slice(-8);
+}
+
+function moveStealth(game:StealthRun,input:StealthInput,dt:number,emit:(event:StealthEvent)=>void) {
+  const {spider,web}=game;
   if (game.noise && game.noise.until<=game.clock) game.noise=undefined;
   if (input.aim) game.aim=unit(input.aim);
   if (input.jump) game.jumpCharge=Math.min(chargeTime,game.jumpCharge+dt);
@@ -182,29 +268,26 @@ export function stepStealth(game:StealthRun,input:StealthInput,dt:number,emit:(e
     game.jumpCharge=0;
   }
   const before=web.strands.length;
-  if (input.silk) {
-    if (!game.silkCharge) emit('launch');
-    game.silkCharge=Math.min(chargeTime,game.silkCharge+dt);
-    if (!game.usedSilk) castSilk(game,emit);
-  } else if (game.silkCharge) {
-    releaseSilk(game,emit);
-    game.silkCharge=0;
-  }
-  const steering=stealthStick(input.move);
-  const lastY=spider.y;
+  if (input.silk && !game.silkHeld) {
+    emit('launch');
+    castSilk(game,emit);
+  } else if (!input.silk && game.silkHeld) releaseSilk(game,emit);
+  game.silkHeld=input.silk;
+  const previous={x:spider.x,y:spider.y};
   const falling=spider.vy;
-  tickCrawler(spider,room,steering,input.move.y<-.43,dt,web.strands,{crawlSpeed:103,airAcceleration:120,ropeMinimum:8});
-  const onGround=spider.y>=floorY-SPIDER_HALF_HEIGHT-.05;
-  const impact=onGround && lastY<floorY-SPIDER_HALF_HEIGHT-.05 && falling>52;
+  tickCrawler(spider,room,stealthStick(input.move),input.move.y<-.43,dt,web.strands,
+    {crawlSpeed:103,airAcceleration:120,ropeMinimum:8});
+  for (const wire of game.enemyWebs) {
+    if (!sweptHit(previous,spider,wire)) continue;
+    bindPlayer(game,emit);
+    if (game.trapped) wire.shakeUntil=game.clock+.4;
+  }
+  const impact=spider.support==='floor' && spider.y>previous.y && falling>52;
   if (impact) emit('land');
-  if (impact || onGround && Math.abs(spider.vx)>quietSpeed) {
+  if (spider.support==='floor' && (impact || Math.abs(spider.vx)>quietSpeed)) {
     game.noise={x:spider.x,y:spider.y,strength:impact ? 118 : 54+Math.abs(spider.vx)*.38,until:game.clock+.29};
   }
   fixSilk(web,spider,room);
   for (const strand of web.strands.slice(before)) strand.expiresAt=game.clock+wireLifetime;
   if (web.strands.length>before) emit('fix');
-  web.strands=web.strands.filter(strand=>(strand.expiresAt??Infinity)>game.clock).slice(-8);
-  for (const guard of game.guards) advanceGuard(game,guard,dt,emit);
-  if (game.phase==='play' && distance(spider,exit)<17 &&
-    !game.guards.some(guard=>guard.witnessed && !guard.caught)) game.phase='complete';
 }

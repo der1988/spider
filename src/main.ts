@@ -1,5 +1,5 @@
 import './style.css';
-import {createStealth,stepStealth,stealthHeight,stealthWidth,type StealthInput,type StealthRun} from './stealth';
+import {createStealth,escapePresses,stepStealth,stealthHeight,stealthWidth,type StealthInput,type StealthRun} from './stealth';
 import {renderStealth} from './stealth-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
@@ -573,7 +573,8 @@ function playStealthFrame(run:StealthRun,input:StealthInput,elapsed:number) {
     while (remainder>=arenaStep && run.phase==='play') {
       remainder-=arenaStep;
       stepStealth(run,input,arenaStep,event=>{
-        if (event==='seen') audio.play('tension');
+        if (event==='seen' || event==='trap') audio.play('tension');
+        else if (event==='escaped') audio.play('release');
         else audio.play(event);
       });
     }
@@ -585,10 +586,10 @@ function playStealthFrame(run:StealthRun,input:StealthInput,elapsed:number) {
   }
   const witness=run.guards.some(guard=>guard.witnessed && !guard.caught);
   const watching=run.guards.some(guard=>guard.alert>.08 && !guard.caught);
-  const status=witness ? 'Witness alerted · Bind it with silk before leaving' :
+  const status=run.trapped ? 'Caught · Tap × / X · '+run.trapped.presses+'/'+escapePresses+' · '+Math.max(0,Math.ceil(run.trapped.until-run.clock))+' s' : witness ? 'Witness alerted · Bind it with silk before leaving' :
     watching ? 'Guards investigating · Move slowly or climb' : 'Stay unseen · Reach the exit pipe';
   if (message.textContent!==status) say(status);
-  const neutralized=String(run.guards.filter(guard=>guard.caught).length)+'/2';
+  const neutralized=String(run.guards.filter(guard=>guard.caught).length)+'/'+run.guards.length;
   if (scoreLabel.textContent!==neutralized) scoreLabel.textContent=neutralized;
   renderStealth(context,run,reduced());
   if (run.phase==='over' && !stealthDefeat.open) {
@@ -668,6 +669,7 @@ function frame(time: number) {
     playStealthFrame(stealth,{
       move,aim:keys.aim??input?.aim,jump:keyboard.has('KeyZ') || !!gamepad?.buttons[4]?.pressed,
       silk:keyboard.has('KeyX') || !!gamepad?.buttons[5]?.pressed,
+      escape:keyboard.has('KeyX') || crossHeld,
     },elapsed);
     requestAnimationFrame(frame);
     return;

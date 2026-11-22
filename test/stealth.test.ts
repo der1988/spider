@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {advanceArena,arenaStep,createArena,type ArenaInput} from '../src/arena-run.ts';
-import {createStealth,exit,guardSees,room,silkReach,stealthStick,stepStealth,type StealthInput,type StealthRun} from '../src/stealth.ts';
+import {createStealth,exit,guardSees,room,escapePresses,stealthAnchor,stealthStick,stepStealth,type StealthInput,type StealthRun} from '../src/stealth.ts';
 import {createCrawler} from '../src/crawler.ts';
 import {arenaLayouts} from '../src/hunt.ts';
 
@@ -33,7 +33,7 @@ test('a slight stick tilt creeps silently while a full tilt alerts a nearby guar
   assert.ok(stealthStick({x:.22,y:0}).x<.08);
   assert.equal(stealthStick({x:1,y:0}).x,1);
   const quiet=createStealth(),loud=createStealth();
-  for (const game of [quiet,loud]) game.spider=createCrawler({x:111,y:262},room);
+  for (const game of [quiet,loud]) game.spider=createCrawler({x:61,y:262},room);
   run(quiet,24,{move:{x:.22,y:0}});
   run(loud,24,{move:{x:1,y:0}});
   assert.ok(loud.spider.x>quiet.spider.x+10);
@@ -44,17 +44,17 @@ test('a slight stick tilt creeps silently while a full tilt alerts a nearby guar
 test('guards see along the floor and a sighting closes the exit until the witness is bound',()=>{
   const game=createStealth();
   const guard=game.guards[0];
-  assert.equal(guardSees(guard,{x:170,y:170}),false);
-  assert.equal(guardSees(guard,{x:170,y:262}),true);
-  game.spider=createCrawler({x:218,y:262},room);
+  assert.equal(guardSees(guard,{x:139,y:170}),false);
+  assert.equal(guardSees(guard,{x:140,y:262}),true);
+  game.spider=createCrawler({x:143,y:262},room);
   run(game,78);
   assert.equal(guard.witnessed,true);
   game.spider=createCrawler(exit,room);
   run(game,1);
   assert.equal(game.phase,'play');
 
-  game.spider=createCrawler({x:111,y:262},room);
-  run(game,82,{aim:{x:1,y:0},silk:true});
+  game.spider=createCrawler({x:60,y:262},room);
+  run(game,1,{aim:{x:1,y:0},silk:true});
   assert.equal(guard.caught,true);
   game.spider=createCrawler(exit,room);
   run(game,1);
@@ -63,9 +63,9 @@ test('guards see along the floor and a sighting closes the exit until the witnes
 
 test('held silk stays mobile on the floor and release fixes it to the surface',()=>{
   const game=createStealth();
-  assert.equal(silkReach(0),42);
-  assert.equal(silkReach(1),155);
-  run(game,60,{aim:{x:-1,y:0},silk:true});
+  game.aim={x:-1,y:0};
+  assert.deepEqual(stealthAnchor(game),{x:9,y:262});
+  run(game,1,{silk:true});
   assert.ok(game.spider.rope);
   assert.equal(game.web.strands.length,0);
   run(game,1);
@@ -86,21 +86,67 @@ test('both jump charge and stick orientation matter on release',()=>{
   assert.ok(vertical.spider.y<long.spider.y);
 });
 
-test('the whole level is passable unseen using a charged jump, a ceiling tether and exit shaft',()=>{
+test('the starting pipe gives time to observe mobile and fixed sentinels',()=>{
   const game=createStealth();
-  const up={x:0,y:-1};
-  run(game,85,{move:up,jump:true});
-  run(game,36,{move:up});
+  const start=game.guards.map(guard=>guard.x);
+  run(game,960);
+  assert.equal(game.phase,'play');
+  assert.equal(game.trapped,undefined);
+  assert.ok(game.guards.every(guard=>guard.alert===0));
+  assert.ok(game.guards.some((guard,i)=>guard.speed && guard.x!==start[i]));
+  assert.ok(game.guards.filter(guard=>!guard.speed).every(guard=>guard.low===guard.x));
+});
+
+test('an alerted guard telegraphs and lands a direct shot, and escape counts distinct presses',()=>{
+  const game=createStealth();
+  game.spider=createCrawler({x:139,y:262},room);
+  run(game,100);
+  assert.ok(game.guards[0].attack);
+  assert.equal(game.trapped,undefined);
+  run(game,64);
+  assert.ok(game.trapped);
+  run(game,40,{escape:true});
+  assert.equal(game.trapped?.presses,1);
+  for (let i=1;i<escapePresses;i++) {
+    run(game,1);
+    run(game,1,{escape:true});
+  }
+  assert.equal(game.trapped,undefined);
+});
+
+test('a sentry can build a trap that binds a spider crossing the strand',()=>{
+  const game=createStealth();
+  game.spider=createCrawler({x:200,y:262},room);
+  const guard=game.guards[1];
+  guard.alert=.8;
+  run(game,1);
+  assert.equal(guard.attack?.web,true);
+  run(game,75);
+  assert.equal(game.enemyWebs.length,1);
+  run(game,30,{move:{x:1,y:0}});
+  assert.ok(game.trapped);
+});
+
+test('the entire S passage can be finished underneath the first wall and over the second',()=>{
+  const game=createStealth();
+  const left={x:-1,y:0},right={x:1,y:0},up={x:0,y:-1};
+  run(game,1,{silk:true,aim:right});
+  run(game,1);
+  run(game,175,{move:right});
+  assert.ok(game.spider.x>163 && game.spider.y>234);
+  run(game,1,{silk:true,aim:right});
+  run(game,2);
+  run(game,210,{move:right});
+  assert.equal(game.spider.x,324);
+  run(game,1,{silk:true,aim:left});
+  run(game,1);
+  run(game,230,{move:up});
+  assert.ok(game.spider.y<82);
   run(game,24,{move:up,jump:true});
-  run(game,12,{move:up});
-  run(game,390,{move:up,aim:up,silk:true});
-  assert.ok(game.spider.rope);
-  run(game,4,{move:up});
-  assert.equal(game.spider.support,'ceiling');
-  run(game,535,{move:{x:1,y:0}});
-  const down={x:0,y:1};
-  run(game,35,{move:down,jump:true});
-  run(game,170,{move:down});
+  run(game,48,{move:{x:1,y:-1}});
+  run(game,160,{move:right});
+  run(game,1,{silk:true,aim:left});
+  run(game,90);
+  run(game,125,{move:{x:0,y:1}});
   assert.equal(game.phase,'complete');
-  assert.ok(game.guards.every(guard=>!guard.witnessed && !guard.caught));
 });
