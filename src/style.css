@@ -263,7 +263,7 @@ dialog h2 { margin: 0; font-size: 16px; }
 .shell[data-reforming] :is(#window-hunt-mode,#practice-mode,#settings-menu) { display:none; }
 .shell[data-window-hunt=practice] .catch-count { visibility:hidden; }
 .open-controls:not([hidden]) {
-  display: grid; grid-template-columns: repeat(5,minmax(0,1fr)) minmax(0,1.35fr);
+  display: grid; grid-template-columns: repeat(7,minmax(0,1fr));
   align-items: center; justify-items: center; gap: 3px; block-size: 48px; padding: 4px;
   background: #14271d; border: 1px solid #789468;
   font: 650 clamp(9px, 1.4vw, 13px)/1.1 system-ui, sans-serif;
@@ -272,27 +272,8 @@ dialog h2 { margin: 0; font-size: 16px; }
 .open-controls kbd { display: inline-block; min-width: 2em; font: bold clamp(13px, 2vw, 19px)/1.1 monospace; }
 #open-cargo { color: #f3dc99; }
 @media (max-width: 540px) {
-  .open-controls:not([hidden]) { grid-template-columns: repeat(3,minmax(0,1fr)); block-size: 54px; }
+  .open-controls:not([hidden]) { grid-template-columns: repeat(4,minmax(0,1fr)); block-size: 54px; }
 }
-.open-controls { position: relative; }
-#open-options:not([hidden]) {
-  position: absolute; inset: 0; display: grid; grid-template-columns: repeat(3,minmax(0,1fr));
-  align-items: stretch; gap: 3px; padding: 3px; background: #14271d;
-}
-#open-options button { min-width: 0; padding: 1px 3px; font-size: clamp(9px, 1.5vw, 13px); }
-.gnat-caption {
-  position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none;
-  width: max-content; max-width: min(var(--caption-width, 65%), 34ch);
-  color: #fff4bd; text-align: center; text-wrap: pretty; overflow-wrap: anywhere;
-  font: 750 clamp(12px, 1.3vw, 16px)/1.19 system-ui, sans-serif;
-  paint-order: stroke fill; -webkit-text-stroke: 2.6px #17271d;
-  text-shadow: 0 2px 3px #0e1b13;
-}
-.gnat-caption[data-speaker=hunter] { color: #ffd0a6; }
-.gnat-caption[data-speaker=midge] { color: #e1ffc3; }
-.gnat-caption[data-speaker=dart] { color: #c4f7fe; }
-.gnat-caption[data-speaker=pip] { color: #f1d8ff; }
-.shell[data-subtitles=large] .gnat-caption { font-size: clamp(14px, 1.55vw, 20px); }
 .shell[data-window-hunt=true] #lyric { display: none; }
 .shell[data-window-hunt=true] #message {
   height: 1.5em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

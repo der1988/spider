@@ -1,5 +1,5 @@
 import {block,drawAimMarker,drawPlatform,drawSpider,line} from './hunt-render';
-import {bedroomHeight,bedroomScale,bedroomWidth,cameraFor,hunterWindup,roomHeight,roomWidth,windowAnchor,worldNear,worldX,type Corner,type WindowRun} from './window-hunt';
+import {bedroomHeight,bedroomScale,bedroomWidth,cameraFor,hunterWindup,roomHeight,roomWidth,windowAnchor,shaftWidth,shaftHeight,type Corner,type WindowRun} from './window-hunt';
 
 const ink='#22392e';
 const cream='#eff3c8';
@@ -129,265 +129,69 @@ function furnishing(ctx:CanvasRenderingContext2D,item:Corner['objects'][number])
   }
 }
 
-const districts=[
-  {name:'THE GROW ROOM',wall:'#a6bb91',shade:'#899f75',trim:'#c3cf9e'},
-  {name:'THE CRACKS',wall:'#a1ab9b',shade:'#818b83',trim:'#bcc1ab'},
-  {name:'THE PANTRY',wall:'#c5bb85',shade:'#a79d70',trim:'#ded0a0'},
-];
-
-function openBackdrop(ctx:CanvasRenderingContext2D,camera:ReturnType<typeof cameraFor>) {
-  const section=bedroomWidth/districts.length;
-  const start=Math.floor(camera.x/section);
-  const end=Math.floor((camera.x+roomWidth)/section);
-  for (let cell=start;cell<=end;cell++) {
-    const left=cell*section;
-    const zone=(cell%districts.length+districts.length)%districts.length;
-    const {name,wall,shade,trim}=districts[zone];
-    block(ctx,Math.floor(left),camera.y,Math.ceil(section)+1,roomHeight,wall);
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(left,camera.y,section,roomHeight);
-    ctx.clip();
-    if (zone===0) {
-      for (let dx=60;dx<section;dx+=118) {
-        const x=left+dx;
-        if (x+51<camera.x || x-63>camera.x+roomWidth) continue;
-        const top=Math.max(62,camera.y);
-        const bottom=Math.min(bedroomHeight,camera.y+roomHeight);
-        const stem=(y:number)=>x-24*(bedroomHeight-y)/(bedroomHeight-62);
-        if (top<bottom) line(ctx,{x:stem(bottom),y:bottom},{x:stem(top),y:top},shade);
-        for (let y=94+(dx%47);y<bedroomHeight;y+=123) {
-          if (y+26<camera.y || y-40>camera.y+roomHeight) continue;
-          const size=dx%23+14;
-          line(ctx,{x:x-63,y:y-size},{x:x+5,y},shade);
-          block(ctx,x-60,y-size-4,28,7,trim);
-          block(ctx,x-51,y-size+3,28,5,trim);
-          line(ctx,{x:x-7,y:y+24},{x:x+51,y:y+1},shade);
-          block(ctx,x+23,y+2,25,7,shade);
-        }
-      }
-    } else if (zone===1) {
-      for (let y=10;y<bedroomHeight;y+=79) {
-        if (y+79<camera.y || y>camera.y+roomHeight) continue;
-        block(ctx,left,y,section,2,shade);
-        for (let dx=(y%2 ? 52 : 13);dx<section;dx+=120) block(ctx,left+dx,y,2,79,shade);
-      }
-      let from={x:left+section*.42,y:0};
-      for (let y=50;y<bedroomHeight;y+=48) {
-        const to={x:left+section*.42+(y*17)%67-33,y};
-        if (to.y>=camera.y && from.y<=camera.y+roomHeight) {
-          line(ctx,from,to,shade);
-          line(ctx,{x:from.x+1,y:from.y},{x:to.x+1,y:to.y},shade);
-        }
-        from=to;
-      }
-    } else {
-      for (let y=92;y<bedroomHeight;y+=159) {
-        if (y+4<camera.y || y-44>camera.y+roomHeight) continue;
-        block(ctx,left,y,section,4,shade);
-        for (let dx=30;dx<section-24;dx+=55) {
-          const x=left+dx;
-          const h=20+dx%24;
-          block(ctx,x,y-h,25,h,trim);
-          block(ctx,x+3,y-h,19,3,shade);
-          block(ctx,x+2,y-10,21,6,wall);
-        }
-      }
-    }
-
-    const signX=left+Math.round(section/2);
-    const signY=bedroomHeight-113;
-    block(ctx,signX-74,signY,148,22,shade);
-    block(ctx,signX-73,signY+1,146,20,trim);
-    ctx.fillStyle=ink;
-    ctx.textAlign='center';
-    ctx.font='bold 11px monospace';
-    ctx.fillText(name,signX,signY+15);
-    ctx.restore();
+function openBackdrop(ctx:CanvasRenderingContext2D) {
+  block(ctx,0,0,shaftWidth,shaftHeight,'#819875');
+  block(ctx,0,0,shaftWidth,295,'#bac69a');
+  block(ctx,0,735,shaftWidth,shaftHeight-735,'#718b68');
+  for (let x=44;x<shaftWidth;x+=113) {
+    line(ctx,{x,y:20},{x:x+19,y:1095},'#718969');
+    for (let y=74;y<1080;y+=147) block(ctx,x+(y%23),y,15,3,'#95ab7c');
   }
-}
-
-function drawShop(ctx:CanvasRenderingContext2D,game:WindowRun) {
-  const {x,y}=worldNear(game.den,game.spider.x);
-  block(ctx,x-24,y-30,48,31,'#657a54');
-  block(ctx,x-16,y-41,32,11,'#657a54');
-  block(ctx,x-17,y-25,34,26,ink);
-  block(ctx,x-10,y-32,20,8,ink);
-  block(ctx,x-15,y-23,30,2,'#8aa477');
-  block(ctx,x-25,y-4,5,5,cream);
-  block(ctx,x+21,y-4,5,5,cream);
-  for (const side of [-1,1]) {
-    const edge=x+side*61;
-    block(ctx,edge-1,y-9,3,10,'#647b57');
-    block(ctx,edge-2,y-10,5,3,cream);
-    block(ctx,edge-side*4,y+4,5,1,'#7f996e');
+  ctx.font='bold 14px monospace';
+  ctx.fillStyle='#263d2d';
+  ctx.fillText('UPPER HUNT',62,73);
+  ctx.fillText('BASE CAMP',59,1063);
+  for (const x of [220,690]) {
+    line(ctx,{x,y:1040},{x:x+7,y:1028},cream);
+    line(ctx,{x:x+7,y:1028},{x:x+14,y:1040},cream);
   }
-  block(ctx,x-37,y-58,74,13,ink);
-  ctx.save();
-  ctx.fillStyle=cream;
-  ctx.textAlign='center';
-  ctx.font='bold 9px monospace';
-  ctx.fillText('FLY MARKET',x,y-48);
-  ctx.restore();
-}
-
-function drawResident(ctx:CanvasRenderingContext2D,id:string,x:number,y:number) {
-  if (id==='mantis') {
-    block(ctx,x-4,y-14,8,4,ink);
-    block(ctx,x-2,y-17,4,3,ink);
-    block(ctx,x-2,y-13,1,1,cream);
-    block(ctx,x+1,y-13,1,1,cream);
-    block(ctx,x-2,y-10,4,7,'#506d42');
-    block(ctx,x-4,y-4,8,3,ink);
-    line(ctx,{x:x-1,y:y-6},{x:x-7,y:y-9},ink);
-    line(ctx,{x:x-7,y:y-9},{x:x-4,y:y-13},ink);
-    line(ctx,{x:x+1,y:y-6},{x:x+7,y:y-9},ink);
-    line(ctx,{x:x+7,y:y-9},{x:x+4,y:y-13},ink);
-    return;
-  }
-  const armored=id==='quartermaster';
-  const body=armored ? '#8b6640' : '#705a63';
-  block(ctx,x-6,y-7,12,6,ink);
-  block(ctx,x-4,y-9,8,7,body);
-  block(ctx,x+1,y-11,5,5,ink);
-  block(ctx,x+3,y-9,1,1,cream);
-  block(ctx,x-5,y-1,2,1,ink);
-  block(ctx,x+3,y-1,2,1,ink);
-  if (armored) {
-    block(ctx,x-6,y-7,3,2,amber);
-    block(ctx,x-1,y-9,1,7,amber);
-  } else {
-    line(ctx,{x:x+4,y:y-11},{x:x+7,y:y-15},ink);
-    line(ctx,{x:x+2,y:y-10},{x:x+1,y:y-15},ink);
-    line(ctx,{x:x-3,y:y-3},{x:x-8,y},ink);
-  }
-}
-
-function drawTown(ctx:CanvasRenderingContext2D,game:WindowRun,camera:ReturnType<typeof cameraFor>) {
-  if (!game.town) return;
-  for (const [i,walker] of game.walkers.entries()) {
-    const {x,y}=worldNear(walker,game.spider.x);
-    block(ctx,x-4,y-3,8,5,i%2 ? '#775842' : '#4b6848');
-    block(ctx,x+walker.direction*4,y-4,2,3,ink);
-    const gait=Math.floor(game.clock*11+i)%2;
-    block(ctx,x-3+gait,y+2,2,2,ink);
-    block(ctx,x+2-gait,y+2,2,2,ink);
-  }
-  for (const resident of game.town.residents) {
-    const {x,y}=worldNear(resident.position,game.spider.x);
-    drawResident(ctx,resident.id,x,y);
-  }
-  for (const [index,item] of game.town.items.entries()) {
-    if (item.collected) continue;
-    const {x,y}=worldNear(item.position,game.spider.x);
-    block(ctx,x-4,y-4,9,7,ink);
-    block(ctx,x-3,y-3,7,5,index%2 ? '#e4c988' : '#b7cb8e');
-    block(ctx,x-1,y-5,3,1,cream);
-    block(ctx,x,y-3,1,5,ink);
-  }
-
-  if (!game.interaction) return;
-  const {kind}=game.interaction;
-  const position=worldNear(game.interaction.position,game.spider.x);
-  const label=kind==='talk' ? 'R2 · Talk' : 'R2 · Pick up';
-  const width=kind==='talk' ? 65 : 82;
-  const x=Math.max(camera.x+width/2+4,Math.min(camera.x+roomWidth-width/2-4,position.x));
-  const y=Math.max(camera.y+34,position.y-(kind==='talk' ? 30 : 22));
-  block(ctx,x-width/2,y-1,width,16,ink);
-  block(ctx,x-width/2+1,y,width-2,14,'#526d52');
-  block(ctx,x-2,y+15,5,2,ink);
-  ctx.save();
-  ctx.fillStyle=cream;
-  ctx.textAlign='center';
-  ctx.font='bold 10px monospace';
-  ctx.fillText(label,x,y+10);
-  ctx.restore();
-}
-
-function projectMapPoint(point:{x:number;y:number},x:number,y:number,sx:number,sy:number,wrap:boolean) {
-  return {x:x+(wrap ? worldX(point.x) : point.x)*sx,y:y+point.y*sy};
 }
 
 function renderMap(ctx:CanvasRenderingContext2D,game:WindowRun) {
-  const x=75,y=43,w=370,h=186;
-  const sx=w/bedroomWidth,sy=h/bedroomHeight;
-  const at=(point:{x:number;y:number})=>projectMapPoint(point,x,y,sx,sy,game.openWorld);
-  const cy=(p:number)=>y+p*sy;
+  const width=game.openWorld ? shaftWidth : bedroomWidth,height=game.openWorld ? shaftHeight : bedroomHeight;
+  const scale=216/height,w=width*scale,x=(roomWidth-w)/2,y=42;
+  const at=(p:{x:number;y:number})=>({x:x+p.x*scale,y:y+p.y*scale});
   block(ctx,0,0,roomWidth,roomHeight,'#20362a');
-  block(ctx,x-5,y-5,w+10,h+10,'#0e241a');
-  block(ctx,x,y,w,h,'#3b5945');
-  if (game.openWorld) {
-    districts.forEach(({shade,name},index)=>{
-      const left=x+index*w/3;
-      block(ctx,left,y,w/3,h,shade);
-      ctx.save();
-      ctx.fillStyle=ink;
-      ctx.textAlign='center';
-      ctx.font='9px monospace';
-      ctx.fillText(name,left+w/6,y+16);
-      ctx.restore();
-    });
-    for (const edge of [x-5,x+w+5]) {
-      ctx.fillStyle=cream;
-      ctx.font='12px monospace';
-      ctx.fillText('↔',edge-4,y+h/2);
-    }
-  }
-  for (const r of game.openWorld ? game.corner.objects : game.surfaces) {
+  block(ctx,x-4,y-4,w+8,224,'#adc395');
+  block(ctx,x,y,w,216,'#3b5945');
+  for (const r of game.surfaces) {
     const p=at(r);
-    block(ctx,p.x,p.y,Math.max(1,r.w*sx),Math.max(1,r.h*sy),'#627e59');
+    block(ctx,p.x,p.y,Math.max(1,r.w*scale),Math.max(1,r.h*scale),'#789468');
   }
-  for (const insect of game.gnats) {
-    const p=at(insect.p);
-    block(ctx,p.x-1,p.y-1,3,3,'#dce5a3');
+  for (const fly of game.gnats) {
+    const p=at(fly.p);
+    block(ctx,p.x-1,p.y-1,3,3,fly.rare ? '#f2aad8' : fly.uncommon ? '#a7e6dc' : cream);
   }
-  for (const wire of game.web.strands) {
-    const from=at(wire.from),to=at(wire.to);
-    if (!game.openWorld || Math.abs(to.x-from.x)<w/2) {
-      line(ctx,from,to,'#b4d3af');
-    } else {
-      const edge=from.x>to.x ? x+w : x;
-      const offset=from.x>to.x ? w : -w;
-      const mid=from.y+(to.y-from.y)*(edge-from.x)/(to.x+offset-from.x);
-      line(ctx,from,{x:edge,y:mid},'#b4d3af');
-      line(ctx,{x:edge-offset,y:mid},to,'#b4d3af');
-    }
-  }
+  for (const wire of game.web.strands) line(ctx,at(wire.from),at(wire.to),'#b4d3af');
   for (const enemy of game.predators) {
     const p=at(enemy.body);
-    block(ctx,p.x-2,p.y-2,5,5,'#db9c70');
-  }
-  if (game.openWorld) {
-    const p=at(game.den);
-    block(ctx,p.x-4,p.y-5,9,7,ink);
-    block(ctx,p.x-1,p.y-4,3,5,cream);
-    for (const resident of game.town?.residents??[]) {
-      const mark=at(resident.position);
-      block(ctx,mark.x-1,mark.y-1,3,3,'#d6b9cf');
-    }
-    for (const item of game.town?.items??[]) {
-      if (item.collected) continue;
-      const mark=at(item.position);
-      block(ctx,mark.x,mark.y,2,2,amber);
-    }
+    block(ctx,p.x-2,p.y-2,4,4,enemy.bee ? '#f3db8b' : '#db9c70');
   }
   const camera=cameraFor(game),view=at(camera);
-  const viewWidth=roomWidth*sx;
-  const visibleWidth=Math.min(viewWidth,x+w-view.x);
   ctx.strokeStyle='#e1e7b2';
-  ctx.strokeRect(view.x,cy(camera.y),visibleWidth,roomHeight*sy);
-  if (game.openWorld && visibleWidth<viewWidth) ctx.strokeRect(x,cy(camera.y),viewWidth-visibleWidth,roomHeight*sy);
+  ctx.strokeRect(view.x,view.y,roomWidth*scale/camera.scale,roomHeight*scale/camera.scale);
   const spider=at(game.spider);
-  block(ctx,spider.x-3,spider.y-3,7,7,cream);
+  block(ctx,spider.x-2,spider.y-2,5,5,cream);
   ctx.fillStyle=cream;
   ctx.font='12px monospace';
-  ctx.fillText(game.openWorld ? 'OPEN WORLD MAP' : 'BEDROOM MAP',75,30);
-  ctx.font='9px monospace';
-  ctx.fillText(game.openWorld ? '● You    · Insect    ■ Guardian    ▣ Shop    — Web' : '● You    · Insect    ■ Hunter    — Web',75,251);
+  ctx.fillText(game.openWorld ? 'HUNTING SHAFT' : 'BEDROOM MAP',x,28);
 }
 
 function drawHunter(ctx:CanvasRenderingContext2D,game:WindowRun,enemy:WindowRun['predators'][number]) {
   const body=enemy.body;
+  if (enemy.bee) {
+    const {x,y}=body,wing=Math.floor(game.clock*26)%2;
+    block(ctx,x-6,y-3,12,7,'#cfa459');
+    block(ctx,x-2,y-3,2,7,ink);
+    block(ctx,x+3,y-3,2,7,ink);
+    block(ctx,x-5,y-6-wing,5,3,cream);
+    block(ctx,x+1,y-6-wing,5,3,cream);
+    if (game.clock<enemy.chaseUntil) {
+      block(ctx,x-1,y-14,2,4,'#ac582f');
+      block(ctx,x-1,y-9,2,1,'#ac582f');
+    }
+    return;
+  }
   const bound=game.clock<enemy.boundUntil;
   const pursuing=game.clock<enemy.chaseUntil && !!enemy.lastKnown;
   const registered=enemy.lastKnown && Math.hypot(body.x-enemy.lastKnown.x,body.y-enemy.lastKnown.y)<12;
@@ -430,6 +234,7 @@ export function renderWindowHunt(ctx:CanvasRenderingContext2D,game:WindowRun,red
   if (mapOpen) {renderMap(ctx,game);return;}
   const camera=cameraFor(game);
   ctx.save();
+  ctx.scale(camera.scale,camera.scale);
   ctx.translate(-camera.x,-camera.y);
   if (game.practice) {
     block(ctx,0,0,roomWidth,roomHeight,'#a2b787');
@@ -438,13 +243,12 @@ export function renderWindowHunt(ctx:CanvasRenderingContext2D,game:WindowRun,red
     }
     for (const surface of game.surfaces) drawPlatform(ctx,surface,0);
   } else if (game.openWorld) {
-    openBackdrop(ctx,camera);
+    openBackdrop(ctx);
     for (const item of game.surfaces) {
-      if (!('kind' in item) || item.x+item.w<camera.x || item.x>camera.x+roomWidth ||
-          item.y+item.h<camera.y || item.y>camera.y+roomHeight) continue;
+      if (!('kind' in item) || item.x+item.w<camera.x || item.x>camera.x+roomWidth/camera.scale ||
+          item.y+item.h<camera.y || item.y>camera.y+roomHeight/camera.scale) continue;
       furnishing(ctx,item);
     }
-    drawShop(ctx,game);
   } else {
     windowBackdrop(ctx,game.corner.objects);
     for (const item of game.corner.objects) furnishing(ctx,item);
@@ -475,6 +279,11 @@ export function renderWindowHunt(ctx:CanvasRenderingContext2D,game:WindowRun,red
       line(ctx,{x,y},{x:x-5,y:y-(flap ? 5 : 2)},'#ffe0ee');
       line(ctx,{x,y},{x:x+5,y:y-(flap ? 5 : 2)},'#ffe0ee');
       block(ctx,x,y+4,1,2,'#bc6ba5');
+    } else if (fly.uncommon) {
+      block(ctx,x-2,y-2,5,5,'#2b5554');
+      block(ctx,x-5,y-3-Number(flap),4,2,'#a8e4dc');
+      block(ctx,x+2,y-3-Number(flap),4,2,'#a8e4dc');
+      block(ctx,x-1,y+2,3,2,'#8ac5b7');
     } else if (fly.kind==='swift') {
       block(ctx,x-fly.direction*5,y,3,1,'#607d59');
       block(ctx,x-2,y,5,2,ink);
@@ -508,11 +317,11 @@ export function renderWindowHunt(ctx:CanvasRenderingContext2D,game:WindowRun,red
     head=p;
   }
   ctx.restore();
-  drawAimMarker(ctx,{x:spider.x-camera.x,y:spider.y-camera.y},game.aim,roomWidth,roomHeight,!!windowAnchor(game));
+  drawAimMarker(ctx,{x:(spider.x-camera.x)*camera.scale,y:(spider.y-camera.y)*camera.scale},game.aim,roomWidth,roomHeight,!!windowAnchor(game));
   ctx.save();
+  ctx.scale(camera.scale,camera.scale);
   ctx.translate(-camera.x,-camera.y);
   drawSpider(ctx,spider,game.clock,{time:game.clock,beat:0});
-  drawTown(ctx,game,camera);
   if (game.trapped) {
     for (let i=-6;i<=6;i+=3) line(ctx,{x:spider.x-8,y:spider.y+i},{x:spider.x+8,y:spider.y+i+1},amber);
   }

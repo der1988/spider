@@ -1,4 +1,3 @@
-import {createTown,interactTown,townTarget,townJumpBonus,townWebBonus,type Town} from './open-world-npcs.ts';
 import {castCrawler,closeCrawlerRopes,createCrawler,jumpCrawler,type Crawler,normals,tickCrawler} from './crawler.ts';
 import {aimHit,DEFAULT_TUNING,SPIDER_HALF_HEIGHT,moveAxis,type Point,type Rect} from './spider.ts';
 import {anchorSilk,crossesSolid,sweptHit,type Strand} from './threads.ts';
@@ -9,6 +8,8 @@ export const roomHeight=290;
 export const bedroomScale=.8;
 export const bedroomWidth=2000;
 export const bedroomHeight=1008;
+export const shaftWidth=900;
+export const shaftHeight=1120;
 export const caughtLifetime=3;
 export const webLifetime=5;
 export const ropeHoldSeconds=.22;
@@ -95,32 +96,27 @@ export function randomBedroom(random=Math.random):Corner {
   };
 }
 
-export function worldX(x:number) {
-  return ((x%bedroomWidth)+bedroomWidth)%bedroomWidth;
-}
-
-export function worldNear(point:Point,referenceX:number):Point {
-  return {x:point.x+Math.round((referenceX-point.x)/bedroomWidth)*bedroomWidth,y:point.y};
-}
-
-export function inDen(game:WindowRun,point:Point) {
-  const den=worldNear(game.den,point.x);
-  return game.openWorld && Math.abs(point.x-den.x)<62 && Math.abs(point.y-den.y)<42;
-}
-
 export function createOpenWorld(random=Math.random) {
-  const room=randomBedroom(random);
-  const ledge=815+random()*37;
-  const objects=room.objects.filter(r=>r.kind!=='wall' || r.w>100);
-  objects.push(object('sill',0,ledge,76,12),object('sill',1944,ledge,56,12),
-    object('wood',26,ledge-166,94,12),object('wood',1920,ledge-270,70,13),
-    object('leaf',64,435,96,12),object('wood',90,239,100,13),
-    object('wood',690,811,65,12),object('wood',690,588,72,12),object('wood',685,363,86,12),
-    object('wood',1230,787,90,12),object('wood',1245,530,75,12),object('wood',1250,310,90,12));
-  const floor=objects[1].y-SPIDER_HALF_HEIGHT;
-  const spawnSites=[106,580,716,1015,1320,1955].map(x=>({x:x+random()*12,y:floor})).filter(p=>
-    !objects.some(r=>p.x>r.x-7 && p.x<r.x+r.w+7 && p.y>r.y-7 && p.y<r.y+r.h+7));
-  return createWindowHunt(false,{...room,objects,spawnSites},random,true);
+  const shelf=(x:number,y:number,w:number)=>object('wood',x+random()*20-10,y+random()*14-7,w,14);
+  const objects=[
+    object('wall',0,0,shaftWidth,16),object('wall',0,1096,shaftWidth,24),
+    object('wall',0,16,16,1080),object('wall',884,16,16,1080),
+    shelf(22,894,145),shelf(356,876,180),shelf(741,903,137),
+    shelf(95,680,105),shelf(528,714,128),shelf(742,657,133),
+    shelf(18,485,147),shelf(328,526,165),shelf(711,456,166),
+    shelf(105,300,140),shelf(471,345,147),shelf(747,255,130),
+    shelf(21,147,104),shelf(339,183,138),shelf(630,119,149),
+  ];
+  const floor=1096-SPIDER_HALF_HEIGHT;
+  const flightSites=[{x:235,y:887},{x:680,y:844},{x:460,y:770},
+    {x:267,y:593},{x:672,y:543},{x:584,y:429},
+    {x:285,y:235},{x:560,y:170},{x:813,y:91},{x:165,y:77}].map(p=>
+      ({x:p.x+random()*22-11,y:p.y+random()*22-11}));
+  return createWindowHunt(false,{
+    objects,flightSites,
+    spawnSites:[{x:190,y:floor},{x:450,y:floor},{x:695,y:floor}],
+    hunterSites:[{x:270,y:floor},{x:825,y:395},{x:70,y:243},{x:800,y:767}],
+  },random,true);
 }
 
 const practiceRoom=[
@@ -137,8 +133,9 @@ const practiceRoom=[
 ];
 
 type GnatKind='common'|'swift'|'wary'|'fly';
-type Gnat={rare:boolean;p:Point;v:Point;home:Point;direction:-1|1;kind:GnatKind;phase:number;steering:Point;decideAt:number};
+type Gnat={rare:boolean;uncommon:boolean;p:Point;v:Point;home:Point;direction:-1|1;kind:GnatKind;phase:number;steering:Point;decideAt:number};
 type Predator={
+  bee:boolean;
   body:Crawler; origin:Point; facing:-1|1; lastKnown?:Point; chaseUntil:number;
   spokeInChase:boolean;
   boundUntil:number; immuneUntil:number; jumpAt:number; fireAt:number;
@@ -148,55 +145,28 @@ type Predator={
 };
 export interface CornerInput {move:Point;aim?:Point;jump:boolean;silk:boolean;silkHeldFor?:number;grip?:boolean;escape?:boolean;remove?:boolean;}
 
-function predator(surfaces:readonly Rect[],x:number,y:number,facing:-1|1):Predator {
-  return {body:createCrawler({x,y},surfaces),origin:{x,y},facing,chaseUntil:0,spokeInChase:false,boundUntil:0,immuneUntil:0,jumpAt:0,fireAt:0,patrolIndex:0,patrolStep:1,swingUntil:0,planAt:0};
+function predator(surfaces:readonly Rect[],x:number,y:number,facing:-1|1,bee=false):Predator {
+  return {bee,body:createCrawler({x,y},surfaces),origin:{x,y},facing,chaseUntil:0,spokeInChase:false,boundUntil:0,immuneUntil:0,jumpAt:0,fireAt:0,patrolIndex:0,patrolStep:1,swingUntil:0,planAt:0};
 }
 
 export function createWindowHunt(practice=false,corner=bedroom,random=Math.random,openWorld=false) {
-  const surfaces=practice ? practiceRoom : openWorld
-    ? [-bedroomWidth,0,bedroomWidth].flatMap(offset=>corner.objects.map(rect=>({...rect,x:rect.x+offset})))
-    : corner.objects;
+  const surfaces=practice ? practiceRoom : corner.objects;
   const spawn=practice ? {x:32,y:262} : randomSite(corner.spawnSites,random);
   const spider=createCrawler(spawn,surfaces);
-  const floor=corner.objects[1].y-SPIDER_HALF_HEIGHT;
-  const den={x:105,y:floor};
-  const hunterStarts=corner.hunterSites.filter(p=>openWorld
-    ? distance(worldNear(p,spawn.x),spawn)>=320 && distance(worldNear(p,den.x),den)>100
-    : distance(p,spider)>=320);
-  const hunters:Point[]=[];
-  if (!practice) {
-    const available=hunterStarts.slice();
-    while (available.length && hunters.length<(openWorld ? 3 : 1)) {
-      hunters.push(available.splice(Math.floor(random()*available.length),1)[0]);
-    }
-  }
-  const starts=hunters.length ? pickFlightSites(corner,spider,random,3,hunters,openWorld) : [];
-  if (openWorld) {
-    const options=[{x:110+random()*85,y:115+random()*24},{x:710+random()*65,y:95+random()*30},
-      {x:1160+random()*95,y:105+random()*38},{x:1790+random()*80,y:82+random()*30}];
-    const upper=options.filter(p=>[spawn,...hunters,...starts.slice(0,2)].every(q=>
-      distance(worldNear(p,q.x),q)>170) && !corner.objects.some(r=>p.x>r.x-15&&p.x<r.x+r.w+15&&p.y>r.y-15&&p.y<r.y+r.h+15));
-    if (upper.length && starts.length===3) starts[2]=randomSite(upper,random);
-  }
-  const town:Town|undefined=openWorld ? createTown(random,{
-    mantis:{x:565,y:floor},springtail:{x:718,y:floor},quartermaster:den,
-    items:[90,688,1265,1960].map(x=>({x:x+random()*26-13,y:floor})),
-  }) : undefined;
+  const hunterStarts=corner.hunterSites.filter(p=>distance(p,spider)>=320);
+  const hunters=practice ? [] : openWorld ? corner.hunterSites : [randomSite(hunterStarts,random)].filter(Boolean);
+  const starts=openWorld ? corner.flightSites : hunters.length ? pickFlightSites(corner,spider,random,3,hunters) : [];
   return {
-    practice,corner,surfaces,spider,openWorld,den,town,delivered:0,coins:0,silkPressedAt:0,ropeAttempt:false,
-    walkers:openWorld ? [53,174,567,650,716,1212,1350,1961].map((x,i)=>({
-      x:x+random()*12,y:floor,direction:i%2 ? 1 : -1,speed:16+i*3,next:.9+i*.41,
-    })) : [],
-    interaction:undefined as ReturnType<typeof townTarget>,interactHeld:false,contextGrip:false,
+    practice,corner,surfaces,spider,openWorld,zoom:1,silkPressedAt:0,ropeAttempt:false,
     web:{strands:[] as Strand[]},
     speech:createSpiderSpeech(),dialogueClock:0,
     greeted:new WeakSet<Gnat>(),
     occupants:new Map<Strand,Gnat[]>(),
-    gnats:starts.map((p,i)=>makeGnat(p,i,random,openWorld && (i===2 || p.y<340 && random()<.35))),
+    gnats:starts.map((p,i)=>makeGnat(p,i,random,openWorld && p.y<265,openWorld && p.y>=265 && p.y<650)),
     carried:[] as Gnat[],
     trail:[{...spawn}] as Point[],
-    predators:hunters.map(p=>{
-      const enemy=predator(surfaces,p.x,p.y,random()<.5 ? -1 : 1);
+    predators:hunters.map((p,i)=>{
+      const enemy=predator(surfaces,p.x,p.y,random()<.5 ? -1 : 1,openWorld && i%2===1);
       if (openWorld) {
         enemy.patrolIndex=(corner.hunterSites.indexOf(p)+1)%corner.hunterSites.length;
         enemy.patrolStep=enemy.facing;
@@ -248,7 +218,7 @@ function jumpWindow(game:WindowRun,raw:Point) {
     const lift=Math.max(0,.38-(normal.x*chosen.x+normal.y*chosen.y));
     direction=unit({x:chosen.x+normal.x*(lift+.04),y:chosen.y+normal.y*(lift+.04)});
   }
-  const speed=jumpSpeed*(game.town ? townJumpBonus(game.town) : 1);
+  const speed=jumpSpeed;
   if (!jumpCrawler(spider,speed)) return false;
   spider.vx=direction.x*speed;
   spider.vy=direction.y*speed;
@@ -259,21 +229,6 @@ function aimEnd(game:WindowRun) {
   const {spider,aim}=game;
   const range=silkRange(game);
   return {x:spider.x+aim.x*range,y:spider.y+aim.y*range};
-}
-
-function walkTown(game:WindowRun,dt:number) {
-  for (const [i,walker] of game.walkers.entries()) {
-    if (game.clock>=walker.next) {
-      walker.direction*=-1;
-      walker.next=game.clock+3+(i%4);
-    }
-    if (walker.next-game.clock<.55+(i%3)*.2) continue;
-    const x=worldX(walker.x+walker.direction*walker.speed*dt);
-    const p={x,y:walker.y};
-    if (game.corner.objects.some(r=>p.x>r.x-6 && p.x<r.x+r.w+6 && p.y>r.y-5 && p.y<r.y+r.h+5)) {
-      walker.direction*=-1;
-    } else walker.x=x;
-  }
 }
 
 function fireRope(game:WindowRun,emit:(event:WindowEvent)=>void) {
@@ -291,21 +246,8 @@ function fireTrap(game:WindowRun,emit:(event:WindowEvent)=>void) {
   const before=web.strands.length;
   if (anchor) anchorSilk(web.strands,anchor,silkRange(game)+SPIDER_HALF_HEIGHT,spider,surfaces,Infinity);
   if (web.strands.length===before) {emit('miss');return;}
-  web.strands[before].expiresAt=game.clock+webLifetime+(game.town ? townWebBonus(game.town,game.clock) : 0);
+  web.strands[before].expiresAt=game.clock+webLifetime;
   emit('fix');
-}
-
-export function catchValue(game:WindowRun) {
-  return game.carried.reduce((value,insect)=>value+(insect.rare ? 12 : 4),0);
-}
-
-export function sellCatch(game:WindowRun) {
-  const value=catchValue(game);
-  game.delivered+=game.carried.length;
-  game.coins+=value;
-  game.carried=[];
-  game.shots=[];
-  return value;
 }
 
 function releaseSilk(game:WindowRun,emit:(event:WindowEvent)=>void) {
@@ -322,7 +264,7 @@ function releaseSilk(game:WindowRun,emit:(event:WindowEvent)=>void) {
   }
   emit('release');
   if (strands.length>before) {
-    strands[before].expiresAt=game.clock+webLifetime+(game.town ? townWebBonus(game.town,game.clock) : 0);
+    strands[before].expiresAt=game.clock+webLifetime;
     emit('fix');
   }
 }
@@ -331,9 +273,9 @@ function randomSite(sites:readonly Point[],random:()=>number) {
   return sites[Math.floor(random()*sites.length)];
 }
 
-function pickFlightSites(corner:Corner,spider:Point,random:()=>number,count:number,occupied:readonly Point[]=[],wrap=false) {
+function pickFlightSites(corner:Corner,spider:Point,random:()=>number,count:number,occupied:readonly Point[]=[]) {
   const picks:Point[]=[];
-  const apart=(a:Point,b:Point)=>distance(wrap ? worldNear(a,b.x) : a,b);
+  const apart=(a:Point,b:Point)=>distance(a,b);
   for (let i=0;i<count;i++) {
     const available=corner.flightSites.filter(p=>apart(p,spider)>205 &&
       [...occupied,...picks].every(q=>apart(p,q)>132));
@@ -343,9 +285,9 @@ function pickFlightSites(corner:Corner,spider:Point,random:()=>number,count:numb
   return picks;
 }
 
-function makeGnat(home:Point,index:number,random:()=>number,rare=false):Gnat {
+function makeGnat(home:Point,index:number,random:()=>number,rare=false,uncommon=false):Gnat {
   const angle=random()*Math.PI*2;
-  return {rare,p:{...home},v:{x:0,y:0},home:{...home},direction:angle>Math.PI ? -1 : 1,
+  return {rare,uncommon,p:{...home},v:{x:0,y:0},home:{...home},direction:angle>Math.PI ? -1 : 1,
     steering:{x:Math.cos(angle),y:Math.sin(angle)},kind:(['wary','swift','fly'] as const)[index%3],
     phase:angle,decideAt:0};
 }
@@ -367,7 +309,7 @@ function steerGnat(game:WindowRun,gnat:Gnat,threat:Point|undefined) {
   const {p,home,steering}=gnat;
   const orbit=game.clock*.62+gnat.phase;
   const goal={x:home.x+Math.cos(orbit)*105,y:home.y+Math.sin(orbit*1.4)*84};
-  const desired=threat ? unit({x:p.x-threat.x,y:p.y-threat.y}) : unit({x:goal.x-p.x,y:goal.y-p.y});
+  const desired=threat && gnat.rare ? unit({x:(p.x-threat.x)*.65,y:p.y<threat.y ? -130 : 130}) : threat ? unit({x:p.x-threat.x,y:p.y-threat.y}) : unit({x:goal.x-p.x,y:goal.y-p.y});
   const heading=Math.atan2(desired.y,desired.x);
   let best=steering,high=-Infinity;
   for (const offset of [0,.48,-.48,.96,-.96,1.45,-1.45,2.1,-2.1,Math.PI]) {
@@ -375,12 +317,12 @@ function steerGnat(game:WindowRun,gnat:Gnat,threat:Point|undefined) {
     const turn={x:Math.cos(angle),y:Math.sin(angle)};
     const near={x:p.x+turn.x*24,y:p.y+turn.y*24};
     if (!clear(game,p,near)) continue;
-    const look=threat ? 87 : 58;
+    const look=gnat.uncommon ? 124 : threat ? 87 : 58;
     const far={x:p.x+turn.x*look,y:p.y+turn.y*look};
     const seenWire=firstCrossing(p,far,game.web.strands);
     const escape=threat ? (distance(far,threat)-distance(p,threat))*.018 : 0;
     const score=2.5*(turn.x*desired.x+turn.y*desired.y)+.66*(turn.x*steering.x+turn.y*steering.y)+escape
-      -(seenWire ? 6 : 0)-(clear(game,near,far) ? 0 : 4);
+      -(seenWire ? (gnat.uncommon ? 12 : 6) : 0)-(clear(game,near,far) ? 0 : 4);
     if (score>high) {high=score;best=turn;}
   }
   return best;
@@ -415,10 +357,10 @@ function advanceGnats(game:WindowRun,previous:Point,dt:number,emit:(event:Window
   game.gnats=game.gnats.filter(gnat=>{
     const {p,v,kind}=gnat;
     const {spider}=game;
-    const threat=distance(p,spider)<(kind==='wary' ? 196 : 162) && clear(game,p,spider) ? spider : undefined;
+    const threat=distance(p,spider)<(gnat.rare ? 250 : kind==='wary' ? 196 : 162) && clear(game,p,spider) ? spider : undefined;
     if (game.clock>=gnat.decideAt) {
       gnat.steering=steerGnat(game,gnat,threat);
-      gnat.decideAt=game.clock+(threat ? .15 : .24);
+      gnat.decideAt=game.clock+(threat && gnat.rare ? .08 : threat ? .15 : .24);
     }
     const speed=(kind==='swift' ? 116 : kind==='fly' ? 78 : 96)+(threat ? 38 : 0);
     const accel=1-Math.exp(-dt*(threat ? 8 : 5));
@@ -544,7 +486,7 @@ function hunterRoute(game:WindowRun,body:Point,goal:Point) {
     for (const x of [rect.x-13,rect.x+rect.w+13]) {
       for (const y of [rect.y-13,rect.y+rect.h+13]) {
         const point={x,y};
-        if ((!game.openWorld && (x<20 || x>bedroomWidth-20)) || y<20 || y>bedroomHeight-25 ||
+        if ((x<20 || x>(game.openWorld ? shaftWidth : bedroomWidth)-20) || y<20 || y>bedroomHeight-25 ||
             !clear(game,body,point) || distance(body,point)<12) continue;
         const score=distance(body,point)+distance(point,goal)*.9+(clear(game,point,goal) ? 0 : 160);
         if (score<cost) {cost=score;best=point;}
@@ -582,26 +524,25 @@ function swingToward(game:WindowRun,enemy:Predator,goal:Point) {
 function stepPredator(game:WindowRun,enemy:Predator,dt:number,emit:(event:WindowEvent)=>void) {
   if (game.clock<enemy.boundUntil) return;
   const body=enemy.body, target=game.spider;
-  const safe=inDen(game,target);
-  if (game.openWorld && (!game.carried.length || safe)) {
+
+  if (game.openWorld && !game.carried.length) {
     enemy.chaseUntil=0;
     enemy.lastKnown=undefined;
     enemy.shot=undefined;
   }
-  const sees=(!game.openWorld || game.carried.length>0 && !safe) && distance(body,target)<365 && clear(game,body,target);
+  const sees=(!game.openWorld || game.carried.length>0) && distance(body,target)<365 && clear(game,body,target);
   if (game.clock>=enemy.chaseUntil) enemy.spokeInChase=false;
   if (sees) {
-    if (!enemy.spokeInChase && inWindow(game,body)) {
+    if (!game.openWorld && !enemy.spokeInChase && inWindow(game,body)) {
       enemy.spokeInChase=startHunterDialogue(game,enemy,'hunter');
     }
     enemy.lastKnown={x:target.x,y:target.y};
     enemy.chaseUntil=game.clock+7;
   }
   const tracking=game.clock<enemy.chaseUntil && enemy.lastKnown;
-  const routes=game.openWorld ? [enemy.origin,{x:enemy.origin.x+105,y:614},
-    {x:enemy.origin.x+215,y:335},{x:enemy.origin.x+285,y:126},
-    {x:enemy.origin.x-140,y:376},{x:enemy.origin.x-85,y:695}] : game.corner.hunterSites;
-  const posts=game.openWorld ? routes.map(p=>worldNear(p,body.x)) : routes;
+  const posts=game.openWorld ? [enemy.origin,{x:clamp(enemy.origin.x+110,70,830),y:770},
+    {x:clamp(enemy.origin.x-95,70,830),y:488},{x:clamp(enemy.origin.x+80,70,830),y:89},
+    {x:clamp(enemy.origin.x-145,70,830),y:335},{x:clamp(enemy.origin.x+100,70,830),y:672}] : game.corner.hunterSites;
   if (enemy.patrolIndex>=posts.length) enemy.patrolIndex=0;
   if (!tracking && distance(body,posts[enemy.patrolIndex])<64) enemy.patrolIndex=(enemy.patrolIndex+enemy.patrolStep+posts.length)%posts.length;
   const goal=tracking || posts[enemy.patrolIndex];
@@ -610,6 +551,19 @@ function stepPredator(game:WindowRun,enemy:Predator,dt:number,emit:(event:Window
     enemy.planAt=game.clock+.22;
   }
   const waypoint=enemy.plan??goal;
+  if (enemy.bee) {
+    const v=unit({x:waypoint.x-body.x,y:waypoint.y-body.y});
+    const speed=tracking ? 120 : 77;
+    const before={x:body.x,y:body.y};
+    moveAxis(body,game.surfaces,'x',v.x*speed*dt);
+    moveAxis(body,game.surfaces,'y',v.y*speed*dt);
+    if (!tracking && distance(before,body)<.08) {
+      enemy.patrolIndex=(enemy.patrolIndex+1)%posts.length;
+      enemy.planAt=0;
+    }
+    if (tracking && distance(body,target)<16 && clear(game,body,target)) game.phase='over';
+    return;
+  }
   if (enemy.shot) {
     if (game.clock<enemy.shot.at) return;
     const {from,to}=enemy.shot;
@@ -679,13 +633,12 @@ function stepPredator(game:WindowRun,enemy:Predator,dt:number,emit:(event:Window
       enemy.immuneUntil=enemy.boundUntil+.6;
       enemy.shot=undefined;
       hit.wire.shakeUntil=game.clock+.4;
-      if (inWindow(game,body)) startHunterDialogue(game,enemy,'boundHunter');
+      if (!game.openWorld && inWindow(game,body)) startHunterDialogue(game,enemy,'boundHunter');
       emit('caught-predator');
       return;
     }
   }
-  if (inDen(game,body)) {body.x=previous.x;body.y=previous.y;body.vx=body.vy=0;closeCrawlerRopes(body);}
-  if ((!game.openWorld || tracking && !safe) && distance(body,target)<16 && !game.surfaces.some(rect=>crossesSolid(body,target,rect))) game.phase='over';
+  if ((!game.openWorld || tracking) && distance(body,target)<16 && !game.surfaces.some(rect=>crossesSolid(body,target,rect))) game.phase='over';
 }
 
 function advanceShots(game:WindowRun,dt:number,emit:(event:WindowEvent)=>void) {
@@ -695,7 +648,7 @@ function advanceShots(game:WindowRun,dt:number,emit:(event:WindowEvent)=>void) {
     const travel=Math.min(remaining,260*dt);
     const next={x:shot.p.x+vector.x*travel,y:shot.p.y+vector.y*travel};
     const target=game.spider;
-    if (!inDen(game,target) && !game.trapped && game.clock>=game.safeUntil &&
+    if (!game.trapped && game.clock>=game.safeUntil &&
         distance(target,pointAt({from:shot.p,to:next,shakeUntil:0},projection(target,{from:shot.p,to:next,shakeUntil:0})))<8 &&
         !game.surfaces.some(rect=>crossesSolid(shot.p,target,rect))) {
       game.trapped=true;
@@ -712,26 +665,23 @@ function advanceShots(game:WindowRun,dt:number,emit:(event:WindowEvent)=>void) {
 }
 
 export function cameraFor(game:WindowRun) {
-  return game.practice ? {x:0,y:0} : {
-    x:game.openWorld ? Math.round(game.spider.x-roomWidth/2) : Math.round(clamp(game.spider.x-roomWidth/2,0,bedroomWidth-roomWidth)),
-    y:Math.round(clamp(game.spider.y-roomHeight*.60,0,bedroomHeight-roomHeight)),
+  if (game.practice) return {x:0,y:0,scale:1};
+  const scale=game.openWorld ? game.zoom : 1;
+  const width=game.openWorld ? shaftWidth : bedroomWidth;
+  const height=game.openWorld ? shaftHeight : bedroomHeight;
+  return {
+    x:clamp(game.spider.x-roomWidth/(2*scale),0,width-roomWidth/scale),
+    y:clamp(game.spider.y-roomHeight*.60/scale,0,height-roomHeight/scale),scale,
   };
+}
+
+export function updateHuntZoom(game:WindowRun,held:boolean,dt:number) {
+  if (game.openWorld) game.zoom+=((held ? .62 : 1)-game.zoom)*(1-Math.exp(-dt*8));
 }
 
 function inWindow(game:WindowRun,point:Point) {
   const camera=cameraFor(game);
   return point.x>=camera.x && point.x<camera.x+roomWidth && point.y>=camera.y && point.y<camera.y+roomHeight;
-}
-
-export function gnatPositions(game:WindowRun):Partial<Record<Speaker,Point>> {
-  const positions:Partial<Record<Speaker,Point>>={spider:game.spider,hunter:game.predators[0]?.body};
-  const resident=game.town?.residents.find(r=>r.id===game.town?.activeResident);
-  if (resident) positions.resident=worldNear(resident.position,game.spider.x);
-  for (const insect of game.gnats) positions[preySpeaker(insect)]=insect.p;
-  for (const occupants of game.occupants.values()) {
-    for (const insect of occupants) positions[preySpeaker(insect)]=insect.p;
-  }
-  return positions;
 }
 
 export function chasingPrey(game:WindowRun,input:CornerInput) {
@@ -758,22 +708,10 @@ export function gnatCast(game:WindowRun):Record<Exclude<Speaker,'resident'>,Cast
 
 export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(event:WindowEvent)=>void) {
   if (game.phase==='over') return;
-  if (game.openWorld) rebaseWorld(game);
   const {spider,web}=game;
   const beforeMove={x:spider.x,y:spider.y};
   game.clock+=dt;
   expireWebs(game);
-  if (game.town) {
-    game.interaction=townTarget(game.town,spider,p=>worldNear(p,spider.x),p=>clear(game,spider,p));
-    if (input.grip && !game.interactHeld) {
-      game.contextGrip=!!game.interaction && !game.trapped;
-      if (game.contextGrip && game.interaction) {
-        sayTown(game,interactTown(game.town,game.interaction,game.clock,catchValue(game)));
-      }
-    }
-    game.interactHeld=!!input.grip;
-    if (game.contextGrip) input={...input,grip:false};
-  }
   if (input.aim) game.aim=unit(input.aim);
   if (!game.practice && input.remove && !game.removeHeld && !game.trapped) {
     const empty=web.strands.filter(wire=>!game.occupants.has(wire));
@@ -789,7 +727,7 @@ export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(
       game.trapped=false;
       game.safeUntil=game.clock+1;
       const hunter=game.predators.find(enemy=>inWindow(game,enemy.body));
-      if (hunter) startHunterDialogue(game,hunter,'escaped');
+      if (hunter && !game.openWorld) startHunterDialogue(game,hunter,'escaped');
       emit('escaped');
     }
   } else {
@@ -840,12 +778,10 @@ export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(
   game.silkHeld=input.silk;
   game.escapeHeld=!!input.escape;
   if (game.practice) return;
-  walkTown(game,dt);
   advanceGnats(game,beforeMove,dt,emit);
   pullChain(game);
   for (const enemy of game.predators) stepPredator(game,enemy,dt,emit);
   advanceShots(game,dt,emit);
-  if (game.openWorld) rebaseWorld(game);
   if (!game.openWorld && !game.trapped && !game.speech.queue.some(request=>request.event==='nearPrey')) {
     const nearby=game.gnats.find(gnat=>!game.greeted.has(gnat) &&
       distance(gnat.p,spider)<76 && clear(game,spider,gnat.p));
@@ -855,56 +791,8 @@ export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(
   }
 }
 
-export function sayTown(game:WindowRun,text:string,speaker:Speaker='spider') {
-  game.speech.pending=[];
-  game.speech.line={speaker,text};
-  game.speech.slowAt=-Infinity;
-  game.speech.visibleUntil=game.dialogueClock+5;
-  game.speech.next=game.speech.visibleUntil;
-}
-
-// Keep each entity in the nearest copy of the ring. Move both ends of
-// ropes and strands together so crossing the seam preserves their length.
-function rebaseWorld(game:WindowRun) {
-  const {spider}=game;
-  const shift=worldX(spider.x)-spider.x;
-  const move=(p:Point|undefined,dx:number)=>{if (p && dx) p.x+=dx;};
-  const moveBody=(body:Crawler,dx:number)=>{
-    move(body,dx);
-    move(body.rope,dx);
-    move(body.firstAnchor,dx);
-  };
-  const nearest=(x:number)=>Math.round((spider.x-x)/bedroomWidth)*bedroomWidth;
-  moveBody(spider,shift);
-  for (const p of game.trail) move(p,shift);
-  const insects=[...game.gnats,...game.carried,...[...game.occupants.values()].flat()];
-  for (const insect of insects) {
-    const dx=nearest(insect.p.x);
-    move(insect.p,dx);
-    move(insect.home,dx);
-  }
-  for (const enemy of game.predators) {
-    const dx=nearest(enemy.body.x);
-    if (!dx) continue;
-    moveBody(enemy.body,dx);
-    move(enemy.lastKnown,dx);
-    enemy.plan=undefined;enemy.planAt=0;enemy.bypass=undefined;
-    if (enemy.shot) {
-      move(enemy.shot.from,dx);move(enemy.shot.to,dx);
-    }
-  }
-  for (const shot of game.shots) {
-    const dx=nearest(shot.p.x);
-    move(shot.p,dx);move(shot.to,dx);
-  }
-  for (const strand of game.web.strands) {
-    const dx=nearest((strand.from.x+strand.to.x)/2);
-    move(strand.from,dx);move(strand.to,dx);
-  }
-}
-
 export function advanceWindowDialogue(game:WindowRun,input:CornerInput,seconds:number) {
-  if (game.practice || game.phase==='over') return;
+  if (game.practice || game.openWorld || game.phase==='over') return;
   const {spider}=game;
   game.dialogueClock+=seconds;
   const idle=!!spider.support && !game.trapped && !spider.rope && !input.silk && !input.jump &&

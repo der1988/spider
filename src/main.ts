@@ -1,8 +1,5 @@
-import {chooseTownReply,closeTownDialogue,interactTown} from './open-world-npcs';
-import {bindGnatDialogueView} from './gnat-dialogue-view';
-import {dialogueRate} from './gnat-dialogue';
 import './style.css';
-import {advanceWindowDialogue,cameraFor,catchValue,chasingPrey,createOpenWorld,createWindowHunt,gnatPositions,sayTown,sellCatch,stepWindowHunt,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
+import {chasingPrey,createOpenWorld,createWindowHunt,stepWindowHunt,updateHuntZoom,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
 import {renderWindowHunt} from './window-hunt-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
@@ -72,59 +69,7 @@ const leaderboard = bindLeaderboard();
 const endlessBoard=bindEndlessBoard();
 const pausePanel=get<HTMLDialogElement>('pause-panel');
 const settingsPanel=get<HTMLDialogElement>('settings-panel');
-const renderGnatDialogue=bindGnatDialogueView();
-const townOptions=get('open-options');
-let townChoice=0;
-let townR2Held=false;
-function selectTownChoice(index:number) {
-  const buttons=[...townOptions.querySelectorAll('button')];
-  if (!buttons.length) return;
-  townChoice=(index+buttons.length)%buttons.length;
-  buttons.forEach((button,i)=>button.dataset.selected=String(i===townChoice));
-  buttons[townChoice].focus({preventScroll:true});
-}
-function openTownPanel(run:WindowRun) {
-  const scene=run.town?.dialogue;
-  if (!scene) return;
-  sayTown(run,scene.resident+': '+scene.opening,'resident');
-  townOptions.replaceChildren(...scene.options.map(({label},index)=>{
-    const button=document.createElement('button');
-    button.type='button';button.textContent=label;
-    button.onclick=()=>{
-      const reply=run.town && chooseTownReply(run.town,index,run.clock);
-      if (reply) {
-        if (reply.sell) {
-          sellCatch(run);
-          audio.play('catch');
-        }
-        sayTown(run,scene.resident+': '+reply.text,'resident');
-      }
-      closeTownPanel();
-    };
-    return button;
-  }));
-  keyboard.clear();
-  townOptions.hidden=false;
-  selectTownChoice(0);
-}
-function closeTownPanel() {
-  townOptions.hidden=true;
-  if (windowHunt?.town) closeTownDialogue(windowHunt.town);
-}
-function repeatTownGreeting() {
-  const run=windowHunt;
-  if (!run?.town || run.interaction?.kind!=='talk') return;
-  sayTown(run,interactTown(run.town,run.interaction,run.clock,catchValue(run)));
-  openTownPanel(run);
-}
-townOptions.onkeydown=event=>{
-  if (event.code==='Escape') {event.preventDefault();closeTownPanel();}
-  if (event.code==='KeyG' && !event.repeat) repeatTownGreeting();
-  if (event.key==='ArrowUp' || event.key==='ArrowDown') {
-    event.preventDefault();selectTownChoice(townChoice+(event.key==='ArrowUp' ? -1 : 1));
-  }
-};
-const dialogOpen=()=>!townOptions.hidden || leaderboard.open || endlessBoard.open || settingsPanel.open;
+const dialogOpen=()=>leaderboard.open || endlessBoard.open || settingsPanel.open;
 get('defeat-top').onclick=()=>void endlessBoard.view();
 let contextAudio: AudioContext|undefined;
 let mode: HuntMode|undefined;
@@ -388,14 +333,14 @@ function beginFly(resume=false) {
 }
 
 window.addEventListener('keydown',event => {
-  if (settingsPanel.open || !townOptions.hidden) return;
+  if (settingsPanel.open) return;
   if (event.code==='KeyM' && !event.repeat && windowHunt && !windowHunt.practice && !paused && windowHunt.phase==='play') {
     roomMapOpen=!roomMapOpen;
     remainder=0;
     event.preventDefault();
   }
   if (!pausePanel.open && shell.dataset.screen==='game' && !dialogOpen() && !windowDefeat.open && defeat.hidden) {
-    if (/^(Key[WASDZXCGV]|Arrow(Up|Down|Left|Right))$/.test(event.code)) {
+    if (/^(Key[WASDZXCGVQ]|Arrow(Up|Down|Left|Right))$/.test(event.code)) {
       keyboard.add(event.code);
       if (!event.repeat && event.code==='KeyZ') keyboardButtons|=1;
       if (!event.repeat && event.code==='KeyX') keyboardButtons|=2;
@@ -609,12 +554,6 @@ function keyboardInput() {
 }
 
 const windowInfo=get('window-hunt-info');
-function showWindowDialogue(run?:WindowRun,elapsed=0) {
-  renderGnatDialogue(run?.openWorld,run?.speech.line,run ? gnatPositions(run) : {},
-    run ? cameraFor(run) : neutralStick,elapsed,run ? run.dialogueClock-run.speech.visibleUntil : Infinity,
-    !!run && !run.practice && !roomMapOpen && run.phase!=='over' && subtitleMode.selectedIndex!==2,reduced());
-}
-
 function setWindowView() {
   if (windowHunt) shell.dataset.windowHunt=windowHunt.practice ? 'practice' : 'true';
   else delete shell.dataset.windowHunt;
@@ -622,9 +561,8 @@ function setWindowView() {
   worldCanvas.height=windowHunt ? roomHeight : 204;
   windowInfo.hidden=!windowHunt?.practice;
   get('open-controls').hidden=!windowHunt?.openWorld;
-  get('score-label').textContent=windowHunt?.openWorld ? 'Coins' : 'Catches';
+  get('score-label').textContent='Catches';
   get('silk-count').hidden=!windowHunt || windowHunt.practice;
-  showWindowDialogue(windowHunt);
 }
 
 function startWindowHunt(practice=false) {
@@ -635,7 +573,6 @@ function startWindowHunt(practice=false) {
   mode=undefined;
   windowDefeat.close();
   clearFlyScene();
-  closeTownPanel();
   windowHunt=practice ? createWindowHunt(true) : createOpenWorld();
   windowHunt.escapeHeld=crossHeld;
   roomMapOpen=false;
@@ -667,15 +604,13 @@ function syncGnatMusic(run:WindowRun) {
   gnatMusic.sync(contextAudio,alerted ? 'danger' : preyChase && run.phase==='play' ? 'chase' : 'explore',paused || document.hidden);
 }
 
-function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number,realElapsed:number) {
-  let captionElapsed=0;
-  if (!paused && !roomMapOpen && townOptions.hidden && !document.hidden && run.phase==='play') {
+function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number,realElapsed:number,zoomHeld:boolean) {
+  if (!paused && !roomMapOpen && !document.hidden && run.phase==='play') {
     silkHeldFor=input.silk ? silkHeldFor+realElapsed : 0;
     input={...input,silkHeldFor};
-    advanceWindowDialogue(run,input,realElapsed);
-    captionElapsed=elapsed;
-    remainder+=elapsed*dialogueRate(run.speech,run.dialogueClock);
-    while (remainder>=arenaStep && run.phase==='play' && !run.town?.dialogue) {
+    updateHuntZoom(run,zoomHeld,elapsed);
+    remainder+=elapsed;
+    while (remainder>=arenaStep && run.phase==='play') {
       remainder-=arenaStep;
       stepWindowHunt(run,input,arenaStep,event=>{
         if (event==='trap') audio.play('tension');
@@ -690,7 +625,6 @@ function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number,realElap
         }
       });
     }
-    if (run.town?.dialogue) {remainder=0;openTownPanel(run);}
     preyChase=!run.practice && chasingPrey(run,input);
   }
   syncGnatMusic(run);
@@ -702,20 +636,15 @@ function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number,realElap
   else if (roomMapOpen) say('World map · △ / M to close');
   else if (run.trapped) say('Trapped · Tap × / C · '+run.escapeCount+'/'+breakFreePresses);
   else if (run.clock>=huntNoticeUntil && message.textContent) say('');
-  const catches=String(run.openWorld ? run.coins : run.catches);
-  if (run.town) {
-    const action=run.interaction?.kind==='talk' ? 'Talk' : run.interaction?.kind==='pickup' ? 'Pick up' : 'Grip';
-    if (get('open-action').textContent!==action) get('open-action').textContent=action;
-    const cargo=`Carry ${run.carried.length} · Pollen ${run.town.inventory.pollen}`;
-    if (get('open-cargo').textContent!==cargo) get('open-cargo').textContent=cargo;
-  }
+  const catches=String(run.catches);
+  const cargo=`Carry ${run.carried.length}`;
+  if (get('open-cargo').textContent!==cargo) get('open-cargo').textContent=cargo;
   const silk=String(run.silk);
   if (scoreLabel.textContent!==catches) scoreLabel.textContent=catches;
   if (silkLabel.textContent!==silk) silkLabel.textContent=silk;
   renderWindowHunt(context,run,reduced(),roomMapOpen);
-  showWindowDialogue(run,captionElapsed);
   if (run.phase==='over' && !windowDefeat.open) {
-    get('window-hunt-result').textContent='Coins · '+run.coins;
+    get('window-hunt-result').textContent='Catches · '+run.catches;
     windowDefeat.showModal();
     windowChoices.select(1,true);
   }
@@ -763,16 +692,8 @@ function frame(time: number) {
     }
     crossPressed=cross && !crossHeld;
     crossHeld=cross;
-    const direction=navigationDirection(gamepad,atMenu || pausePanel.open || settingsPanel.open || !townOptions.hidden);
+    const direction=navigationDirection(gamepad,atMenu || pausePanel.open || settingsPanel.open);
     if (settingsPanel.open) settingsPad(gamepad,crossPressed,cancel && !cancelHeld,direction);
-    const townR2=!!gamepad.buttons[7]?.pressed || (gamepad.buttons[7]?.value??0)>.3;
-    if (!townOptions.hidden) {
-      if (townR2 && !townR2Held) repeatTownGreeting();
-      else if (cancel && !cancelHeld) closeTownPanel();
-      else if (crossPressed) townOptions.querySelectorAll('button')[townChoice]?.click();
-      else if (direction && direction!==padDirection) selectTownChoice(townChoice+direction);
-    }
-    townR2Held=townR2;
     cancelHeld=cancel;
     if (navigation && !boardWasOpen && direction && direction!==padDirection) {
       navigation.move(direction);
@@ -795,7 +716,6 @@ function frame(time: number) {
     crossHeld=false;
     triangleHeld=false;
     cancelHeld=false;
-    townR2Held=false;
     padDirection=0;
   }
 
@@ -810,7 +730,7 @@ function frame(time: number) {
       grip:keyboard.has('KeyG') || !!gamepad?.buttons[7]?.pressed || (gamepad?.buttons[7]?.value??0)>.3,
       escape:keyboard.has('KeyC') || crossHeld,
       remove:keyboard.has('KeyV') || !!gamepad?.buttons[2]?.pressed,
-    },elapsed,realElapsed);
+    },elapsed,realElapsed,!!gamepad?.buttons[6]?.pressed || (gamepad?.buttons[6]?.value??0)>.3 || keyboard.has('KeyQ'));
     requestAnimationFrame(frame);
     return;
   }
