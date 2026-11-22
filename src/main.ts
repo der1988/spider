@@ -334,7 +334,7 @@ window.addEventListener('keydown',event => {
     event.preventDefault();
   }
   if (!pausePanel.open && shell.dataset.screen==='game' && !dialogOpen() && !windowDefeat.open && defeat.hidden) {
-    if (/^(Key[WASDZXCG]|Arrow(Up|Down|Left|Right))$/.test(event.code)) {
+    if (/^(Key[WASDZXCGV]|Arrow(Up|Down|Left|Right))$/.test(event.code)) {
       keyboard.add(event.code);
       if (!event.repeat && event.code==='KeyZ') keyboardButtons|=1;
       if (!event.repeat && event.code==='KeyX') keyboardButtons|=2;
@@ -557,7 +557,7 @@ function setWindowView() {
   get('silk-count').hidden=!windowHunt || windowHunt.practice;
   windowInfo.textContent=windowHunt?.practice
     ? 'L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower'
-    : 'L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower · R2 / G grip web · △ / M map · × / C escape';
+    : 'L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower · R2 / G grip · △ / M map · □ / V remove web · × / C escape';
 }
 
 function startWindowHunt(practice=false) {
@@ -590,7 +590,10 @@ function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number) {
     while (remainder>=arenaStep && run.phase==='play') {
       remainder-=arenaStep;
       stepWindowHunt(run,input,arenaStep,event=>{
-        if (event==='trap') audio.play('tension');
+        if (event==='web-limit') {
+          say('One web at a time · □ / V removes an empty web');
+          huntNoticeUntil=run.clock+1.8;
+        } else if (event==='trap') audio.play('tension');
         else if (event==='escaped') audio.play('release');
         else if (event==='caught-insect' || event==='caught-predator') audio.play('fix');
         else {
@@ -700,6 +703,7 @@ function frame(time: number) {
       silk:keyboard.has('KeyX') || !!gamepad?.buttons[5]?.pressed,
       grip:keyboard.has('KeyG') || !!gamepad?.buttons[7]?.pressed || (gamepad?.buttons[7]?.value??0)>.3,
       escape:keyboard.has('KeyC') || crossHeld,
+      remove:keyboard.has('KeyV') || !!gamepad?.buttons[2]?.pressed,
     },elapsed);
     requestAnimationFrame(frame);
     return;

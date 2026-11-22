@@ -28,81 +28,109 @@ function run(game:WindowRun,frames:number,input:Partial<CornerInput>={}) {
   for (let i=0;i<frames;i++) stepWindowHunt(game,{...controls,...input},arenaStep,()=>{});
 }
 
-test('bedroom layout offers a real web on the first flight route and delays paying until it expires',()=>{
+test('exactly three insects and one hunter start at varied, distant positions',()=>{
+  const starts=new Set<string>();
+  for (const roll of [.03,.22,.49,.72,.96]) {
+    const game=createWindowHunt(false,undefined,()=>roll);
+    assert.equal(game.gnats.length,3);
+    assert.equal(game.predators.length,1);
+    for (const point of [...game.gnats.map(insect=>insect.p), game.predators[0].body]) {
+      assert.ok(Math.hypot(point.x-game.spider.x,point.y-game.spider.y)>300);
+    }
+    starts.add(game.gnats.map(insect=>insect.home.x).join(',')+':'+game.predators[0].origin.x);
+  }
+  assert.equal(starts.size,5);
+});
+
+test('prey steer away from the spider and avoid a visible web',()=>{
+  const game=createWindowHunt(false,undefined,()=>.5);
+  game.predators.length=0;
+  const gnat=game.gnats[0];
+  game.gnats=[gnat];
+  gnat.p={x:840,y:570};
+  gnat.home={...gnat.p};
+  game.spider=createCrawler({x:773,y:570}, game.surfaces);
+  run(game,55);
+  assert.ok(gnat.p.x>868);
+  gnat.p={x:840,y:570};gnat.v={x:0,y:0};gnat.decideAt=0;
+  game.web.strands=[{from:{x:876,y:538},to:{x:876,y:604},shakeUntil:0}];
+  run(game,70);
+  assert.equal(game.occupants.size,0);
+  assert.ok(Math.abs(gnat.p.y-570)>22);
+});
+
+test('one web at a time, empty webs are removable and expiry pays for captured prey',()=>{
   const game=createWindowHunt(false,undefined,()=>.5);
   assert.ok(windowAnchor(game));
   run(game,1,{silk:true});
   run(game,1);
-  assert.equal(game.web.strands.length,1);
   const wire=game.web.strands[0];
-  run(game,255);
-  assert.equal(game.occupants.get(wire)?.length,2);
-  assert.equal(game.silk,0);
-  assert.equal(game.catches,0);
-  assert.ok(wire.expiresAt!>game.clock);
-  run(game,390);
-  assert.equal(game.web.strands.includes(wire),false);
-  assert.equal(game.silk,2);
-  assert.equal(game.catches,2);
-});
-
-test('placing a new trap works while more than five other traps are present',()=>{
-  const game=createWindowHunt(false);
-  game.web.strands.push(...Array.from({length:30},(_,i)=>({
-    from:{x:i,y:11},to:{x:i,y:50},shakeUntil:0,
-  })));
-  run(game,1,{silk:true});
+  assert.ok(wire);
+  run(game,1,{silk:true,aim:{x:-.45,y:-1}});
   run(game,1);
-  assert.equal(game.web.strands.length,31);
+  assert.deepEqual(game.web.strands,[wire]);
+  run(game,1,{remove:true});
+  assert.equal(game.web.strands.length,0);
+  const occupied={from:{x:850,y:520},to:{x:850,y:620},shakeUntil:0,expiresAt:game.clock+caughtLifetime};
+  game.web.strands=[occupied];
+  const insect=game.gnats.pop()!;
+  game.occupants.set(occupied,[insect]);
+  run(game,120);
   assert.equal(game.silk,0);
+  assert.deepEqual(game.web.strands,[occupied]);
+  run(game,245);
+  assert.equal(game.silk,1);
+  assert.equal(game.web.strands.length,0);
+  assert.equal(game.gnats.length,3);
 });
 
-test('R2 alone allows the spider to travel on a vertical web and releasing drops it',()=>{
+test('R2 alone lets the spider travel on a vertical web and releasing drops it',()=>{
   const game=createWindowHunt();
-  game.spider=createCrawler({x:170,y:435},game.surfaces);
-  const wire={from:{x:172,y:420},to:{x:172,y:473},shakeUntil:0};
+  game.spider=createCrawler({x:490,y:900},game.surfaces);
+  const wire={from:{x:492,y:880},to:{x:492,y:940},shakeUntil:0};
   game.web.strands.push(wire);
   run(game,5,{move:{x:0,y:-1}});
   assert.equal(game.clinging,undefined);
   run(game,12,{grip:true,move:{x:0,y:-1}});
   assert.equal(game.clinging,wire);
-  assert.ok(game.spider.y<431);
+  assert.ok(game.spider.y<896);
   run(game,1);
   assert.equal(game.clinging,undefined);
 });
 
-test('hunters stop on webs for three seconds and touching a free hunter ends the run',()=>{
+test('a hunter can jump a visible web, but an unexpected crossing still binds it',()=>{
   const game=createWindowHunt();
-  game.predators.length=1;
   const hunter=game.predators[0];
-  hunter.body=createCrawler({x:376,y:598},game.surfaces);
-  hunter.origin={x:376,y:598};
-  hunter.facing=1;
-  game.spider=createCrawler({x:444,y:598},game.surfaces);
-  const wire={from:{x:398,y:560},to:{x:398,y:606},shakeUntil:0};
-  game.web.strands.push(wire);
-  for (let i=0;i<100 && !hunter.boundUntil;i++) run(game,1);
-  assert.equal(hunter.boundUntil-game.clock,caughtLifetime);
-  assert.equal(game.occupants.has(wire),false);
+  hunter.body=createCrawler({x:700,y:1204},game.surfaces);
+  hunter.origin={x:700,y:1204};
+  hunter.fireAt=Infinity;
+  game.spider=createCrawler({x:855,y:1204},game.surfaces);
+  game.web.strands=[{from:{x:740,y:1163},to:{x:740,y:1212},shakeUntil:0}];
+  run(game,1);
+  assert.ok(hunter.body.vy<0);
+  hunter.body=createCrawler({x:737,y:1204},game.surfaces);
+  hunter.jumpAt=game.clock+1;
+  for(let i=0;i<35&&!hunter.boundUntil;i++)run(game,1);
+  assert.ok(Math.abs(hunter.boundUntil-game.clock-caughtLifetime)<.001);
+  assert.equal(game.occupants.size,0);
   run(game,250);
-  assert.equal(hunter.body.x,398);
-  game.spider.x=410;
-  for (let i=0;i<200 && game.phase==='play';i++) run(game,1);
+  assert.equal(hunter.body.x,740);
+  game.spider.x=750;
+  for(let i=0;i<200&&game.phase==='play';i++)run(game,1);
   assert.equal(game.phase,'over');
 });
 
-test('a hunting spider can bind with silk and escape requires five distinct presses',()=>{
+test('a hunter can still bind with silk and escape requires five distinct presses',()=>{
   const game=createWindowHunt();
-  game.predators.length=1;
   const hunter=game.predators[0];
-  hunter.body=createCrawler({x:332,y:598},game.surfaces);
-  hunter.origin={x:332,y:598};
-  game.spider=createCrawler({x:483,y:598},game.surfaces);
-  for (let i=0;i<175 && !game.trapped;i++) run(game,1);
+  hunter.body=createCrawler({x:700,y:1204},game.surfaces);
+  hunter.origin={x:700,y:1204};
+  game.spider=createCrawler({x:885,y:1204},game.surfaces);
+  for(let i=0;i<175&&!game.trapped;i++)run(game,1);
   assert.ok(game.trapped);
   run(game,6,{escape:true});
   assert.equal(game.escapeCount,1);
-  for (let i=0;i<4;i++) {run(game,1);run(game,1,{escape:true});}
+  for(let i=0;i<4;i++) {run(game,1);run(game,1,{escape:true});}
   assert.equal(game.trapped,false);
 });
 
@@ -110,10 +138,10 @@ test('camera follows in two axes and solid walls keep the player inside the room
   const game=createWindowHunt();
   const start=cameraFor(game);
   game.predators.length=0;
-  game.spider=createCrawler({x:1200,y:176},game.surfaces);
+  game.spider=createCrawler({x:2460,y:510},game.surfaces);
   assert.ok(cameraFor(game).x>start.x && cameraFor(game).y<start.y);
   run(game,300,{move:{x:1,y:0}});
-  assert.ok(game.spider.x<=bedroomWidth-17);
+  assert.ok(game.spider.x<=bedroomWidth-27);
   assert.equal(game.phase,'play');
 });
 

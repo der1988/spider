@@ -6,19 +6,50 @@ const cream='#eff3c8';
 const amber='#f0d389';
 
 function windowBackdrop(ctx:CanvasRenderingContext2D,objects:Corner['objects']) {
-  block(ctx,0,0,bedroomWidth,bedroomHeight,'#aabe8d');
-  block(ctx,0,540,bedroomWidth,66,'#9caf7e');
-  block(ctx,0,583,bedroomWidth,6,'#879e70');
-  for (let x=20;x<bedroomWidth;x+=135) block(ctx,x,10,2,530,'#a4b889');
-  block(ctx,110,64,260,230,'#839e71');
-  block(ctx,119,73,242,211,'#cbd9a4');
-  block(ctx,236,73,6,211,'#9caf7b');
-  block(ctx,119,171,242,6,'#9caf7b');
-  block(ctx,126,79,105,2,'#d8e4b0');
-  block(ctx,806,222,75,55,'#82986a');
-  block(ctx,811,227,65,44,'#b7c795');
-  line(ctx,{x:813,y:265},{x:849,y:236},'#95ad80');
-  line(ctx,{x:848,y:236},{x:874,y:251},'#95ad80');
+  const wall=ctx.createLinearGradient(0,0,0,bedroomHeight);
+  wall.addColorStop(0,'#c5d0ab');
+  wall.addColorStop(.56,'#abbc95');
+  wall.addColorStop(1,'#7e9a7a');
+  ctx.fillStyle=wall;
+  ctx.fillRect(0,0,bedroomWidth,bedroomHeight);
+  const daylight=ctx.createRadialGradient(503,300,70,560,435,990);
+  daylight.addColorStop(0,'#f7eac188');
+  daylight.addColorStop(1,'#f7eac100');
+  ctx.fillStyle=daylight;
+  ctx.fillRect(0,0,bedroomWidth,bedroomHeight);
+  for (let x=31;x<bedroomWidth;x+=109) {
+    block(ctx,x,20,1,1090,'#819a7929');
+    block(ctx,x+1,20,2,1090,'#ecedcd25');
+  }
+  block(ctx,0,1090,bedroomWidth,122,'#859e7a');
+  block(ctx,0,1090,bedroomWidth,5,'#bac6a0');
+  block(ctx,0,1101,bedroomWidth,3,'#687d65');
+  block(ctx,0,1183,bedroomWidth,4,'#a0ad8a');
+  for (let x=24;x<bedroomWidth;x+=172) {
+    block(ctx,x,1212,2,48,'#2b493b');
+    block(ctx,x+3,1218,66,1,'#a5a677');
+  }
+  block(ctx,207,117,542,482,'#688368');
+  block(ctx,216,126,522,463,'#d1d9aa');
+  const glass=ctx.createLinearGradient(237,147,761,591);
+  glass.addColorStop(0,'#dbe3c0');
+  glass.addColorStop(.45,'#b4c9a5');
+  glass.addColorStop(1,'#d5d9a1');
+  ctx.fillStyle=glass;
+  ctx.fillRect(236,146,481,423);
+  block(ctx,471,143,16,428,'#829c78');
+  block(ctx,232,337,487,15,'#829c78');
+  block(ctx,232,337,487,3,'#cbd6ad');
+  block(ctx,471,143,3,428,'#dee2b9');
+  block(ctx,234,566,482,4,'#778a65');
+  ctx.fillStyle='#f7f2cd39';
+  ctx.beginPath();
+  ctx.moveTo(240,147);ctx.lineTo(369,147);ctx.lineTo(665,562);ctx.lineTo(575,562);ctx.closePath();ctx.fill();
+  block(ctx,1602,444,154,110,'#657f65');
+  block(ctx,1609,451,140,96,'#aebc90');
+  block(ctx,1616,458,126,82,'#bac69a');
+  line(ctx,{x:1620,y:533},{x:1698,y:466},'#879f78');
+  line(ctx,{x:1698,y:466},{x:1740,y:513},'#879f78');
   const pot=objects.find(item=>item.kind==='pot');
   if (pot) {
     const base={x:pot.x+pot.w*.58,y:pot.y};
@@ -102,10 +133,11 @@ function renderMap(ctx:CanvasRenderingContext2D,game:WindowRun) {
   block(ctx,x-5,y-5,w+10,h+10,'#0e241a');
   block(ctx,x,y,w,h,'#3b5945');
   for (const r of game.surfaces) block(ctx,cx(r.x),cy(r.y),Math.max(1,r.w*sx),Math.max(1,r.h*sy),'#78956c');
-  for (const lane of game.corner.lanes) {
-    const left=cx(lane.left),right=cx(lane.right),height=cy(lane.y);
-    line(ctx,{x:left,y:height},{x:right,y:height},'#a9bc79',true);
-    block(ctx,(left+right)/2-1,height-1,3,3,'#dce5a3');
+  for (const insect of game.gnats) {
+    block(ctx,cx(insect.p.x)-1,cy(insect.p.y)-1,3,3,'#dce5a3');
+  }
+  for (const wire of game.web.strands) {
+    line(ctx,{x:cx(wire.from.x),y:cy(wire.from.y)},{x:cx(wire.to.x),y:cy(wire.to.y)},'#b4d3af');
   }
   for (const enemy of game.predators) {
     block(ctx,cx(enemy.body.x)-2,cy(enemy.body.y)-2,5,5,'#db9c70');
@@ -118,7 +150,7 @@ function renderMap(ctx:CanvasRenderingContext2D,game:WindowRun) {
   ctx.font='12px monospace';
   ctx.fillText('BEDROOM MAP',75,30);
   ctx.font='9px monospace';
-  ctx.fillText('● You    - - Flight zone    ■ Hunter',75,251);
+  ctx.fillText('● You    · Insect    ■ Hunter    — Web',75,251);
 }
 
 function drawHunter(ctx:CanvasRenderingContext2D,game:WindowRun,enemy:WindowRun['predators'][number]) {
@@ -187,7 +219,7 @@ export function renderWindowHunt(ctx:CanvasRenderingContext2D,game:WindowRun,red
     }
   }
   for (const points of game.occupants.values()) {
-    for (const p of points) {
+    for (const {p} of points) {
       block(ctx,p.x-2,p.y-2,5,5,ink);
       block(ctx,p.x-1,p.y-1,3,3,amber);
       block(ctx,p.x-4,p.y,1,1,cream);
