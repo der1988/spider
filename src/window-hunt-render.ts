@@ -1,5 +1,5 @@
 import {block,drawAimMarker,drawPlatform,drawSpider,line} from './hunt-render';
-import {bedroomHeight,bedroomScale,bedroomWidth,cameraFor,hunterWindup,roomHeight,roomWidth,windowAnchor,shaftWidth,shaftHeight,type Corner,type WindowRun} from './window-hunt';
+import {bedroomHeight,bedroomScale,bedroomWidth,cameraFor,hunterWindup,roomHeight,roomWidth,windowAnchor,shaftWidth,shaftHeight,pantryHalfWidth,pantryTiers,pantryX,type Corner,type WindowRun} from './window-hunt';
 
 const ink='#22392e';
 const cream='#eff3c8';
@@ -143,11 +143,25 @@ function openBackdrop(ctx:CanvasRenderingContext2D,pulse:number) {
   ctx.font='bold 14px monospace';
   ctx.fillStyle='#263d2d';
   ctx.fillText('UPPER HUNT',62,73);
-  ctx.fillText('BASE CAMP',59,1063);
   for (const x of [220,690]) {
     line(ctx,{x,y:1040},{x:x+7,y:1028},cream);
     line(ctx,{x:x+7,y:1028},{x:x+14,y:1040},cream);
   }
+}
+
+function drawPantry(ctx:CanvasRenderingContext2D,game:WindowRun) {
+  const x=pantryX,y=1096;
+  block(ctx,x-pantryHalfWidth,y-43,pantryHalfWidth*2,41,'#617c55');
+  block(ctx,x-pantryHalfWidth+3,y-40,pantryHalfWidth*2-6,38,'#344f3c');
+  block(ctx,x-pantryHalfWidth,y-3,pantryHalfWidth*2,3,cream);
+  ctx.fillStyle=cream;
+  ctx.font='bold 11px monospace';
+  ctx.fillText('NEST',x-13,y-28);
+  pantryTiers.forEach((tier,index)=>{
+    const px=x-30+index*25;
+    block(ctx,px,y-22,10,11,'#14271d');
+    if (game.pantry[tier]) block(ctx,px+2,y-20,6,7,['#e3edb8','#a7e6dc','#f2aad8'][index]);
+  });
 }
 
 function renderMap(ctx:CanvasRenderingContext2D,game:WindowRun) {
@@ -169,6 +183,13 @@ function renderMap(ctx:CanvasRenderingContext2D,game:WindowRun) {
   for (const enemy of game.predators) {
     const p=at(enemy.body);
     block(ctx,p.x-2,p.y-2,4,4,enemy.bee ? '#f3db8b' : '#db9c70');
+  }
+  if (game.openWorld) {
+    const nest=at({x:pantryX,y:1080});
+    block(ctx,nest.x-4,nest.y-4,8,7,'#f4d78a');
+    ctx.font='9px monospace';
+    ctx.fillStyle=cream;
+    ctx.fillText('NEST',nest.x+7,nest.y+1);
   }
   const camera=cameraFor(game),view=at(camera);
   ctx.strokeStyle='#e1e7b2';
@@ -253,6 +274,7 @@ export function renderWindowHunt(ctx:CanvasRenderingContext2D,game:WindowRun,red
     for (const surface of game.surfaces) drawPlatform(ctx,surface,0);
   } else if (game.openWorld) {
     openBackdrop(ctx,pulse);
+    drawPantry(ctx,game);
     for (const item of game.surfaces) {
       if (!('kind' in item) || item.x+item.w<camera.x || item.x>camera.x+roomWidth/camera.scale ||
           item.y+item.h<camera.y || item.y>camera.y+roomHeight/camera.scale) continue;

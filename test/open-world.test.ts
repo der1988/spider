@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createCrawler} from '../src/crawler.ts';
-import {createOpenWorld,stepWindowHunt,updateHuntZoom,cameraFor,shaftWidth,shaftHeight} from '../src/window-hunt.ts';
+import {createOpenWorld,pantryTiers,pantryX,preyTier,restartOpenWorld,stepWindowHunt,updateHuntZoom,cameraFor,shaftWidth,shaftHeight} from '../src/window-hunt.ts';
 
 const idle={move:{x:0,y:0},jump:false,silk:false};
 
@@ -106,4 +106,50 @@ test('crossing a web slows an open world bee without stopping or removing it',()
   stepWindowHunt(game,idle,1/120,()=>{});
   assert.ok(bee.body.x>x && bee.body.x-x<.4);
   assert.equal(game.predators.length,1);
+});
+
+test('three different prey finish the hunt only after returning them to the nest',()=>{
+  const game=createOpenWorld(()=>.5);
+  const events:string[]=[];
+  const emit=(event:string)=>events.push(event);
+  game.predators=[];
+  const take=(tier:typeof pantryTiers[number])=>game.gnats.splice(game.gnats.findIndex(prey=>preyTier(prey)===tier),1)[0];
+  game.carried=[take('common'),take('common')];
+  game.spider=createCrawler({x:pantryX+70,y:1088},game.surfaces);
+  stepWindowHunt(game,idle,1/120,emit);
+  assert.equal(game.pantry.common,false);
+  assert.equal(game.carried.length,2);
+  game.spider=createCrawler({x:pantryX,y:1088},game.surfaces);
+  stepWindowHunt(game,idle,1/120,emit);
+  assert.equal(game.pantry.common,true);
+  assert.equal(game.carried.length,0);
+  assert.equal(game.phase,'play');
+  game.carried=[take('uncommon'),take('rare')];
+  stepWindowHunt(game,idle,1/120,emit);
+  assert.equal(game.phase,'complete');
+  assert.deepEqual(game.pantry,{common:true,uncommon:true,rare:true});
+  stepWindowHunt(game,idle,1/120,emit);
+  assert.deepEqual(events,['store','complete']);
+});
+
+test('retry keeps nest supplies and layout while eaten prey can return',()=>{
+  const game=createOpenWorld(()=>.5);
+  game.pantry.common=true;
+  game.spider=createCrawler({x:120,y:1088},game.surfaces);
+  game.predators=[];
+  const rare=game.gnats.splice(game.gnats.findIndex(prey=>prey.rare),1)[0];
+  game.carried=[rare];
+  stepWindowHunt(game,{...idle,escape:true},1/120,()=>{});
+  assert.ok(game.returningPrey.some(({insect})=>insect===rare));
+  game.clock+=4.1;
+  stepWindowHunt(game,idle,1/120,()=>{});
+  assert.ok(game.gnats.includes(rare));
+  game.phase='over';
+  const retry=restartOpenWorld(game);
+  assert.equal(retry.corner,game.corner);
+  assert.deepEqual(retry.pantry,game.pantry);
+  assert.notEqual(retry.pantry,game.pantry);
+  assert.equal(retry.spider.x,pantryX);
+  assert.equal(retry.carried.length,0);
+  assert.equal(retry.phase,'play');
 });

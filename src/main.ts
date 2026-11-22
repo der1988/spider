@@ -1,5 +1,5 @@
 import './style.css';
-import {createOpenWorld,createWindowHunt,stepWindowHunt,updateHuntZoom,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
+import {createOpenWorld,createWindowHunt,pantryTiers,preyTier,restartOpenWorld,stepWindowHunt,updateHuntZoom,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
 import {renderWindowHunt} from './window-hunt-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
@@ -119,7 +119,7 @@ const menuChoices=bindChoices([
 ],true);
 const pauseChoices=bindChoices([['resume',togglePause],['pause-settings',openSettings],['pause-menu',showMenu]],true);
 const windowDefeat=get<HTMLDialogElement>('window-hunt-defeat');
-const windowChoices=bindChoices([['window-hunt-menu',showMenu],['window-hunt-retry',startWindowHunt]]);
+const windowChoices=bindChoices([['window-hunt-menu',showMenu],['window-hunt-retry',retryOpenWorld]]);
 
 const musicVolume=get<HTMLInputElement>('music-volume');
 const effectsVolume=get<HTMLInputElement>('effects-volume');
@@ -561,8 +561,8 @@ function setWindowView() {
   worldCanvas.height=windowHunt ? roomHeight : 204;
   windowInfo.hidden=!windowHunt?.practice;
   get('open-controls').hidden=!windowHunt?.openWorld;
+  get('open-goal').hidden=!windowHunt?.openWorld;
   get('score-label').textContent='Catches';
-  get('silk-count').hidden=!windowHunt || windowHunt.practice;
 }
 
 function startWindowHunt(practice=false) {
@@ -589,7 +589,22 @@ function startWindowHunt(practice=false) {
   syncPause();
 }
 
-const silkLabel=get('silk-points');
+function retryOpenWorld() {
+  if (!windowHunt?.openWorld || windowHunt.phase==='complete') {
+    startWindowHunt();
+    return;
+  }
+  windowHunt=restartOpenWorld(windowHunt);
+  windowHunt.escapeHeld=crossHeld;
+  windowDefeat.close();
+  roomMapOpen=false;
+  huntNoticeUntil=0;
+  silkHeldFor=0;
+  say('You kept your nest supplies');
+  huntNoticeUntil=2.2;
+  syncPause();
+}
+
 let huntNoticeUntil=0;
 let silkHeldFor=0;
 function syncGnatMusic(run:WindowRun) {
@@ -611,7 +626,11 @@ function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number,realElap
     while (remainder>=arenaStep && run.phase==='play') {
       remainder-=arenaStep;
       stepWindowHunt(run,input,arenaStep,event=>{
-        if (event==='eat') audio.play('catch');
+        if (event==='store' || event==='complete') {
+          audio.play('discovery');
+          say(event==='complete' ? 'Nest stocked!' : 'Cargo safely stored');
+          huntNoticeUntil=run.clock+2;
+        } else if (event==='eat') audio.play('catch');
         else if (event==='trap') audio.play('tension');
         else if (event==='escaped') audio.play('release');
         else if (event==='caught-insect' || event==='caught-predator') audio.play('fix');
@@ -634,16 +653,30 @@ function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number,realElap
   else if (roomMapOpen) say('World map · △ / M to close');
   else if (run.trapped) say('Trapped · Tap × / C · '+run.escapeCount+'/'+breakFreePresses);
   else if (run.clock<run.eatingUntil) say('Eating · Stay out of sight');
-  else if (run.clock>=huntNoticeUntil && message.textContent) say('');
+  else if (run.clock>=huntNoticeUntil) {
+    const next=pantryTiers.find(tier=>!run.pantry[tier]);
+    const needed=run.carried.some(prey=>!run.pantry[preyTier(prey)]);
+    say(needed ? 'Bring your catch back to the nest' : next ? 'Find a '+next+' insect' : 'Nest stocked!');
+  }
   const catches=String(run.catches);
   const cargo=`Carry ${run.carried.length}`;
   if (get('open-cargo').textContent!==cargo) get('open-cargo').textContent=cargo;
-  const silk=String(run.silk);
   if (scoreLabel.textContent!==catches) scoreLabel.textContent=catches;
-  if (silkLabel.textContent!==silk) silkLabel.textContent=silk;
+  for (const tier of pantryTiers) {
+    const slot=get('nest-'+tier);
+    const status=run.pantry[tier] ? 'stored' : run.carried.some(prey=>preyTier(prey)===tier) ? 'carried' : 'missing';
+    if (slot.dataset.state!==status) {
+      slot.dataset.state=status;
+      slot.setAttribute('aria-label',tier+': '+status);
+    }
+  }
   renderWindowHunt(context,run,reduced(),roomMapOpen,gnatMusic.pulse);
-  if (run.phase==='over' && !windowDefeat.open) {
-    get('window-hunt-result').textContent='Catches · '+run.catches;
+  if (run.phase!=='play' && !windowDefeat.open) {
+    const won=run.phase==='complete';
+    get('window-hunt-title').textContent=won ? 'Nest stocked!' : 'Caught on patrol';
+    get('window-hunt-result').textContent=won ? 'One of each kind. Dinner is sorted.'
+      : `Nest supplies kept · ${pantryTiers.filter(tier=>run.pantry[tier]).length}/3`;
+    get('window-hunt-retry').textContent=won ? 'New Hunt' : 'Return to Nest';
     windowDefeat.showModal();
     windowChoices.select(1,true);
   }

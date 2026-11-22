@@ -262,6 +262,20 @@ dialog h2 { margin: 0; font-size: 16px; }
 
 .shell[data-reforming] :is(#window-hunt-mode,#practice-mode,#settings-menu) { display:none; }
 .shell[data-window-hunt=practice] .catch-count { visibility:hidden; }
+.open-goal:not([hidden]) {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+  gap: 4px clamp(6px, 1.6vw, 16px); min-height: 27px; color: #e7edc4;
+  font: 600 clamp(10px, 1.4vw, 14px)/1.2 system-ui, sans-serif;
+}
+.open-goal span { color: #b1c294; white-space: nowrap; }
+.open-goal span::before { content: '○'; margin-right: .25em; }
+.open-goal [data-state=carried] { color: #f5dfa0; }
+.open-goal [data-state=carried]::before { content: '↑'; }
+.open-goal [data-state=stored] { color: #eff5cf; }
+.open-goal [data-state=stored]::before { content: '✓'; }
+.open-goal [data-tier=uncommon] { --tier: #a7e6dc; }
+.open-goal [data-tier=rare] { --tier: #f2aad8; }
+.open-goal span::before { color: var(--tier, #e3edb8); }
 .open-controls:not([hidden]) {
   display: grid; grid-template-columns: repeat(8,minmax(0,1fr));
   align-items: center; justify-items: center; gap: 3px; block-size: 48px; padding: 4px;
@@ -291,6 +305,3 @@ dialog h2 { margin: 0; font-size: 16px; }
 }
 
 .shell[data-window-hunt] .clock { display:none; }
-#silk-count { grid-column:3; justify-self:end; }
-#silk-count[hidden] { display:none; }
-#silk-points { font-size:clamp(20px,3.5vw,32px); font-weight:800; line-height:1; }

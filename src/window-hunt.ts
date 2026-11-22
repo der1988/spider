@@ -13,6 +13,10 @@ export const shaftHeight=1120;
 export const huntZoomIn=1.16;
 const huntZoomOut=.62;
 export const eatingSeconds=1.35;
+export const pantryX=405;
+export const pantryHalfWidth=58;
+export const pantryTiers=['common','uncommon','rare'] as const;
+type PantryTier=typeof pantryTiers[number];
 export const caughtLifetime=3;
 export const webLifetime=5;
 export const ropeHoldSeconds=.22;
@@ -117,7 +121,7 @@ export function createOpenWorld(random=Math.random) {
       ({x:(p.x+random()*22-11)*.9,y:p.y+random()*22-11}));
   return createWindowHunt(false,{
     objects,flightSites,
-    spawnSites:[171,405,625].map(x=>({x,y:floor})),
+    spawnSites:[{x:pantryX,y:floor}],
     hunterSites:[{x:243,y:floor},{x:742,y:395},{x:63,y:243},{x:720,y:767}],
   },random,true);
 }
@@ -137,6 +141,10 @@ const practiceRoom=[
 
 type GnatKind='common'|'swift'|'wary'|'fly';
 type Gnat={rare:boolean;uncommon:boolean;p:Point;v:Point;home:Point;direction:-1|1;kind:GnatKind;phase:number;steering:Point;decideAt:number};
+
+export function preyTier(prey:Gnat):PantryTier {
+  return prey.rare ? 'rare' : prey.uncommon ? 'uncommon' : 'common';
+}
 type Predator={
   bee:boolean; slowedUntil:number;
   body:Crawler; origin:Point; facing:-1|1; lastKnown?:Point; chaseUntil:number;
@@ -167,6 +175,8 @@ export function createWindowHunt(practice=false,corner=bedroom,random=Math.rando
     occupants:new Map<Strand,Gnat[]>(),
     gnats:starts.map((p,i)=>makeGnat(p,i,random,openWorld && p.y<265,openWorld && p.y>=265 && p.y<650)),
     carried:[] as Gnat[],
+    pantry:{common:false,uncommon:false,rare:false},
+    returningPrey:[] as {insect:Gnat;at:number}[],
     trail:[{...spawn}] as Point[],
     predators:hunters.map((p,i)=>{
       const enemy=predator(surfaces,p.x,p.y,random()<.5 ? -1 : 1,openWorld && i%2===1);
@@ -181,14 +191,47 @@ export function createWindowHunt(practice=false,corner=bedroom,random=Math.rando
     trapped:false,escapeCount:0,escapeHeld:false,safeUntil:0,removeHeld:false,
     silk:0,catches:0,
     aim:{x:.36,y:-.932},clock:0,jumpHeld:false,silkHeld:false,
-    phase:'play' as 'play'|'over',
+    phase:'play' as 'play'|'over'|'complete',
   };
 }
 export type WindowRun=ReturnType<typeof createWindowHunt>;
-export type WindowEvent='jump'|'launch'|'attach'|'fix'|'release'|'miss'|'caught-insect'|'catch'|'land'|'trap'|'escaped'|'caught-predator'|'eat';
+export type WindowEvent='jump'|'launch'|'attach'|'fix'|'release'|'miss'|'caught-insect'|'catch'|'land'|'trap'|'escaped'|'caught-predator'|'eat'|'store'|'complete';
 const clamp=(n:number,min:number,max:number)=>Math.min(max,Math.max(min,n));
 const magnitude=(p:Point)=>Math.hypot(p.x,p.y);
 const distance=(a:Point,b:Point)=>Math.hypot(a.x-b.x,a.y-b.y);
+
+export function restartOpenWorld(game:WindowRun) {
+  const next=createWindowHunt(false,game.corner,Math.random,true);
+  next.pantry={...game.pantry};
+  next.catches=game.catches;
+  return next;
+}
+
+function atPantry(game:WindowRun) {
+  return game.openWorld && Math.abs(game.spider.x-pantryX)<pantryHalfWidth && game.spider.y>1053;
+}
+
+function storeCargo(game:WindowRun,emit:(event:WindowEvent)=>void) {
+  if (!atPantry(game) || !game.carried.length) return;
+  for (const insect of game.carried) game.pantry[preyTier(insect)]=true;
+  game.carried=[];
+  if (pantryTiers.every(tier=>game.pantry[tier])) {
+    game.phase='complete';
+    emit('complete');
+  } else emit('store');
+}
+
+function returnEatenPrey(game:WindowRun) {
+  if (!game.returningPrey.length) return;
+  game.returningPrey=game.returningPrey.filter(({insect,at})=>{
+    if (game.clock<at || distance(game.spider,insect.home)<110) return true;
+    insect.p={...insect.home};
+    insect.v={x:0,y:0};
+    insect.decideAt=0;
+    game.gnats.push(insect);
+    return false;
+  });
+}
 
 function unit(point:Point):Point {
   const n=magnitude(point)||1;
@@ -529,8 +572,9 @@ function stepPredator(game:WindowRun,enemy:Predator,dt:number,emit:(event:Window
   const body=enemy.body, target=game.spider;
 
   const visible=(game.openWorld ? inWindow(game,body) : distance(body,target)<365) && clear(game,body,target);
-  const evidence=game.carried.length>0 || game.clock<game.eatingUntil;
-  if (game.openWorld && (game.clock>=enemy.chaseUntil || visible && !evidence)) {
+  const sheltered=atPantry(game);
+  const evidence=!sheltered && (game.carried.length>0 || game.clock<game.eatingUntil);
+  if (game.openWorld && (sheltered || game.clock>=enemy.chaseUntil || visible && !evidence)) {
     enemy.chaseUntil=0;
     enemy.lastKnown=undefined;
     enemy.shot=undefined;
@@ -666,7 +710,7 @@ function advanceShots(game:WindowRun,dt:number,emit:(event:WindowEvent)=>void) {
     const travel=Math.min(remaining,260*dt);
     const next={x:shot.p.x+vector.x*travel,y:shot.p.y+vector.y*travel};
     const target=game.spider;
-    if (!game.trapped && game.clock>=game.safeUntil &&
+    if (!atPantry(game) && !game.trapped && game.clock>=game.safeUntil &&
         distance(target,pointAt({from:shot.p,to:next,shakeUntil:0},projection(target,{from:shot.p,to:next,shakeUntil:0})))<8 &&
         !game.surfaces.some(rect=>crossesSolid(shot.p,target,rect))) {
       game.trapped=true;
@@ -725,7 +769,7 @@ export function gnatCast(game:WindowRun):Record<Exclude<Speaker,'resident'>,Cast
 }
 
 export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(event:WindowEvent)=>void) {
-  if (game.phase==='over') return;
+  if (game.phase!=='play') return;
   const {spider,web}=game;
   const beforeMove={x:spider.x,y:spider.y};
   game.clock+=dt;
@@ -740,9 +784,10 @@ export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(
     if (closest) web.strands=web.strands.filter(wire=>wire!==closest);
   }
   game.removeHeld=!!input.remove;
-  if (game.openWorld && !game.trapped && input.escape && !game.escapeHeld &&
+  if (game.openWorld && !atPantry(game) && !game.trapped && input.escape && !game.escapeHeld &&
       game.clock>=game.eatingUntil && game.carried.length) {
-    game.carried.pop();
+    const insect=game.carried.pop()!;
+    game.returningPrey.push({insect,at:game.clock+4});
     game.eatingUntil=game.clock+eatingSeconds;
     emit('eat');
   }
@@ -802,7 +847,10 @@ export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(
   game.silkHeld=input.silk;
   game.escapeHeld=!!input.escape;
   if (game.practice) return;
+  returnEatenPrey(game);
   advanceGnats(game,beforeMove,dt,emit);
+  storeCargo(game,emit);
+  if (game.phase!=='play') return;
   pullChain(game);
   for (const enemy of game.predators) stepPredator(game,enemy,dt,emit);
   advanceShots(game,dt,emit);
