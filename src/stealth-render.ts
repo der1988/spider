@@ -1,5 +1,5 @@
-import {block,drawPlatform,drawSpider,line} from './hunt-render';
-import {chargeTime,entry,exit,escapePresses,floorY,room,sightRange,sightSlope,stealthAnchor,stealthHeight,stealthWidth,type Guard,type StealthRun} from './stealth';
+import {block,drawAimMarker,drawPlatform,drawSpider,line} from './hunt-render';
+import {chargeTime,entry,exit,escapePresses,floorY,room,sightRange,sightSlope,stealthHeight,stealthWidth,type Guard,type StealthRun} from './stealth';
 import {aimHit} from './spider';
 
 const ink='#152b22';
@@ -68,17 +68,24 @@ function drawGuard(ctx:CanvasRenderingContext2D,guard:Guard,time:number) {
 
 export function renderStealth(ctx:CanvasRenderingContext2D,game:StealthRun,reduced=false) {
   block(ctx,0,0,stealthWidth,stealthHeight,'#a2b787');
-  for (let x=39;x<stealthWidth;x+=68) {
+  if (game.practice) {
+    for (let y=46;y<floorY;y+=44) {
+      for (let x=37;x<stealthWidth;x+=44) block(ctx,x,y,1,1,'#b3c594');
+    }
+  }
+  for (let x=39;!game.practice && x<stealthWidth;x+=68) {
     block(ctx,x,16,5,floorY-16,'#97ad80');
     block(ctx,x-17,27+x%39,23,6,'#97ad80');
     block(ctx,x-13,179+x%46,28,3,'#97ad80');
     block(ctx,x+13,94+x%50,2,2,'#bdce9e');
   }
   for (const guard of game.guards) if (!guard.caught) sight(ctx,guard);
-  for (const surface of room) drawPlatform(ctx,surface,0);
-  const locked=game.guards.some(guard=>guard.witnessed && !guard.caught);
-  pipe(ctx,entry.x,'IN');
-  pipe(ctx,exit.x,locked ? 'LOCKED' : 'OUT',locked);
+  for (const surface of game.surfaces) drawPlatform(ctx,surface,0);
+  if (!game.practice) {
+    const locked=game.guards.some(guard=>guard.witnessed && !guard.caught);
+    pipe(ctx,entry.x,'IN');
+    pipe(ctx,exit.x,locked ? 'LOCKED' : 'OUT',locked);
+  }
   const {spider,noise}=game;
   for (const wire of game.web.strands) line(ctx,wire.from,wire.to,'#526f51',(wire.expiresAt??Infinity)-game.clock<2);
   for (const loose of game.web.loose) line(ctx,loose.from,spider,'#83986a',true);
@@ -92,19 +99,14 @@ export function renderStealth(ctx:CanvasRenderingContext2D,game:StealthRun,reduc
     if (guard.attack && !guard.caught) line(ctx,guard.attack.from,guard.attack.to,amber,true);
   }
   for (const shot of game.shots) block(ctx,shot.p.x-2,shot.p.y-2,5,5,amber);
-  if (noise && !reduced) {
+  if (!game.practice && noise && !reduced) {
     const size=6+Math.round((1-(noise.until-game.clock)/.38)*9);
     line(ctx,{x:noise.x-size,y:noise.y-3},{x:noise.x-size-4,y:noise.y-6},outline);
     line(ctx,{x:noise.x+size,y:noise.y-3},{x:noise.x+size+4,y:noise.y-6},outline);
   }
   for (const guard of game.guards) drawGuard(ctx,guard,game.clock);
   ctx.textAlign='left';
-  const anchor=stealthAnchor(game);
-  if (anchor) {
-    line(ctx,{x:anchor.x-5,y:anchor.y},{x:anchor.x+5,y:anchor.y},ink);
-    line(ctx,{x:anchor.x,y:anchor.y-5},{x:anchor.x,y:anchor.y+5},ink);
-    block(ctx,anchor.x-1,anchor.y-1,3,3,cream);
-  }
+  drawAimMarker(ctx,spider,game.aim,stealthWidth,stealthHeight);
   drawSpider(ctx,spider,game.clock,{time:game.clock,beat:0});
   if (game.trapped) {
     block(ctx,spider.x-9,spider.y-8,18,16,'#6c523d');

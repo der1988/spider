@@ -105,11 +105,12 @@ function bindChoices(items: readonly (readonly [string,()=>void])[],vertical=fal
   return {select,move,get selected(){return selected;},confirm:()=>buttons[selected].click()};
 }
 
-const topTenIndex=4;
+const topTenIndex=5;
 const menuChoices=bindChoices([
   ['story',()=>requestMode('story')],
   ['loop',()=>requestMode('loop')],
   ['stealth-mode',startStealth],
+  ['practice-mode',()=>startStealth(true)],
   ['settings-menu',openSettings],
   ['menu-top',()=>void endlessBoard.view()],
 ],true);
@@ -256,6 +257,7 @@ function startIntro(next: HuntMode,resume=false) {
 
 function showMenu() {
   const priorMode=mode;
+  const practice=stealth?.practice;
   const wasStealth=!!stealth;
   stealth=undefined;
   storyCheckpoint=undefined;
@@ -272,7 +274,7 @@ function showMenu() {
   endlessBoard.clear();
   shell.dataset.screen='start';
   launch.inert=false;
-  menuChoices.select(wasStealth ? 2 : priorMode==='loop' ? 1 : 0,true);
+  menuChoices.select(practice ? 3 : wasStealth ? 2 : priorMode==='loop' ? 1 : 0,true);
   startStatus.textContent='';
   captions('');
   say('');
@@ -540,22 +542,25 @@ function keyboardInput() {
 
 const stealthInfo=get('stealth-info');
 function setStealthView() {
-  if (stealth) shell.dataset.stealth='true';
+  if (stealth) shell.dataset.stealth=stealth.practice ? 'practice' : 'true';
   else delete shell.dataset.stealth;
   worldCanvas.width=stealth ? stealthWidth : 360;
   worldCanvas.height=stealth ? stealthHeight : 204;
   stealthInfo.hidden=!stealth;
   get('score-label').textContent=stealth ? 'Guards bound' : 'Catches';
+  stealthInfo.textContent=stealth?.practice
+    ? 'Hold L1 / Z to charge a jump · R1 / X to fire · Hold to swing · Up to reel'
+    : 'Hold L1 / Z to charge a jump · R1 / X to fire · Hold to swing · Up to reel · Tap × / X to escape';
 }
 
-function startStealth() {
+function startStealth(practice=false) {
   contextAudio=audio.audioContext();
   audio.unlock();
   song.stop();
   mode=undefined;
   stealthDefeat.close();
   clearFlyScene();
-  stealth=createStealth();
+  stealth=createStealth(practice);
   setStealthView();
   shell.dataset.screen='game';
   launch.inert=true;
@@ -578,6 +583,10 @@ function playStealthFrame(run:StealthRun,input:StealthInput,elapsed:number) {
         else audio.play(event);
       });
     }
+  }
+  if (run.practice) {
+    renderStealth(context,run,reduced());
+    return;
   }
   if (run.phase==='complete') {
     audio.play('discovery');
