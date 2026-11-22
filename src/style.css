@@ -260,10 +260,9 @@ dialog h2 { margin: 0; font-size: 16px; }
 .board-actions { display: flex; gap: 6px; }
 #name-controls { margin: 0; color: #b8ca94; }
 
-.shell[data-reforming] :is(#stealth-mode,#practice-mode,#settings-menu) { display:none; }
-.shell[data-stealth] .clock { visibility:hidden; }
-.shell[data-stealth=practice] .catch-count { visibility:hidden; }
-#stealth-info { color:#c9dda5; }
+.shell[data-reforming] :is(#window-hunt-mode,#practice-mode,#settings-menu) { display:none; }
+.shell[data-window-hunt=practice] .catch-count { visibility:hidden; }
+#window-hunt-info { color:#c9dda5; }
 .pause-choices { grid-template-columns:1fr; width:100%; margin-top:14px; }
 .settings-fields { display:grid; grid-template-columns:1fr minmax(110px,1fr); gap:12px; align-items:center; margin-block:16px; }
 #settings-panel, #pause-panel { max-height:90dvh; overflow:auto; }
@@ -274,3 +273,8 @@ dialog h2 { margin: 0; font-size: 16px; }
   .launch-copy h1 img { width:min(58vw,43dvh,606px); }
   .launch > .mode-choices button { min-height:clamp(15px,9dvh,36px); padding-block:1px; }
 }
+
+.shell[data-window-hunt] .clock { display:none; }
+#silk-count { grid-column:3; justify-self:end; }
+#silk-count[hidden] { display:none; }
+#silk-points { font-size:clamp(20px,3.5vw,32px); font-weight:800; line-height:1; }

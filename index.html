@@ -29,7 +29,7 @@
     <div class="mode-choices">
       <button id="story" type="button" data-selected="true"><span>STORY</span><code aria-hidden="true">story()</code></button>
       <button id="loop" type="button" data-selected="false"><span>ENDLESS</span><code aria-hidden="true">loop()</code></button>
-      <button id="stealth-mode" type="button" data-selected="false">Stealth</button>
+      <button id="window-hunt-mode" type="button" data-selected="false">Gnat Hunt</button>
       <button id="practice-mode" type="button" data-selected="false">Practice</button>
       <button id="settings-menu" type="button" data-selected="false">Settings</button>
       <button id="menu-top" type="button" data-selected="false" aria-haspopup="dialog"><span>Top 10</span></button>
@@ -51,6 +51,7 @@
       <span class="clock-rhythm" aria-hidden="true"></span>
       <div class="clock-track" aria-hidden="true"><span id="clock-meter"></span></div>
     </div>
+    <div id="silk-count" class="catch-count" hidden><label for="silk-points">Silk</label><output id="silk-points">5/5</output></div>
     <code id="ending-code" class="ending-code" aria-hidden="true"></code>
   </header>
   <section class="stage" aria-label="Hunting arena">
@@ -72,7 +73,7 @@
     </section>
   </section>
   <footer>
-    <p id="stealth-info" hidden>L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower · Tap × / X to escape</p>
+    <p id="window-hunt-info" hidden>L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower</p>
     <p id="message" role="status"></p>
     <p id="lyric" class="lyric" lang="en"></p>
   </footer>
@@ -104,11 +105,12 @@
   <p id="endless-board-status" role="status"></p>
   <button id="endless-again" type="button" hidden>Try Again</button>
 </dialog>
-<dialog id="stealth-defeat" aria-labelledby="stealth-title">
-  <h2 id="stealth-title">The guards caught you</h2>
+<dialog id="window-hunt-defeat" aria-labelledby="window-hunt-title">
+  <h2 id="window-hunt-title">You fell out of the scene</h2>
+  <p id="window-hunt-result"></p>
   <div class="mode-choices">
-    <button id="stealth-menu" type="button">Main Menu</button>
-    <button id="stealth-retry" type="button">Retry</button>
+    <button id="window-hunt-menu" type="button">Main Menu</button>
+    <button id="window-hunt-retry" type="button">Retry</button>
   </div>
 </dialog>
 <dialog id="pause-panel" aria-labelledby="pause-title">

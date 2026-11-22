@@ -1,6 +1,6 @@
 import './style.css';
-import {createStealth,escapePresses,stepStealth,stealthHeight,stealthWidth,type StealthInput,type StealthRun} from './stealth';
-import {renderStealth} from './stealth-render';
+import {createWindowHunt,stepWindowHunt,roomHeight,roomWidth,silkLimit,type CornerInput,type WindowRun} from './window-hunt';
+import {renderWindowHunt} from './window-hunt-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
 import {advanceArena,arenaInput,arenaStep,createArena,type ArenaEvent} from './arena-run';
@@ -75,7 +75,7 @@ let padDirection = 0;
 let opening = true;
 let paused = false;
 let escape: FlyEscape|undefined;
-let stealth: StealthRun|undefined;
+let windowHunt: WindowRun|undefined;
 let storyCheckpoint: {offset:number; arena:typeof arena}|undefined;
 let escapeCheckpoint: FlyEscape|undefined;
 const keyboard=new Set<string>();
@@ -109,14 +109,14 @@ const topTenIndex=5;
 const menuChoices=bindChoices([
   ['story',()=>requestMode('story')],
   ['loop',()=>requestMode('loop')],
-  ['stealth-mode',startStealth],
-  ['practice-mode',()=>startStealth(true)],
+  ['window-hunt-mode',startWindowHunt],
+  ['practice-mode',()=>startWindowHunt(true)],
   ['settings-menu',openSettings],
   ['menu-top',()=>void endlessBoard.view()],
 ],true);
 const pauseChoices=bindChoices([['resume',togglePause],['pause-settings',openSettings],['pause-menu',showMenu]],true);
-const stealthDefeat=get<HTMLDialogElement>('stealth-defeat');
-const stealthChoices=bindChoices([['stealth-menu',showMenu],['stealth-retry',startStealth]]);
+const windowDefeat=get<HTMLDialogElement>('window-hunt-defeat');
+const windowChoices=bindChoices([['window-hunt-menu',showMenu],['window-hunt-retry',startWindowHunt]]);
 
 const musicVolume=get<HTMLInputElement>('music-volume');
 const effectsVolume=get<HTMLInputElement>('effects-volume');
@@ -167,7 +167,7 @@ function openSettings() {
 get('settings-close').onclick=()=>settingsPanel.close();
 settingsPanel.onclose=()=>settingsReturn?.focus();
 pausePanel.oncancel=event=>{event.preventDefault();togglePause();};
-stealthDefeat.oncancel=event=>{event.preventDefault();showMenu();};
+windowDefeat.oncancel=event=>{event.preventDefault();showMenu();};
 function settingsPad(gamepad:Gamepad,cross:boolean,cancel:boolean,direction:number) {
   if (cancel) {settingsPanel.close();return;}
   const index=Math.max(0,settingsFields.findIndex(field=>field===document.activeElement));
@@ -197,7 +197,7 @@ get<HTMLDialogElement>('endless-board').addEventListener('close',()=>{
 function activeChoices() {
   if (dialogOpen()) return;
   if (pausePanel.open) return pauseChoices;
-  if (stealthDefeat.open) return stealthChoices;
+  if (windowDefeat.open) return windowChoices;
   if (shell.dataset.screen==='start') return menuChoices;
   if (!defeat.hidden) return defeatChoices;
 }
@@ -257,14 +257,14 @@ function startIntro(next: HuntMode,resume=false) {
 
 function showMenu() {
   const priorMode=mode;
-  const practice=stealth?.practice;
-  const wasStealth=!!stealth;
-  stealth=undefined;
+  const practice=windowHunt?.practice;
+  const wasWindowHunt=!!windowHunt;
+  windowHunt=undefined;
   storyCheckpoint=undefined;
   escapeCheckpoint=undefined;
   pausePanel.close();
-  stealthDefeat.close();
-  setStealthView();
+  windowDefeat.close();
+  setWindowView();
   mode=undefined;
   song.play('menu',contextAudio);
   paused=false;
@@ -274,7 +274,7 @@ function showMenu() {
   endlessBoard.clear();
   shell.dataset.screen='start';
   launch.inert=false;
-  menuChoices.select(practice ? 3 : wasStealth ? 2 : priorMode==='loop' ? 1 : 0,true);
+  menuChoices.select(practice ? 3 : wasWindowHunt ? 2 : priorMode==='loop' ? 1 : 0,true);
   startStatus.textContent='';
   captions('');
   say('');
@@ -304,7 +304,7 @@ function syncPause() {
   if (!frozen) audio.unlock();
 }
 function togglePause() {
-  if (!(stealth || mode && song.started) || !defeat.hidden || stealthDefeat.open) return;
+  if (!(windowHunt || mode && song.started) || !defeat.hidden || windowDefeat.open) return;
   paused = !paused;
   if (paused) {
     pausePanel.showModal();
@@ -326,8 +326,8 @@ function beginFly(resume=false) {
 
 window.addEventListener('keydown',event => {
   if (settingsPanel.open) return;
-  if (!pausePanel.open && shell.dataset.screen==='game' && !dialogOpen() && !stealthDefeat.open && defeat.hidden) {
-    if (/^(Key[WASDZX]|Arrow(Up|Down|Left|Right))$/.test(event.code)) {
+  if (!pausePanel.open && shell.dataset.screen==='game' && !dialogOpen() && !windowDefeat.open && defeat.hidden) {
+    if (/^(Key[WASDZXCV]|Arrow(Up|Down|Left|Right))$/.test(event.code)) {
       keyboard.add(event.code);
       if (!event.repeat && event.code==='KeyZ') keyboardButtons|=1;
       if (!event.repeat && event.code==='KeyX') keyboardButtons|=2;
@@ -342,7 +342,7 @@ window.addEventListener('keydown',event => {
     event.preventDefault();
     choices.move(event.code==='ArrowLeft' || event.code==='ArrowUp' ? -1 : 1);
   }
-  if (event.code==='Escape' && !event.repeat && !dialogOpen() && !stealthDefeat.open) {
+  if (event.code==='Escape' && !event.repeat && !dialogOpen() && !windowDefeat.open) {
     event.preventDefault();
     togglePause();
   }
@@ -540,28 +540,30 @@ function keyboardInput() {
   return {move,aim:aim.x || aim.y ? aim : undefined};
 }
 
-const stealthInfo=get('stealth-info');
-function setStealthView() {
-  if (stealth) shell.dataset.stealth=stealth.practice ? 'practice' : 'true';
-  else delete shell.dataset.stealth;
-  worldCanvas.width=stealth ? stealthWidth : 360;
-  worldCanvas.height=stealth ? stealthHeight : 204;
-  stealthInfo.hidden=!stealth;
-  get('score-label').textContent=stealth ? 'Guards bound' : 'Catches';
-  stealthInfo.textContent=stealth?.practice
+const windowInfo=get('window-hunt-info');
+function setWindowView() {
+  if (windowHunt) shell.dataset.windowHunt=windowHunt.practice ? 'practice' : 'true';
+  else delete shell.dataset.windowHunt;
+  worldCanvas.width=windowHunt ? roomWidth : 360;
+  worldCanvas.height=windowHunt ? roomHeight : 204;
+  windowInfo.hidden=!windowHunt;
+  get('silk-count').hidden=!windowHunt || windowHunt.practice;
+  windowInfo.textContent=windowHunt?.practice
     ? 'L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower'
-    : 'L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower · Tap × / X to escape';
+    : 'L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower · × / C direct shot · □ / V reclaim aimed web';
 }
 
-function startStealth(practice=false) {
+function startWindowHunt(practice=false) {
   contextAudio=audio.audioContext();
   audio.unlock();
   song.stop();
   mode=undefined;
-  stealthDefeat.close();
+  windowDefeat.close();
   clearFlyScene();
-  stealth=createStealth(practice);
-  setStealthView();
+  windowHunt=createWindowHunt(practice);
+  windowHunt.directHeld=crossHeld;
+  huntNoticeUntil=0;
+  setWindowView();
   shell.dataset.screen='game';
   launch.inert=true;
   paused=false;
@@ -572,38 +574,43 @@ function startStealth(practice=false) {
   syncPause();
 }
 
-function playStealthFrame(run:StealthRun,input:StealthInput,elapsed:number) {
+const silkLabel=get('silk-points');
+let huntNoticeUntil=0;
+function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number) {
   if (!paused && !document.hidden && run.phase==='play') {
     remainder+=elapsed;
     while (remainder>=arenaStep && run.phase==='play') {
       remainder-=arenaStep;
-      stepStealth(run,input,arenaStep,event=>{
-        if (event==='seen' || event==='trap') audio.play('tension');
-        else if (event==='escaped') audio.play('release');
-        else audio.play(event);
+      stepWindowHunt(run,input,arenaStep,event=>{
+        if (event==='empty' || event==='capacity' || event==='no-target') {
+          say(event==='empty' ? 'Silk empty · Reclaim a web' : event==='capacity'
+            ? 'Five webs active · Aim at one and press □ / V to reclaim it'
+            : 'Aim at a web to reclaim it');
+          huntNoticeUntil=run.clock+2.8;
+        } else {
+          audio.play(event==='reclaim' ? 'release' : event);
+          if (event==='catch') {
+            say('Gnat caught · +1 silk up to five');
+            huntNoticeUntil=run.clock+1.4;
+          }
+        }
       });
     }
   }
   if (run.practice) {
-    renderStealth(context,run,reduced());
+    renderWindowHunt(context,run,reduced());
     return;
   }
-  if (run.phase==='complete') {
-    audio.play('discovery');
-    showMenu();
-    return;
-  }
-  const witness=run.guards.some(guard=>guard.witnessed && !guard.caught);
-  const watching=run.guards.some(guard=>guard.alert>.08 && !guard.caught);
-  const status=run.trapped ? 'Caught · Tap × / X · '+run.trapped.presses+'/'+escapePresses+' · '+Math.max(0,Math.ceil(run.trapped.until-run.clock))+' s' : witness ? 'Witness alerted · Bind it with silk before leaving' :
-    watching ? 'Guards investigating · Move slowly or climb' : 'Stay unseen · Reach the exit pipe';
-  if (message.textContent!==status) say(status);
-  const neutralized=String(run.guards.filter(guard=>guard.caught).length)+'/'+run.guards.length;
-  if (scoreLabel.textContent!==neutralized) scoreLabel.textContent=neutralized;
-  renderStealth(context,run,reduced());
-  if (run.phase==='over' && !stealthDefeat.open) {
-    stealthDefeat.showModal();
-    stealthChoices.select(1,true);
+  if (run.clock>=huntNoticeUntil && message.textContent) say('');
+  const catches=String(run.catches);
+  const silk=run.silk+'/'+silkLimit;
+  if (scoreLabel.textContent!==catches) scoreLabel.textContent=catches;
+  if (silkLabel.textContent!==silk) silkLabel.textContent=silk;
+  renderWindowHunt(context,run,reduced());
+  if (run.phase==='over' && !windowDefeat.open) {
+    get('window-hunt-result').textContent='Catches · '+run.catches;
+    windowDefeat.showModal();
+    windowChoices.select(1,true);
   }
 }
 
@@ -674,11 +681,12 @@ function frame(time: number) {
   const actions=keyboardButtons;
   keyboardButtons=0;
   const move=keys.move.x || keys.move.y ? keys.move : gamepad ? readLeftStick(gamepad) : neutralStick;
-  if (stealth) {
-    playStealthFrame(stealth,{
+  if (windowHunt) {
+    playWindowFrame(windowHunt,{
       move,aim:keys.aim??input?.aim,jump:keyboard.has('KeyZ') || !!gamepad?.buttons[4]?.pressed,
       silk:keyboard.has('KeyX') || !!gamepad?.buttons[5]?.pressed,
-      escape:keyboard.has('KeyX') || crossHeld,
+      direct:keyboard.has('KeyC') || crossHeld,
+      remove:keyboard.has('KeyV') || !!gamepad?.buttons[2]?.pressed,
     },elapsed);
     requestAnimationFrame(frame);
     return;
