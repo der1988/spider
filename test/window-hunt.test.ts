@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {advanceArena,arenaStep,createArena,type ArenaInput} from '../src/arena-run.ts';
-import {createWindowHunt,outsideRoom,windowAnchor,stepWindowHunt,type CornerInput,type WindowRun} from '../src/window-hunt.ts';
+import {createWindowHunt,cameraFor,bedroomWidth,caughtLifetime,windowAnchor,stepWindowHunt,type CornerInput,type WindowRun} from '../src/window-hunt.ts';
 import {createCrawler} from '../src/crawler.ts';
 import {arenaLayouts} from '../src/hunt.ts';
 
@@ -28,79 +28,95 @@ function run(game:WindowRun,frames:number,input:Partial<CornerInput>={}) {
   for (let i=0;i<frames;i++) stepWindowHunt(game,{...controls,...input},arenaStep,()=>{});
 }
 
-test('the starting perch can place a real trap across the first swarm',()=>{
+test('bedroom layout offers a real web on the first flight route and delays paying until it expires',()=>{
   const game=createWindowHunt(false,undefined,()=>.5);
   assert.ok(windowAnchor(game));
   run(game,1,{silk:true});
-  assert.equal(game.silk,5);
   run(game,1);
   assert.equal(game.web.strands.length,1);
-  assert.equal(game.silk,4);
-  run(game,410);
-  assert.ok(game.catches>=1);
-  assert.equal(game.silk,5);
+  const wire=game.web.strands[0];
+  run(game,255);
+  assert.equal(game.occupants.get(wire)?.length,2);
+  assert.equal(game.silk,0);
+  assert.equal(game.catches,0);
+  assert.ok(wire.expiresAt!>game.clock);
+  run(game,390);
+  assert.equal(game.web.strands.includes(wire),false);
+  assert.equal(game.silk,2);
+  assert.equal(game.catches,2);
 });
 
-test('a second reachable trap from the pot catches gnats in the lower corridor',()=>{
-  const game=createWindowHunt(false,undefined,()=>.5);
-  const right={x:1,y:0},left={x:-1,y:0},leap={x:1,y:-1};
-  run(game,89,{jump:true,move:leap});
-  run(game,54,{move:right});
-  run(game,68,{jump:true,move:leap});
-  run(game,24);
-  run(game,140,{move:left});
-  assert.equal(game.spider.y,227);
-  run(game,1,{silk:true,aim:{x:-.66,y:-1}});
-  run(game,1);
-  assert.equal(game.web.strands.length,1);
-  run(game,710);
-  assert.ok(game.catches>=1);
-  assert.equal(game.silk,5);
-});
-
-test('direct shots spend one on a miss and credit a captured gnat',()=>{
-  const game=createWindowHunt();
-  run(game,1,{direct:true,aim:{x:1,y:0}});
-  assert.equal(game.silk,4);
-  run(game,1);
-  game.gnats.push({p:{x:174,y:180},lane:0,targetY:180,kind:'swift',direction:1,phase:0,dodging:false});
-  run(game,1,{direct:true});
-  assert.equal(game.silk,4);
-  assert.equal(game.catches,1);
-  assert.equal(game.gnats.length,0);
-});
-
-test('five webs block placement and the player can specifically reclaim one',()=>{
-  const game=createWindowHunt();
-  const wires=Array.from({length:5},(_,i)=>({
-    from:{x:166+i*16,y:146},to:{x:166+i*16,y:174},shakeUntil:0,
-  }));
-  game.web.strands.push(...wires);
+test('placing a new trap works while more than five other traps are present',()=>{
+  const game=createWindowHunt(false);
+  game.web.strands.push(...Array.from({length:30},(_,i)=>({
+    from:{x:i,y:11},to:{x:i,y:50},shakeUntil:0,
+  })));
   run(game,1,{silk:true});
   run(game,1);
-  assert.equal(game.web.strands.length,5);
-  assert.equal(game.silk,5);
-  game.silk=2;
-  run(game,1,{remove:true,aim:{x:1,y:-.4}});
-  assert.equal(game.web.strands.length,4);
-  assert.deepEqual(game.web.strands,wires.slice(1));
-  assert.equal(game.silk,3);
+  assert.equal(game.web.strands.length,31);
+  assert.equal(game.silk,0);
 });
 
-test('a spider below the scene can reel back in and falls if it releases',()=>{
+test('R2 alone allows the spider to travel on a vertical web and releasing drops it',()=>{
   const game=createWindowHunt();
-  game.spider=createCrawler({x:365,y:287},game.surfaces);
-  const up={x:0,y:-1};
-  run(game,41,{silk:true,aim:up,move:{x:0,y:1}});
-  assert.ok(outsideRoom(game.spider) && game.spider.rope);
-  assert.equal(game.phase,'play');
-  const falling=structuredClone(game.spider);
-  run(game,110,{silk:true,move:up});
-  assert.equal(outsideRoom(game.spider),false);
-  game.spider=falling;
+  game.spider=createCrawler({x:170,y:435},game.surfaces);
+  const wire={from:{x:172,y:420},to:{x:172,y:473},shakeUntil:0};
+  game.web.strands.push(wire);
+  run(game,5,{move:{x:0,y:-1}});
+  assert.equal(game.clinging,undefined);
+  run(game,12,{grip:true,move:{x:0,y:-1}});
+  assert.equal(game.clinging,wire);
+  assert.ok(game.spider.y<431);
   run(game,1);
+  assert.equal(game.clinging,undefined);
+});
+
+test('hunters stop on webs for three seconds and touching a free hunter ends the run',()=>{
+  const game=createWindowHunt();
+  game.predators.length=1;
+  const hunter=game.predators[0];
+  hunter.body=createCrawler({x:376,y:598},game.surfaces);
+  hunter.origin={x:376,y:598};
+  hunter.facing=1;
+  game.spider=createCrawler({x:444,y:598},game.surfaces);
+  const wire={from:{x:398,y:560},to:{x:398,y:606},shakeUntil:0};
+  game.web.strands.push(wire);
+  for (let i=0;i<100 && !hunter.boundUntil;i++) run(game,1);
+  assert.equal(hunter.boundUntil-game.clock,caughtLifetime);
+  assert.equal(game.occupants.has(wire),false);
+  run(game,250);
+  assert.equal(hunter.body.x,398);
+  game.spider.x=410;
+  for (let i=0;i<200 && game.phase==='play';i++) run(game,1);
   assert.equal(game.phase,'over');
 });
+
+test('a hunting spider can bind with silk and escape requires five distinct presses',()=>{
+  const game=createWindowHunt();
+  game.predators.length=1;
+  const hunter=game.predators[0];
+  hunter.body=createCrawler({x:332,y:598},game.surfaces);
+  hunter.origin={x:332,y:598};
+  game.spider=createCrawler({x:483,y:598},game.surfaces);
+  for (let i=0;i<175 && !game.trapped;i++) run(game,1);
+  assert.ok(game.trapped);
+  run(game,6,{escape:true});
+  assert.equal(game.escapeCount,1);
+  for (let i=0;i<4;i++) {run(game,1);run(game,1,{escape:true});}
+  assert.equal(game.trapped,false);
+});
+
+test('camera follows in two axes and solid walls keep the player inside the room',()=>{
+  const game=createWindowHunt();
+  const start=cameraFor(game);
+  game.predators.length=0;
+  game.spider=createCrawler({x:1200,y:176},game.surfaces);
+  assert.ok(cameraFor(game).x>start.x && cameraFor(game).y<start.y);
+  run(game,300,{move:{x:1,y:0}});
+  assert.ok(game.spider.x<=bedroomWidth-17);
+  assert.equal(game.phase,'play');
+});
+
 test('jump fires on press at fixed strength and holding does not spend the air jump',()=>{
   const game=createWindowHunt(true);
   run(game,1,{jump:true,move:{x:1,y:-1}});

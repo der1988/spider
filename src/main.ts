@@ -1,5 +1,5 @@
 import './style.css';
-import {createWindowHunt,stepWindowHunt,roomHeight,roomWidth,silkLimit,type CornerInput,type WindowRun} from './window-hunt';
+import {createWindowHunt,stepWindowHunt,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
 import {renderWindowHunt} from './window-hunt-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
@@ -76,6 +76,7 @@ let opening = true;
 let paused = false;
 let escape: FlyEscape|undefined;
 let windowHunt: WindowRun|undefined;
+let roomMapOpen=false;
 let storyCheckpoint: {offset:number; arena:typeof arena}|undefined;
 let escapeCheckpoint: FlyEscape|undefined;
 const keyboard=new Set<string>();
@@ -260,6 +261,7 @@ function showMenu() {
   const practice=windowHunt?.practice;
   const wasWindowHunt=!!windowHunt;
   windowHunt=undefined;
+  roomMapOpen=false;
   storyCheckpoint=undefined;
   escapeCheckpoint=undefined;
   pausePanel.close();
@@ -326,8 +328,13 @@ function beginFly(resume=false) {
 
 window.addEventListener('keydown',event => {
   if (settingsPanel.open) return;
+  if (event.code==='KeyM' && !event.repeat && windowHunt && !windowHunt.practice && !paused && windowHunt.phase==='play') {
+    roomMapOpen=!roomMapOpen;
+    remainder=0;
+    event.preventDefault();
+  }
   if (!pausePanel.open && shell.dataset.screen==='game' && !dialogOpen() && !windowDefeat.open && defeat.hidden) {
-    if (/^(Key[WASDZXCV]|Arrow(Up|Down|Left|Right))$/.test(event.code)) {
+    if (/^(Key[WASDZXCG]|Arrow(Up|Down|Left|Right))$/.test(event.code)) {
       keyboard.add(event.code);
       if (!event.repeat && event.code==='KeyZ') keyboardButtons|=1;
       if (!event.repeat && event.code==='KeyX') keyboardButtons|=2;
@@ -550,7 +557,7 @@ function setWindowView() {
   get('silk-count').hidden=!windowHunt || windowHunt.practice;
   windowInfo.textContent=windowHunt?.practice
     ? 'L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower'
-    : 'L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower · × / C direct shot · □ / V reclaim aimed web';
+    : 'L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower · R2 / G grip web · △ / M map · × / C escape';
 }
 
 function startWindowHunt(practice=false) {
@@ -561,7 +568,8 @@ function startWindowHunt(practice=false) {
   windowDefeat.close();
   clearFlyScene();
   windowHunt=createWindowHunt(practice);
-  windowHunt.directHeld=crossHeld;
+  windowHunt.escapeHeld=crossHeld;
+  roomMapOpen=false;
   huntNoticeUntil=0;
   setWindowView();
   shell.dataset.screen='game';
@@ -577,21 +585,19 @@ function startWindowHunt(practice=false) {
 const silkLabel=get('silk-points');
 let huntNoticeUntil=0;
 function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number) {
-  if (!paused && !document.hidden && run.phase==='play') {
+  if (!paused && !roomMapOpen && !document.hidden && run.phase==='play') {
     remainder+=elapsed;
     while (remainder>=arenaStep && run.phase==='play') {
       remainder-=arenaStep;
       stepWindowHunt(run,input,arenaStep,event=>{
-        if (event==='empty' || event==='capacity' || event==='no-target') {
-          say(event==='empty' ? 'Silk empty · Reclaim a web' : event==='capacity'
-            ? 'Five webs active · Aim at one and press □ / V to reclaim it'
-            : 'Aim at a web to reclaim it');
-          huntNoticeUntil=run.clock+2.8;
-        } else {
-          audio.play(event==='reclaim' ? 'release' : event);
+        if (event==='trap') audio.play('tension');
+        else if (event==='escaped') audio.play('release');
+        else if (event==='caught-insect' || event==='caught-predator') audio.play('fix');
+        else {
+          audio.play(event);
           if (event==='catch') {
-            say('Gnat caught · +1 silk up to five');
-            huntNoticeUntil=run.clock+1.4;
+            say('Web collected · silk credited');
+            huntNoticeUntil=run.clock+1.35;
           }
         }
       });
@@ -601,12 +607,14 @@ function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number) {
     renderWindowHunt(context,run,reduced());
     return;
   }
-  if (run.clock>=huntNoticeUntil && message.textContent) say('');
+  if (roomMapOpen) say('Bedroom map · △ / M to close');
+  else if (run.trapped) say('Trapped · Tap × / C · '+run.escapeCount+'/'+breakFreePresses);
+  else if (run.clock>=huntNoticeUntil && message.textContent) say('');
   const catches=String(run.catches);
-  const silk=run.silk+'/'+silkLimit;
+  const silk=String(run.silk);
   if (scoreLabel.textContent!==catches) scoreLabel.textContent=catches;
   if (silkLabel.textContent!==silk) silkLabel.textContent=silk;
-  renderWindowHunt(context,run,reduced());
+  renderWindowHunt(context,run,reduced(),roomMapOpen);
   if (run.phase==='over' && !windowDefeat.open) {
     get('window-hunt-result').textContent='Catches · '+run.catches;
     windowDefeat.showModal();
@@ -640,7 +648,12 @@ function frame(time: number) {
     const options=!!gamepad.buttons[9]?.pressed;
     const triangle=!!gamepad.buttons[3]?.pressed;
     const cancel=!!gamepad.buttons[1]?.pressed;
-    if (triangle && !triangleHeld && !navigation && !dialogOpen() && canSwitchPerspective()) beginFly();
+    if (triangle && !triangleHeld && !navigation && !dialogOpen()) {
+      if (windowHunt && !windowHunt.practice && windowHunt.phase==='play') {
+        roomMapOpen=!roomMapOpen;
+        remainder=0;
+      } else if (canSwitchPerspective()) beginFly();
+    }
     triangleHeld=triangle;
     if (activePad!==gamepad.index) {
       activePad=gamepad.index;
@@ -685,8 +698,8 @@ function frame(time: number) {
     playWindowFrame(windowHunt,{
       move,aim:keys.aim??input?.aim,jump:keyboard.has('KeyZ') || !!gamepad?.buttons[4]?.pressed,
       silk:keyboard.has('KeyX') || !!gamepad?.buttons[5]?.pressed,
-      direct:keyboard.has('KeyC') || crossHeld,
-      remove:keyboard.has('KeyV') || !!gamepad?.buttons[2]?.pressed,
+      grip:keyboard.has('KeyG') || !!gamepad?.buttons[7]?.pressed || (gamepad?.buttons[7]?.value??0)>.3,
+      escape:keyboard.has('KeyC') || crossHeld,
     },elapsed);
     requestAnimationFrame(frame);
     return;
