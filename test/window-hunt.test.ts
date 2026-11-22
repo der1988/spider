@@ -217,3 +217,24 @@ test('active rope can shorten and lengthen while fire remains held',()=>{
   assert.ok(game.spider.y>y+10);
   assert.equal(game.web.strands.length,0);
 });
+
+test('Gnat Hunt can aim, pay out and fix silk at quadruple the old range',()=>{
+  const game=createWindowHunt();
+  const floor={x:50,y:608,w:1310,h:20,grip:true};
+  const wall={x:1000,y:480,w:20,h:128,grip:true};
+  game.surfaces=[floor,wall];
+  game.predators.length=0;
+  game.gnats=[];
+  game.spider=createCrawler({x:400,y:600},game.surfaces);
+  const aim={x:1,y:0};
+  game.aim=aim;
+  assert.deepEqual(windowAnchor(game),{x:1000,y:600});
+  run(game,60,{silk:true,aim,move:{x:0,y:1}});
+  assert.equal(game.spider.rope?.length,620);
+  run(game,1);
+  assert.equal(game.web.strands.length,1);
+  assert.ok(Math.abs(game.web.strands[0].from.x-game.web.strands[0].to.x)>=600);
+
+  game.surfaces=[floor,{...wall,x:1021}];
+  assert.equal(windowAnchor(game),undefined);
+});

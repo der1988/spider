@@ -9,6 +9,7 @@ export const bedroomWidth=2000;
 export const bedroomHeight=1008;
 export const caughtLifetime=3;
 export const breakFreePresses=5;
+const huntSilkRange=DEFAULT_TUNING.range*4;
 const jumpSpeed=172;
 const grip=(x:number,y:number,w:number,h:number):Rect=>({x,y,w,h,grip:true});
 const boundary=[grip(0,0,520,16),grip(0,270,520,20),grip(0,16,9,254),grip(511,16,9,254)];
@@ -133,9 +134,13 @@ export function windowStick(raw:Point):Point {
   return {x:direction.x*strength,y:direction.y*strength};
 }
 
+function silkRange(game:WindowRun) {
+  return game.practice ? DEFAULT_TUNING.range : huntSilkRange;
+}
+
 export function windowAnchor(game:WindowRun) {
   const {spider,aim}=game;
-  return aimHit(spider,game.surfaces,{x:spider.x+aim.x,y:spider.y+aim.y});
+  return aimHit(spider,game.surfaces,{x:spider.x+aim.x,y:spider.y+aim.y},{range:silkRange(game)});
 }
 
 function jumpWindow(game:WindowRun,raw:Point) {
@@ -156,14 +161,14 @@ function jumpWindow(game:WindowRun,raw:Point) {
 
 function aimEnd(game:WindowRun) {
   const {spider,aim}=game;
-  const range=DEFAULT_TUNING.range;
+  const range=silkRange(game);
   return {x:spider.x+aim.x*range,y:spider.y+aim.y*range};
 }
 
 function releaseSilk(game:WindowRun,emit:(event:WindowEvent)=>void) {
   const rope=closeCrawlerRopes(game.spider);
   if (!rope) return;
-  const reach=DEFAULT_TUNING.range+SPIDER_HALF_HEIGHT;
+  const reach=silkRange(game)+SPIDER_HALF_HEIGHT;
   if (!anchorSilk(game.web.strands,rope,reach,game.spider,game.surfaces,game.practice ? 8 : Infinity)) {
     leaveSilk(game.web,rope,reach);
   }
@@ -542,7 +547,7 @@ export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(
     const before=web.strands.length;
     if (input.silk && !game.silkHeld) {
       emit('launch');
-      if (castCrawler(spider,game.surfaces,aimEnd(game),{minLength:8})) {
+      if (castCrawler(spider,game.surfaces,aimEnd(game),{range:silkRange(game),minLength:8})) {
         game.clinging=undefined;
         emit('attach');
       } else emit('miss');
@@ -550,7 +555,7 @@ export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(
     const previous={x:spider.x,y:spider.y};
     const falling=spider.vy;
     if (spider.rope && input.move.y>.43) {
-      spider.rope.length=Math.min(DEFAULT_TUNING.range,spider.rope.length+DEFAULT_TUNING.reelSpeed*dt);
+      spider.rope.length=Math.min(silkRange(game),spider.rope.length+DEFAULT_TUNING.reelSpeed*dt);
     }
     const stick=windowStick(input.move);
     if (game.clinging) crawlWeb(game,game.clinging,stick,dt);
