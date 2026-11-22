@@ -84,13 +84,13 @@ export function drawPlatform(ctx: CanvasRenderingContext2D,r: Rect,beat: number)
 
 interface MusicFrame { time: number; beat: number; shot?: OpeningShot }
 
-export function drawAimMarker(ctx:CanvasRenderingContext2D,point:Point,direction:Point,width:number,height:number) {
+export function drawAimMarker(ctx:CanvasRenderingContext2D,point:Point,direction:Point,width:number,height:number,reachable=true) {
   const edgeX=direction.x>0 ? width-3-point.x : point.x-2;
   const edgeY=direction.y>0 ? height-3-point.y : point.y-2;
   const reach=Math.min(16,edgeX/Math.abs(direction.x),edgeY/Math.abs(direction.y));
   const tip={x:point.x+direction.x*reach,y:point.y+direction.y*reach};
-  block(ctx,tip.x-1,tip.y-1,3,3,cream);
-  block(ctx,tip.x,tip.y,1,1,ink);
+  block(ctx,tip.x-1,tip.y-1,3,3,reachable ? cream : ink);
+  if (reachable) block(ctx,tip.x,tip.y,1,1,ink);
 }
 
 export function renderHunt(ctx: CanvasRenderingContext2D,hunt: Hunt,spider: Crawler,direction: Point,music: MusicFrame) {

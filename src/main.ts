@@ -549,8 +549,8 @@ function setStealthView() {
   stealthInfo.hidden=!stealth;
   get('score-label').textContent=stealth ? 'Guards bound' : 'Catches';
   stealthInfo.textContent=stealth?.practice
-    ? 'Hold L1 / Z to charge a jump · R1 / X to fire · Hold to swing · Up to reel'
-    : 'Hold L1 / Z to charge a jump · R1 / X to fire · Hold to swing · Up to reel · Tap × / X to escape';
+    ? 'L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower'
+    : 'L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower · Tap × / X to escape';
 }
 
 function startStealth(practice=false) {

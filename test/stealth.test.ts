@@ -73,17 +73,33 @@ test('held silk stays mobile on the floor and release fixes it to the surface',(
   assert.equal(game.web.strands.length,1);
 });
 
-test('both jump charge and stick orientation matter on release',()=>{
-  const short=createStealth(),long=createStealth(),vertical=createStealth();
-  run(short,8,{jump:true});
-  run(long,84,{jump:true});
-  run(vertical,84,{jump:true});
-  run(short,7,{move:{x:1,y:0}});
-  run(long,7,{move:{x:1,y:0}});
-  run(vertical,7,{move:{x:0,y:-1}});
-  assert.ok(long.spider.x>short.spider.x+4);
-  assert.equal(vertical.spider.x,32);
-  assert.ok(vertical.spider.y<long.spider.y);
+test('jump fires on press at fixed strength and holding does not spend the air jump',()=>{
+  const game=createStealth(true);
+  run(game,1,{jump:true,move:{x:1,y:-1}});
+  assert.ok(game.spider.x>32 && game.spider.y<262);
+  const launchSpeed=Math.hypot(game.spider.vx,game.spider.vy);
+  run(game,12,{jump:true,move:{x:1,y:-1}});
+  assert.equal(game.spider.airJump,true);
+  run(game,1);
+  run(game,1,{jump:true,move:{x:0,y:-1}});
+  assert.equal(game.spider.airJump,false);
+  assert.ok(launchSpeed>168 && launchSpeed<174);
+  assert.equal(game.spider.vx,0);
+});
+
+test('active rope can shorten and lengthen while fire remains held',()=>{
+  const game=createStealth(true);
+  game.spider=createCrawler({x:32,y:130},game.surfaces);
+  const aim={x:0,y:-1};
+  run(game,40,{silk:true,aim,move:aim});
+  const rope=game.spider.rope!;
+  const length=rope.length,y=game.spider.y;
+  assert.ok(length<114);
+  run(game,40,{silk:true,move:{x:0,y:1}});
+  assert.equal(game.spider.rope,rope);
+  assert.ok(rope.length>length+10);
+  assert.ok(game.spider.y>y+10);
+  assert.equal(game.web.strands.length,0);
 });
 
 test('the starting pipe gives time to observe mobile and fixed sentinels',()=>{
@@ -142,11 +158,10 @@ test('the entire S passage can be finished underneath the first wall and over th
   run(game,1);
   run(game,230,{move:up});
   assert.ok(game.spider.y<82);
-  run(game,24,{move:up,jump:true});
-  run(game,48,{move:{x:1,y:-1}});
+  run(game,72,{move:{x:1,y:-1},jump:true});
   run(game,160,{move:right});
-  run(game,1,{silk:true,aim:left});
-  run(game,90);
-  run(game,125,{move:{x:0,y:1}});
+  run(game,1,{silk:true,aim:{x:-1,y:-.1}});
+  run(game,1);
+  run(game,165,{move:{x:0,y:1}});
   assert.equal(game.phase,'complete');
 });

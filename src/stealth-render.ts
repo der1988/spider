@@ -1,5 +1,5 @@
 import {block,drawAimMarker,drawPlatform,drawSpider,line} from './hunt-render';
-import {chargeTime,entry,exit,escapePresses,floorY,room,sightRange,sightSlope,stealthHeight,stealthWidth,type Guard,type StealthRun} from './stealth';
+import {entry,exit,escapePresses,floorY,room,sightRange,sightSlope,stealthAnchor,stealthHeight,stealthWidth,type Guard,type StealthRun} from './stealth';
 import {aimHit} from './spider';
 
 const ink='#152b22';
@@ -106,16 +106,12 @@ export function renderStealth(ctx:CanvasRenderingContext2D,game:StealthRun,reduc
   }
   for (const guard of game.guards) drawGuard(ctx,guard,game.clock);
   ctx.textAlign='left';
-  drawAimMarker(ctx,spider,game.aim,stealthWidth,stealthHeight);
+  drawAimMarker(ctx,spider,game.aim,stealthWidth,stealthHeight,!!stealthAnchor(game));
   drawSpider(ctx,spider,game.clock,{time:game.clock,beat:0});
   if (game.trapped) {
     block(ctx,spider.x-9,spider.y-8,18,16,'#6c523d');
     for (let i=-6;i<=6;i+=3) line(ctx,{x:spider.x-8,y:spider.y+i},{x:spider.x+8,y:spider.y+i+1},amber);
     block(ctx,spider.x-9,spider.y-12,18,2,ink);
     block(ctx,spider.x-9,spider.y-12,18*game.trapped.presses/escapePresses,2,cream);
-  }
-  if (game.jumpCharge) {
-    block(ctx,spider.x-8,spider.y-13,17,3,ink);
-    block(ctx,spider.x-7,spider.y-12,Math.round(15*game.jumpCharge/chargeTime),1,cream);
   }
 }
