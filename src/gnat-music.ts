@@ -14,8 +14,8 @@ const melody=[
   [84,0,82,79,75,0,79,77], [74,0,78,81,79,78,74,0],
 ] as const;
 
-export type GnatMood='explore'|'chase'|'danger';
-const moods=['explore','chase','danger'] as const;
+export type GnatMood='explore'|'danger';
+const moods=['explore','danger'] as const;
 type Voice='lead'|'bass'|'keys'|'pad';
 type Drum='kick'|'snare'|'hat'|'tom';
 function pulse(phase:number,width:number) {
@@ -27,7 +27,7 @@ function envelope(time:number,length:number,attack:number,release:number) {
 }
 
 function renderMusic(context:AudioContext,mood:GnatMood,accent=false) {
-  const danger=mood==='danger',chase=mood==='chase';
+  const danger=mood==='danger';
   const length=accent ? .27 : bar*chords.length;
   const buffer=context.createBuffer(2,Math.round(length*sampleRate),sampleRate);
   const left=buffer.getChannelData(0),right=buffer.getChannelData(1);
@@ -109,11 +109,6 @@ function renderMusic(context:AudioContext,mood:GnatMood,accent=false) {
         if (step===2 || step===6) drum('snare',at,danger ? .225 : .127,-.12);
         drum('hat',at+(step%2 ? 0 : eighth*.52),step%2 ? .092 : .042,.55);
         if (danger) drum('hat',at+eighth*.48,.069,-.48);
-        if (chase) {
-          if (step%2) drum('hat',at+eighth*.45,.055,-.42);
-          if (step===3 || step===7) note('bass',root+7,at,eighth*.62,.13);
-          if (step%2===0) note('keys',arp+12,at+eighth*.55,eighth*.55,.075,-.55);
-        }
         if (index%4===3 && step>=6) drum('tom',at+eighth*.56,danger ? .18 : .105,(step-6)*.4-.2);
       }
     }
@@ -136,6 +131,13 @@ export class GnatMusic {
   private releaseAt?:number;
   private releaseMood?:GnatMood;
   private volume=.6;
+
+  get pulse() {
+    if (!this.playing) return 0;
+    const {output,started}=this.playing;
+    const time=this.offset+Math.max(0,output.context.currentTime-started);
+    return Math.exp(-((time%beat)/beat)*5.6);
+  }
 
   setVolume(value:number) {
     this.volume=.6*value;

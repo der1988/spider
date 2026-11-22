@@ -263,7 +263,7 @@ dialog h2 { margin: 0; font-size: 16px; }
 .shell[data-reforming] :is(#window-hunt-mode,#practice-mode,#settings-menu) { display:none; }
 .shell[data-window-hunt=practice] .catch-count { visibility:hidden; }
 .open-controls:not([hidden]) {
-  display: grid; grid-template-columns: repeat(7,minmax(0,1fr));
+  display: grid; grid-template-columns: repeat(8,minmax(0,1fr));
   align-items: center; justify-items: center; gap: 3px; block-size: 48px; padding: 4px;
   background: #14271d; border: 1px solid #789468;
   font: 650 clamp(9px, 1.4vw, 13px)/1.1 system-ui, sans-serif;

@@ -1,5 +1,5 @@
 import './style.css';
-import {chasingPrey,createOpenWorld,createWindowHunt,stepWindowHunt,updateHuntZoom,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
+import {createOpenWorld,createWindowHunt,stepWindowHunt,updateHuntZoom,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
 import {renderWindowHunt} from './window-hunt-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
@@ -577,7 +577,6 @@ function startWindowHunt(practice=false) {
   windowHunt.escapeHeld=crossHeld;
   roomMapOpen=false;
   huntNoticeUntil=0;
-  preyChase=false;
   silkHeldFor=0;
   setWindowView();
   shell.dataset.screen='game';
@@ -592,7 +591,6 @@ function startWindowHunt(practice=false) {
 
 const silkLabel=get('silk-points');
 let huntNoticeUntil=0;
-let preyChase=false;
 let silkHeldFor=0;
 function syncGnatMusic(run:WindowRun) {
   if (run.practice) {
@@ -601,7 +599,7 @@ function syncGnatMusic(run:WindowRun) {
   }
   const alerted=run.phase==='play' && (run.trapped || run.predators.some(predator=>
     run.clock>=predator.boundUntil && run.clock<predator.chaseUntil));
-  gnatMusic.sync(contextAudio,alerted ? 'danger' : preyChase && run.phase==='play' ? 'chase' : 'explore',paused || document.hidden);
+  gnatMusic.sync(contextAudio,alerted ? 'danger' : 'explore',paused || document.hidden);
 }
 
 function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number,realElapsed:number,zoomHeld:boolean) {
@@ -613,7 +611,8 @@ function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number,realElap
     while (remainder>=arenaStep && run.phase==='play') {
       remainder-=arenaStep;
       stepWindowHunt(run,input,arenaStep,event=>{
-        if (event==='trap') audio.play('tension');
+        if (event==='eat') audio.play('catch');
+        else if (event==='trap') audio.play('tension');
         else if (event==='escaped') audio.play('release');
         else if (event==='caught-insect' || event==='caught-predator') audio.play('fix');
         else {
@@ -625,7 +624,6 @@ function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number,realElap
         }
       });
     }
-    preyChase=!run.practice && chasingPrey(run,input);
   }
   syncGnatMusic(run);
   if (run.practice) {
@@ -635,6 +633,7 @@ function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number,realElap
   if (contextAudio && contextAudio.state!=='running') say('Click or press a keyboard key to enable music');
   else if (roomMapOpen) say('World map · △ / M to close');
   else if (run.trapped) say('Trapped · Tap × / C · '+run.escapeCount+'/'+breakFreePresses);
+  else if (run.clock<run.eatingUntil) say('Eating · Stay out of sight');
   else if (run.clock>=huntNoticeUntil && message.textContent) say('');
   const catches=String(run.catches);
   const cargo=`Carry ${run.carried.length}`;
@@ -642,7 +641,7 @@ function playWindowFrame(run:WindowRun,input:CornerInput,elapsed:number,realElap
   const silk=String(run.silk);
   if (scoreLabel.textContent!==catches) scoreLabel.textContent=catches;
   if (silkLabel.textContent!==silk) silkLabel.textContent=silk;
-  renderWindowHunt(context,run,reduced(),roomMapOpen);
+  renderWindowHunt(context,run,reduced(),roomMapOpen,gnatMusic.pulse);
   if (run.phase==='over' && !windowDefeat.open) {
     get('window-hunt-result').textContent='Catches · '+run.catches;
     windowDefeat.showModal();

@@ -15,7 +15,7 @@ test('the shaft has distinct altitude bands, four guards and a smooth live zoom'
   assert.equal(game.predators.filter(enemy=>!enemy.bee).length,2);
   updateHuntZoom(game,true,.05);
   const scale=cameraFor(game).scale;
-  assert.ok(scale<1 && scale>.62);
+  assert.ok(scale<1.16 && scale>.62);
   const clock=game.clock;
   stepWindowHunt(game,idle,1/120,()=>{});
   assert.ok(game.clock>clock);
@@ -69,4 +69,41 @@ test('R1 tap stays grounded, a hold attaches, and a held miss leaves support int
   for(let i=0;i<32;i++) tick(true);
   assert.equal(game.spider.rope,undefined);
   assert.equal(game.spider.support,'floor');
+});
+
+test('Cross eats one caught insect and guards settle when they see the player with no evidence',()=>{
+  const game=createOpenWorld(()=>.5);
+  const y=1088;
+  game.spider=createCrawler({x:340,y},game.surfaces);
+  const [guard]=game.predators;
+  game.predators=[guard]; guard.body=createCrawler({x:230,y},game.surfaces);
+  guard.fireAt=Infinity;
+  game.carried=game.gnats.splice(0,1);
+  const eat={...idle,escape:true};
+  stepWindowHunt(game,eat,1/120,()=>{});
+  assert.equal(game.carried.length,0);
+  assert.ok(game.eatingUntil>game.clock);
+  assert.ok(guard.chaseUntil>game.clock);
+  const wall={x:280,y:990,w:9,h:106};
+  game.surfaces=[...game.surfaces,wall];
+  game.clock=game.eatingUntil+.1;
+  stepWindowHunt(game,eat,1/120,()=>{});
+  assert.ok(guard.chaseUntil>game.clock);
+  game.surfaces.pop();
+  stepWindowHunt(game,idle,1/120,()=>{});
+  assert.equal(guard.chaseUntil,0);
+});
+
+test('crossing a web slows an open world bee without stopping or removing it',()=>{
+  const game=createOpenWorld(()=>.5);
+  const bee=game.predators.find(enemy=>enemy.bee)!;
+  game.predators=[bee]; bee.body=createCrawler({x:300,y:820},game.surfaces);
+  bee.plan={x:350,y:820}; bee.planAt=99;
+  game.web.strands.push({from:{x:300.3,y:808},to:{x:300.3,y:835},shakeUntil:0});
+  stepWindowHunt(game,idle,1/120,()=>{});
+  assert.ok(bee.slowedUntil>game.clock);
+  const x=bee.body.x;
+  stepWindowHunt(game,idle,1/120,()=>{});
+  assert.ok(bee.body.x>x && bee.body.x-x<.4);
+  assert.equal(game.predators.length,1);
 });

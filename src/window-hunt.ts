@@ -8,8 +8,11 @@ export const roomHeight=290;
 export const bedroomScale=.8;
 export const bedroomWidth=2000;
 export const bedroomHeight=1008;
-export const shaftWidth=900;
+export const shaftWidth=810;
 export const shaftHeight=1120;
+export const huntZoomIn=1.16;
+const huntZoomOut=.62;
+export const eatingSeconds=1.35;
 export const caughtLifetime=3;
 export const webLifetime=5;
 export const ropeHoldSeconds=.22;
@@ -97,10 +100,10 @@ export function randomBedroom(random=Math.random):Corner {
 }
 
 export function createOpenWorld(random=Math.random) {
-  const shelf=(x:number,y:number,w:number)=>object('wood',x+random()*20-10,y+random()*14-7,w,14);
+  const shelf=(x:number,y:number,w:number)=>object('wood',(x+random()*20-10)*.9,y+random()*14-7,w*.9,14);
   const objects=[
     object('wall',0,0,shaftWidth,16),object('wall',0,1096,shaftWidth,24),
-    object('wall',0,16,16,1080),object('wall',884,16,16,1080),
+    object('wall',0,16,16,1080),object('wall',shaftWidth-16,16,16,1080),
     shelf(22,894,145),shelf(356,876,180),shelf(741,903,137),
     shelf(95,680,105),shelf(528,714,128),shelf(742,657,133),
     shelf(18,485,147),shelf(328,526,165),shelf(711,456,166),
@@ -111,11 +114,11 @@ export function createOpenWorld(random=Math.random) {
   const flightSites=[{x:235,y:887},{x:680,y:844},{x:460,y:770},
     {x:267,y:593},{x:672,y:543},{x:584,y:429},
     {x:285,y:235},{x:560,y:170},{x:813,y:91},{x:165,y:77}].map(p=>
-      ({x:p.x+random()*22-11,y:p.y+random()*22-11}));
+      ({x:(p.x+random()*22-11)*.9,y:p.y+random()*22-11}));
   return createWindowHunt(false,{
     objects,flightSites,
-    spawnSites:[{x:190,y:floor},{x:450,y:floor},{x:695,y:floor}],
-    hunterSites:[{x:270,y:floor},{x:825,y:395},{x:70,y:243},{x:800,y:767}],
+    spawnSites:[171,405,625].map(x=>({x,y:floor})),
+    hunterSites:[{x:243,y:floor},{x:742,y:395},{x:63,y:243},{x:720,y:767}],
   },random,true);
 }
 
@@ -135,7 +138,7 @@ const practiceRoom=[
 type GnatKind='common'|'swift'|'wary'|'fly';
 type Gnat={rare:boolean;uncommon:boolean;p:Point;v:Point;home:Point;direction:-1|1;kind:GnatKind;phase:number;steering:Point;decideAt:number};
 type Predator={
-  bee:boolean;
+  bee:boolean; slowedUntil:number;
   body:Crawler; origin:Point; facing:-1|1; lastKnown?:Point; chaseUntil:number;
   spokeInChase:boolean;
   boundUntil:number; immuneUntil:number; jumpAt:number; fireAt:number;
@@ -146,7 +149,7 @@ type Predator={
 export interface CornerInput {move:Point;aim?:Point;jump:boolean;silk:boolean;silkHeldFor?:number;grip?:boolean;escape?:boolean;remove?:boolean;}
 
 function predator(surfaces:readonly Rect[],x:number,y:number,facing:-1|1,bee=false):Predator {
-  return {bee,body:createCrawler({x,y},surfaces),origin:{x,y},facing,chaseUntil:0,spokeInChase:false,boundUntil:0,immuneUntil:0,jumpAt:0,fireAt:0,patrolIndex:0,patrolStep:1,swingUntil:0,planAt:0};
+  return {bee,slowedUntil:0,body:createCrawler({x,y},surfaces),origin:{x,y},facing,chaseUntil:0,spokeInChase:false,boundUntil:0,immuneUntil:0,jumpAt:0,fireAt:0,patrolIndex:0,patrolStep:1,swingUntil:0,planAt:0};
 }
 
 export function createWindowHunt(practice=false,corner=bedroom,random=Math.random,openWorld=false) {
@@ -157,7 +160,7 @@ export function createWindowHunt(practice=false,corner=bedroom,random=Math.rando
   const hunters=practice ? [] : openWorld ? corner.hunterSites : [randomSite(hunterStarts,random)].filter(Boolean);
   const starts=openWorld ? corner.flightSites : hunters.length ? pickFlightSites(corner,spider,random,3,hunters) : [];
   return {
-    practice,corner,surfaces,spider,openWorld,zoom:1,silkPressedAt:0,ropeAttempt:false,
+    practice,corner,surfaces,spider,openWorld,zoom:openWorld ? huntZoomIn : 1,eatingUntil:0,silkPressedAt:0,ropeAttempt:false,
     web:{strands:[] as Strand[]},
     speech:createSpiderSpeech(),dialogueClock:0,
     greeted:new WeakSet<Gnat>(),
@@ -182,7 +185,7 @@ export function createWindowHunt(practice=false,corner=bedroom,random=Math.rando
   };
 }
 export type WindowRun=ReturnType<typeof createWindowHunt>;
-export type WindowEvent='jump'|'launch'|'attach'|'fix'|'release'|'miss'|'caught-insect'|'catch'|'land'|'trap'|'escaped'|'caught-predator';
+export type WindowEvent='jump'|'launch'|'attach'|'fix'|'release'|'miss'|'caught-insect'|'catch'|'land'|'trap'|'escaped'|'caught-predator'|'eat';
 const clamp=(n:number,min:number,max:number)=>Math.min(max,Math.max(min,n));
 const magnitude=(p:Point)=>Math.hypot(p.x,p.y);
 const distance=(a:Point,b:Point)=>Math.hypot(a.x-b.x,a.y-b.y);
@@ -525,12 +528,15 @@ function stepPredator(game:WindowRun,enemy:Predator,dt:number,emit:(event:Window
   if (game.clock<enemy.boundUntil) return;
   const body=enemy.body, target=game.spider;
 
-  if (game.openWorld && !game.carried.length) {
+  const visible=(game.openWorld ? inWindow(game,body) : distance(body,target)<365) && clear(game,body,target);
+  const evidence=game.carried.length>0 || game.clock<game.eatingUntil;
+  if (game.openWorld && (game.clock>=enemy.chaseUntil || visible && !evidence)) {
     enemy.chaseUntil=0;
     enemy.lastKnown=undefined;
     enemy.shot=undefined;
   }
-  const sees=(!game.openWorld || game.carried.length>0) && distance(body,target)<365 && clear(game,body,target);
+  const sees=visible && (!game.openWorld || evidence);
+  if (game.clock<enemy.slowedUntil) dt*=.40;
   if (game.clock>=enemy.chaseUntil) enemy.spokeInChase=false;
   if (sees) {
     if (!game.openWorld && !enemy.spokeInChase && inWindow(game,body)) {
@@ -540,9 +546,9 @@ function stepPredator(game:WindowRun,enemy:Predator,dt:number,emit:(event:Window
     enemy.chaseUntil=game.clock+7;
   }
   const tracking=game.clock<enemy.chaseUntil && enemy.lastKnown;
-  const posts=game.openWorld ? [enemy.origin,{x:clamp(enemy.origin.x+110,70,830),y:770},
-    {x:clamp(enemy.origin.x-95,70,830),y:488},{x:clamp(enemy.origin.x+80,70,830),y:89},
-    {x:clamp(enemy.origin.x-145,70,830),y:335},{x:clamp(enemy.origin.x+100,70,830),y:672}] : game.corner.hunterSites;
+  const posts=game.openWorld ? [enemy.origin,{x:clamp(enemy.origin.x+110,70,shaftWidth-70),y:770},
+    {x:clamp(enemy.origin.x-95,70,shaftWidth-70),y:488},{x:clamp(enemy.origin.x+80,70,shaftWidth-70),y:89},
+    {x:clamp(enemy.origin.x-145,70,shaftWidth-70),y:335},{x:clamp(enemy.origin.x+100,70,shaftWidth-70),y:672}] : game.corner.hunterSites;
   if (enemy.patrolIndex>=posts.length) enemy.patrolIndex=0;
   if (!tracking && distance(body,posts[enemy.patrolIndex])<64) enemy.patrolIndex=(enemy.patrolIndex+enemy.patrolStep+posts.length)%posts.length;
   const goal=tracking || posts[enemy.patrolIndex];
@@ -561,6 +567,7 @@ function stepPredator(game:WindowRun,enemy:Predator,dt:number,emit:(event:Window
       enemy.patrolIndex=(enemy.patrolIndex+1)%posts.length;
       enemy.planAt=0;
     }
+    slowGuard(game,enemy,before,emit);
     if (tracking && distance(body,target)<16 && clear(game,body,target)) game.phase='over';
     return;
   }
@@ -625,7 +632,8 @@ function stepPredator(game:WindowRun,enemy:Predator,dt:number,emit:(event:Window
     enemy.patrolIndex=(enemy.patrolIndex+enemy.patrolStep+posts.length)%posts.length;
     enemy.planAt=0;
   }
-  if (game.clock>=enemy.immuneUntil) {
+  if (game.openWorld) slowGuard(game,enemy,previous,emit);
+  else if (game.clock>=enemy.immuneUntil) {
     const hit=firstCrossing(previous,body,game.web.strands);
     if (hit) {
       body.x=hit.point.x;body.y=hit.point.y;body.vx=0;body.vy=0;
@@ -639,6 +647,16 @@ function stepPredator(game:WindowRun,enemy:Predator,dt:number,emit:(event:Window
     }
   }
   if ((!game.openWorld || tracking) && distance(body,target)<16 && !game.surfaces.some(rect=>crossesSolid(body,target,rect))) game.phase='over';
+}
+
+function slowGuard(game:WindowRun,enemy:Predator,previous:Point,emit:(event:WindowEvent)=>void) {
+  if (game.clock<enemy.immuneUntil) return;
+  const hit=firstCrossing(previous,enemy.body,game.web.strands);
+  if (!hit) return;
+  enemy.slowedUntil=game.clock+2.4;
+  enemy.immuneUntil=game.clock+3.1;
+  hit.wire.shakeUntil=game.clock+.35;
+  emit('caught-predator');
 }
 
 function advanceShots(game:WindowRun,dt:number,emit:(event:WindowEvent)=>void) {
@@ -670,18 +688,18 @@ export function cameraFor(game:WindowRun) {
   const width=game.openWorld ? shaftWidth : bedroomWidth;
   const height=game.openWorld ? shaftHeight : bedroomHeight;
   return {
-    x:clamp(game.spider.x-roomWidth/(2*scale),0,width-roomWidth/scale),
+    x:width<roomWidth/scale ? (width-roomWidth/scale)/2 : clamp(game.spider.x-roomWidth/(2*scale),0,width-roomWidth/scale),
     y:clamp(game.spider.y-roomHeight*.60/scale,0,height-roomHeight/scale),scale,
   };
 }
 
 export function updateHuntZoom(game:WindowRun,held:boolean,dt:number) {
-  if (game.openWorld) game.zoom+=((held ? .62 : 1)-game.zoom)*(1-Math.exp(-dt*8));
+  if (game.openWorld) game.zoom+=((held ? huntZoomOut : huntZoomIn)-game.zoom)*(1-Math.exp(-dt*8));
 }
 
 function inWindow(game:WindowRun,point:Point) {
   const camera=cameraFor(game);
-  return point.x>=camera.x && point.x<camera.x+roomWidth && point.y>=camera.y && point.y<camera.y+roomHeight;
+  return point.x>=camera.x && point.x<camera.x+roomWidth/camera.scale && point.y>=camera.y && point.y<camera.y+roomHeight/camera.scale;
 }
 
 export function chasingPrey(game:WindowRun,input:CornerInput) {
@@ -722,6 +740,12 @@ export function stepWindowHunt(game:WindowRun,input:CornerInput,dt:number,emit:(
     if (closest) web.strands=web.strands.filter(wire=>wire!==closest);
   }
   game.removeHeld=!!input.remove;
+  if (game.openWorld && !game.trapped && input.escape && !game.escapeHeld &&
+      game.clock>=game.eatingUntil && game.carried.length) {
+    game.carried.pop();
+    game.eatingUntil=game.clock+eatingSeconds;
+    emit('eat');
+  }
   if (game.trapped) {
     if (input.escape && !game.escapeHeld && ++game.escapeCount>=breakFreePresses) {
       game.trapped=false;

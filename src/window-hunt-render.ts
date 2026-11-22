@@ -129,13 +129,16 @@ function furnishing(ctx:CanvasRenderingContext2D,item:Corner['objects'][number])
   }
 }
 
-function openBackdrop(ctx:CanvasRenderingContext2D) {
+function openBackdrop(ctx:CanvasRenderingContext2D,pulse:number) {
   block(ctx,0,0,shaftWidth,shaftHeight,'#819875');
   block(ctx,0,0,shaftWidth,295,'#bac69a');
   block(ctx,0,735,shaftWidth,shaftHeight-735,'#718b68');
   for (let x=44;x<shaftWidth;x+=113) {
     line(ctx,{x,y:20},{x:x+19,y:1095},'#718969');
-    for (let y=74;y<1080;y+=147) block(ctx,x+(y%23),y,15,3,'#95ab7c');
+    for (let y=74;y<1080;y+=147) {
+      block(ctx,x+(y%23),y,15,3,'#95ab7c');
+      if (pulse>.24) block(ctx,x+(y%23)+3,y,2+9*pulse,2,'#e3e9ad');
+    }
   }
   ctx.font='bold 14px monospace';
   ctx.fillStyle='#263d2d';
@@ -179,6 +182,10 @@ function renderMap(ctx:CanvasRenderingContext2D,game:WindowRun) {
 
 function drawHunter(ctx:CanvasRenderingContext2D,game:WindowRun,enemy:WindowRun['predators'][number]) {
   const body=enemy.body;
+  if (game.clock<enemy.slowedUntil) {
+    block(ctx,body.x-9,body.y+9,4,1,'#d5edd0');
+    block(ctx,body.x+5,body.y+9,4,1,'#d5edd0');
+  }
   if (enemy.bee) {
     const {x,y}=body,wing=Math.floor(game.clock*26)%2;
     block(ctx,x-6,y-3,12,7,'#cfa459');
@@ -230,9 +237,11 @@ function drawHunter(ctx:CanvasRenderingContext2D,game:WindowRun,enemy:WindowRun[
   }
 }
 
-export function renderWindowHunt(ctx:CanvasRenderingContext2D,game:WindowRun,reduced=false,mapOpen=false) {
+export function renderWindowHunt(ctx:CanvasRenderingContext2D,game:WindowRun,reduced=false,mapOpen=false,pulse=0) {
   if (mapOpen) {renderMap(ctx,game);return;}
   const camera=cameraFor(game);
+  if (reduced) pulse=0;
+  if (game.openWorld) block(ctx,0,0,roomWidth,roomHeight,ink);
   ctx.save();
   ctx.scale(camera.scale,camera.scale);
   ctx.translate(-camera.x,-camera.y);
@@ -243,7 +252,7 @@ export function renderWindowHunt(ctx:CanvasRenderingContext2D,game:WindowRun,red
     }
     for (const surface of game.surfaces) drawPlatform(ctx,surface,0);
   } else if (game.openWorld) {
-    openBackdrop(ctx);
+    openBackdrop(ctx,pulse);
     for (const item of game.surfaces) {
       if (!('kind' in item) || item.x+item.w<camera.x || item.x>camera.x+roomWidth/camera.scale ||
           item.y+item.h<camera.y || item.y>camera.y+roomHeight/camera.scale) continue;
@@ -264,7 +273,7 @@ export function renderWindowHunt(ctx:CanvasRenderingContext2D,game:WindowRun,red
       line(ctx,wire.from,mid,tone);
       line(ctx,mid,wire.to,tone);
     } else line(ctx,wire.from,wire.to,tone);
-    if (!game.practice) for (const p of [wire.from,wire.to]) block(ctx,p.x-1,p.y-1,3,3,tone);
+    if (!game.practice) for (const p of [wire.from,wire.to]) block(ctx,p.x-1,p.y-1,3,3,pulse>.55 ? cream : tone);
   }
   if (spider.rope) line(ctx,spider,spider.rope,cream);
   for (const enemy of game.predators) drawHunter(ctx,game,enemy);
@@ -321,7 +330,12 @@ export function renderWindowHunt(ctx:CanvasRenderingContext2D,game:WindowRun,red
   ctx.save();
   ctx.scale(camera.scale,camera.scale);
   ctx.translate(-camera.x,-camera.y);
-  drawSpider(ctx,spider,game.clock,{time:game.clock,beat:0});
+  drawSpider(ctx,spider,game.clock,{time:game.clock,beat:pulse});
+  if (game.clock<game.eatingUntil) {
+    const chew=reduced ? 0 : Math.floor(game.clock*17)%3;
+    block(ctx,spider.x+spider.facing*7,spider.y-3-chew,3,2,amber);
+    block(ctx,spider.x+spider.facing*(10+chew),spider.y-6,2,2,cream);
+  }
   if (game.trapped) {
     for (let i=-6;i<=6;i+=3) line(ctx,{x:spider.x-8,y:spider.y+i},{x:spider.x+8,y:spider.y+i+1},amber);
   }
