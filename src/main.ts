@@ -4,7 +4,7 @@ import {renderWindowHunt} from './window-hunt-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
 import {advanceArena,arenaInput,arenaStep,createArena,type ArenaEvent} from './arena-run';
-import {advanceArcade,arcadeEscapeButton,arcadeEscapePresses,arcadeHeight,arcadeStage,arcadeWidth,createArcade,species,stages,type ArcadeEvent,type ArcadeRun} from './arcade';
+import {advanceArcade,arcadeEscapeButton,arcadeEscapePresses,arcadeHeight,arcadeStage,arcadeWidth,createArcade,species,speciesUnlocked,stages,type ArcadeEvent,type ArcadeRun} from './arcade';
 import {rivalName} from './arcade-script';
 import {ArcadeMusic} from './arcade-music';
 import {arcadeIcon,renderArcade} from './arcade-render';
@@ -277,6 +277,7 @@ function showMenu() {
   arcade=undefined;
   arcadeMusic.stop();
   delete shell.dataset.arcade;
+  delete shell.dataset.arcadeIntro;
   get('arcade-left').hidden=true;
   get('arcade-right').hidden=true;
   gnatMusic.reset();
@@ -333,7 +334,7 @@ function retryLoop() {
 
 const arcadeSounds={
   jump:'jump',attach:'attach',double:'attach',miss:'miss',release:'release',fix:'fix',evict:'fix',
-  catch:'catch',new:'discovery',over:'miss',recover:'discovery',boss:'tension',
+  catch:'catch',entrance:'discovery',new:'discovery',over:'miss',recover:'discovery',boss:'tension',
   'boss-trap':'attach','boss-free':'release',snared:'tension','escape-step':'fix',escape:'release',
   hit:'catch',win:'discovery',hurt:'miss',
 } as const;
@@ -361,12 +362,13 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
   }
   const stage=arcadeStage(run.level);
   const boss=run.boss;
+  shell.toggleAttribute('data-arcade-intro',!!run.intro);
   const finished=run.phase==='over' || run.phase==='won';
   if (run.phase!=='ready') arcadeMusic.sync(contextAudio,stage,!!boss,frozen && !finished || document.hidden || paused);
   if (shownArcadeLevel!==run.level) {
     if (!shownArcadeLevel || arcadeStage(shownArcadeLevel)!==stage) {
       get('arcade-stage').textContent=stages[stage][0];
-      get('arcade-species').innerHTML=species.slice(0,stage+1).map(([name,description],i)=>
+      get('arcade-species').innerHTML=species.slice(0,speciesUnlocked(stage)).map(([name,description],i)=>
         `<li>${arcadeIcon(i)}<div><strong>${name}</strong><span>${description}</span></div></li>`).join('');
     }
     get('arcade-level').textContent=`Stage ${stage+1} / 10 · Level ${run.level} / 100`;
@@ -400,7 +402,7 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
   if (run.phase!=='ready') say(finished ? '' : run.intro ? 'Press × or Enter to skip.' : boss ?
     (run.snare ? `Press × or X to break free · ${run.snare.presses}/${arcadeEscapePresses}` :
       'Set a web, then touch the rival while he’s tangled.') : 'Touch insects to catch them. A web holds them for about 3 seconds.');
-  renderArcade(context,run,beat);
+  renderArcade(context,run,beat,reduced());
 }
 
 function syncPause() {

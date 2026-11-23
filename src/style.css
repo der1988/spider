@@ -334,3 +334,8 @@ dialog h2 { margin: 0; font-size: 16px; }
   #arcade-species li { grid-template-columns: 1fr; gap: 1px; }
   #arcade-species svg { width: 1em; }
 }
+
+@media (max-width: 680px) {
+  .shell[data-arcade][data-arcade-intro] .playfield { grid-template-columns: minmax(0,1fr); }
+  .shell[data-arcade][data-arcade-intro] .arcade-rail { display: none; }
+}

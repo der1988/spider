@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {advanceArcade,arcadeEscapeButton,arcadeEscapePresses,arcadeLayouts,arcadeStage,createArcade,waveCapacity} from '../src/arcade.ts';
 import {arenaInput,arenaStep} from '../src/arena-run.ts';
+import {dialogueFor,levelDialogues,levelIntroDuration} from '../src/arcade-dialogue.ts';
 
 const neutral=arenaInput({x:0,y:0});
 function ticks(run:ReturnType<typeof createArcade>,seconds:number) {
@@ -19,6 +20,57 @@ function skip(run:ReturnType<typeof createArcade>) {
   advanceArcade(run,cross);
   assert.equal(run.intro,undefined);
 }
+
+test('the 100 levels each stage an authored exchange and resume with their own roster',()=>{
+  assert.equal(levelDialogues.length,100);
+  assert.equal(new Set(levelDialogues.map(([name])=>name)).size,100);
+  assert.equal(new Set(levelDialogues.flatMap(([,line,reply])=>[line,reply])).size,200);
+  for (let level=1;level<=100;level++) {
+    const run=createArcade(level),before=run.time;
+    const cast=run.flies.map(fly=>fly.kind);
+    assert.equal(new Set(cast).size,run.quota);
+    assert.ok(dialogueFor(level).every(line=>line.trim().length>0));
+    advanceArcade(run,arenaInput({x:1,y:0}));
+    ticks(run,levelIntroDuration(level)-.1);
+    assert.equal(run.intro?.kind,'level');
+    assert.equal(run.time,before);
+    assert.deepEqual(run.flies.map(fly=>fly.kind),cast);
+    for (let frame=0;run.intro && frame<30;frame++) advanceArcade(run,neutral);
+    assert.equal(run.intro,undefined);
+    advanceArcade(run,neutral);
+    assert.ok(run.time<before);
+    assert.equal(run.phase,'wave');
+  }
+});
+
+test('a comet holds a fast line while its slower leafwing teammate turns first',()=>{
+  const run=createArcade(60);
+  start(run);
+  const [leafwing,comet]=run.flies;
+  leafwing.kind=5;comet.kind=4;
+  leafwing.p={x:130,y:192};comet.p={x:130,y:182};
+  for (const fly of [comet,leafwing]) {
+    fly.v={x:0,y:0};fly.target={x:380,y:fly.p.y};fly.aimAt=8;
+  }
+  ticks(run,.75);
+  assert.ok(comet.p.x>leafwing.p.x+12);
+  for (const fly of [comet,leafwing]) fly.target={x:30,y:fly.p.y};
+  ticks(run,.15);
+  assert.ok(leafwing.v.x<0);
+  assert.ok(comet.v.x>0);
+});
+
+test('a leafwing diverts at a silk barrier a gnat would try to cross',()=>{
+  for (const [kind,avoidsSilk] of [[0,false],[5,true]] as const) {
+    const run=createArcade(2);
+    start(run);
+    const fly=run.flies[0];
+    fly.kind=kind;fly.p={x:180,y:186};
+    run.movement.hunt.strands=[{from:{x:230,y:7},to:{x:230,y:217},shakeUntil:0}];
+    advanceArcade(run,neutral);
+    assert.equal(fly.target.x<230,avoidsSilk);
+  }
+});
 
 test('Endless holds for intentional input and expired prey cannot be collected',()=>{
   const run=createArcade();

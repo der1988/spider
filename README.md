@@ -10,7 +10,7 @@ Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scorri
 
 ## Endless arcade
 
-- Dieci stage da dieci livelli. Ogni livello presenta un gruppo fisso di 1–6 insetti con un breve scambio fra ciascun insetto e Spidey. Catturali tutti per avanzare. Premi **×** o **Invio** per saltare la presentazione.
+- Dieci stage da dieci livelli. Ogni livello si apre con una presentazione animata al centro dell’arena e uno dei **100 dialoghi originali**. Il primo livello di ogni stage presenta un solista. Le squadre hanno un nome collettivo e combinano specie con traiettorie e reazioni diverse. Cattura tutto il gruppo per avanzare. Premi **×** o **Invio** per saltare la presentazione.
 - Tocca un insetto in volo o intrappolato per catturarlo. Se resta impigliato per circa tre secondi, scompare e torna dall’altro lato della stanza. Sul filo attivo, tieni **su** per accorciarlo e **giù** per allungarlo. Spidey attraversa le proprie tele fisse.
 - Ai livelli 10, 20 e così via, piazza un filo scuro sulla traiettoria della carica e raggiungi il rivale mentre è impigliato. A ogni ingresso di **Duke Wobbleknees** parte una breve presentazione con un tema più aggressivo a 146 BPM. Ogni immobilizzazione permette un colpo e dura 2,8 secondi. Il rivale alterna cariche e tele scure con nodi. Se resti impigliato, premi e rilascia **×** o **X** cinque volte. Vinci sconfiggendo il rivale al livello 100.
 - Il round riparte da 32 secondi, con due secondi in più per stage e un bonus al recupero. Hai tre vite contro il rivale. Alla fine puoi scegliere **Retry** o **Main Menu** con la croce direzionale o lo stick e confermare con **×**.
