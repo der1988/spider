@@ -1,7 +1,5 @@
 const sampleRate=22050;
 const beat=60/110;
-const eighth=beat/2;
-const bar=beat*4;
 const circle=2*Math.PI;
 const chords=[
   [43,55,58,62],[39,55,58,63],[46,53,58,62],[41,53,57,60],
@@ -26,7 +24,10 @@ function envelope(time:number,length:number,attack:number,release:number) {
   return Math.max(0,Math.min(1,time/attack,(length-time)/release));
 }
 
-function renderMusic(context:AudioContext,mood:GnatMood,accent=false) {
+export function renderMusic(context:AudioContext,mood:GnatMood,accent=false,bpm=110,variant=-1) {
+  const eighth=30/bpm,bar=eighth*8;
+  const arcade=variant>=0;
+  const key=arcade ? [0,2,-2,3,5,-4,1,4,-3,7][variant] : 0;
   const danger=mood==='danger';
   const length=accent ? .27 : bar*chords.length;
   const buffer=context.createBuffer(2,Math.round(length*sampleRate),sampleRate);
@@ -43,7 +44,7 @@ function renderMusic(context:AudioContext,mood:GnatMood,accent=false) {
   }
   function note(voice:Voice,pitch:number,at:number,duration:number,gain:number,pan=0) {
     if (!pitch) return;
-    const hz=440*2**((pitch-69)/12);
+    const hz=440*2**((pitch+key-69)/12);
     mix(at,duration,pan,time=>{
       const phase=hz*time;
       const angle=phase*circle;
@@ -95,20 +96,21 @@ function renderMusic(context:AudioContext,mood:GnatMood,accent=false) {
       for (let step=0;step<8;step++) {
         const at=start+step*eighth;
         const bass=step===7 ? root+7 : step===4 ? root+12 : root;
-        if (danger || step%2===0 || step===7) {
+        if (arcade || danger || step%2===0 || step===7) {
           note('bass',bass-(danger ? 12 : 0),at,eighth*(danger ? .71 : 1.38),danger ? .24 : .18);
         }
         const lead=melody[index][step];
+        if (arcade && (step+variant)%4===1) note('keys',harmony[(step+variant)%3]+24,at,eighth*.71,.105,-.51);
         if (lead && (!danger || step%4!==3)) {
           note('lead',lead-(danger ? 12 : 0),at,eighth*(step%4===0 ? 1.38 : .83),danger ? .15 : .14,-.16);
           if (step<7) note('keys',lead,at+eighth*.77,eighth*.81,.031,.59);
         }
         const arp=harmony[(step+index)%harmony.length];
         if (danger || step%2) note('keys',arp+(step%4===3 ? 24 : 12),at+eighth*.18,eighth*.73,danger ? .112 : .085,.46);
-        if (step===0 || step===4 || danger && (step===3 || step===6)) drum('kick',at,danger ? .28 : .17);
-        if (step===2 || step===6) drum('snare',at,danger ? .225 : .127,-.12);
+        if (step===0 || step===4 || danger && (step===3 || step===6)) drum('kick',at,danger || arcade ? .28 : .17);
+        if (step===2 || step===6) drum('snare',at,danger || arcade ? .225 : .127,-.12);
         drum('hat',at+(step%2 ? 0 : eighth*.52),step%2 ? .092 : .042,.55);
-        if (danger) drum('hat',at+eighth*.48,.069,-.48);
+        if (danger || arcade && step%2===variant%2) drum('hat',at+eighth*.48,.069,-.48);
         if (index%4===3 && step>=6) drum('tom',at+eighth*.56,danger ? .18 : .105,(step-6)*.4-.2);
       }
     }

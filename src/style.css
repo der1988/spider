@@ -121,7 +121,7 @@ dialog h2 { margin: 0; font-size: 16px; }
   background-size: 93px 79px, 157px 131px, 100% 4px;
   background-position: 17px 31px, 61px 13px, 0 0;
 }
-.shell[data-screen=start] :is(header,.stage,footer) { display: none; }
+.shell[data-screen=start] :is(header,.playfield,footer) { display: none; }
 /* The title screen keeps its own vertical arcade layout. */
 .launch-copy {
   align-self: end; padding-inline: 8px; text-align: center; z-index: 1;
@@ -305,3 +305,32 @@ dialog h2 { margin: 0; font-size: 16px; }
 }
 
 .shell[data-window-hunt] .clock { display:none; }
+
+.playfield { display: grid; min-width: 0; min-height: 0; }
+.shell[data-arcade] .playfield {
+  grid-template-columns: clamp(68px, 12vw, 150px) minmax(0,1fr) clamp(74px, 17vw, 205px);
+  gap: clamp(3px, 1vw, 10px);
+}
+.shell[data-arcade] #lyric { display: none; }
+.arcade-rail {
+  padding: clamp(3px, 1vw, 10px); min-height: 0; overflow: auto;
+  background: var(--panel); border: 1px solid var(--border);
+  font-size: clamp(10px, 1.35vw, 14px); line-height: 1.25;
+  scrollbar-width: thin; overflow-wrap: anywhere;
+}
+.arcade-rail h2 { font-size: inherit; margin: 0 0 .65em; color: #f4f8cf; }
+.arcade-rail p { margin: .65em 0; }
+.arcade-rail ul, .arcade-rail ol { list-style: none; margin: 0; padding: 0; }
+#arcade-progress { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 3px; }
+#arcade-progress li { height: 7px; border: 1px solid #7b8d6b; }
+#arcade-progress li[data-status=done] { background: #a9bf84; }
+#arcade-progress li[aria-current] { background: #ffe48e; border-color: #ffe48e; }
+#arcade-species { display: grid; gap: 5px; }
+#arcade-species li { display: grid; grid-template-columns: 1.3em minmax(0,1fr); gap: 4px; align-items: start; }
+#arcade-species svg { display: block; width: 100%; background: #1c2c24; }
+#arcade-species strong, #arcade-species span { display: block; }
+#arcade-species span { color: #ccd7ad; font-size: .87em; }
+@media (max-width: 480px) {
+  #arcade-species li { grid-template-columns: 1fr; gap: 1px; }
+  #arcade-species svg { width: 1em; }
+}

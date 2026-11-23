@@ -29,7 +29,7 @@ function finishWebs(run:ArenaRun,before:number,emit?: (event:ArenaEvent)=>void) 
   emit?.(evicted ? 'evict' : 'fix');
 }
 
-export function advanceArena(run:ArenaRun,input:ArenaInput,emit?: (event:ArenaEvent)=>void) {
+export function moveArena(run:ArenaRun,input:ArenaInput,emit?: (event:ArenaEvent)=>void) {
   const {hunt,spider}=run;
   const {surfaces}=hunt;
   const [x,y,ax,ay,buttons]=input;
@@ -62,6 +62,12 @@ export function advanceArena(run:ArenaRun,input:ArenaInput,emit?: (event:ArenaEv
   anchorCrawlerRope(spider,surfaces,hunt.strands);
   fixSilk(hunt,spider,surfaces);
   finishWebs(run,before,emit);
+}
+
+export function advanceArena(run:ArenaRun,input:ArenaInput,emit?: (event:ArenaEvent)=>void) {
+  const {hunt,spider}=run;
+  const surfaces=hunt.surfaces;
+  moveArena(run,input,emit);
   const result=tickHunt(hunt,spider,arenaStep);
   if (hunt.surfaces!==surfaces) Object.assign(spider,createCrawler(spawn,hunt.surfaces),{rope:undefined,firstAnchor:undefined,thread:undefined,support:'floor'});
   if (result) emit?.(result);

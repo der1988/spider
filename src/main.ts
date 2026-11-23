@@ -4,7 +4,9 @@ import {renderWindowHunt} from './window-hunt-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
 import {advanceArena,arenaInput,arenaStep,createArena,type ArenaEvent} from './arena-run';
-import {endlessArena,newEndlessId,recordReplay} from './endless-replay';
+import {advanceArcade,arcadeHeight,arcadeStage,arcadeWidth,createArcade,species,stages,type ArcadeEvent,type ArcadeRun} from './arcade';
+import {ArcadeMusic} from './arcade-music';
+import {arcadeIcon,renderArcade} from './arcade-render';
 import {WEB_KEY} from './threads';
 import {renderHunt} from './hunt-render';
 import {readLeftStick,samplePlayStation} from './pad-controls';
@@ -19,7 +21,6 @@ import {createMenuRoom,renderMenuRoom,stepMenuRoom} from './menu-room';
 import {createFlyEscape,ESCAPE_PRESSES,finishFlyEscape,FLY_SECONDS,stepFlyEscape,type FlyEscape} from './fly-escape';
 import {renderFlyEscape,type FlyEscapeFrame} from './fly-escape-render';
 import {flyCues,flyDoubtAt,flyDuration,flyFinalStart,flyMenuStart,flyRoomEffect} from './fly-song-timing';
-import {infiniteHuntStart} from './infinite-timing';
 
 const get = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const worldCanvas=get<HTMLCanvasElement>('world');
@@ -56,6 +57,7 @@ try {
 } catch { /* Storage may be unavailable. */ }
 const audio = new Soundscape();
 const gnatMusic=new GnatMusic();
+const arcadeMusic=new ArcadeMusic();
 function fetchTrack(name: string) {
   const url=document.querySelector<HTMLMetaElement>('meta[name="'+name+'"]')!.content;
   return fetch(url).then(response=>response.ok ? response.arrayBuffer() : undefined).catch(()=>undefined);
@@ -70,7 +72,6 @@ const endlessBoard=bindEndlessBoard();
 const pausePanel=get<HTMLDialogElement>('pause-panel');
 const settingsPanel=get<HTMLDialogElement>('settings-panel');
 const dialogOpen=()=>leaderboard.open || endlessBoard.open || settingsPanel.open;
-get('defeat-top').onclick=()=>void endlessBoard.view();
 let contextAudio: AudioContext|undefined;
 let mode: HuntMode|undefined;
 let padDirection = 0;
@@ -78,6 +79,9 @@ let opening = true;
 let paused = false;
 let escape: FlyEscape|undefined;
 let windowHunt: WindowRun|undefined;
+let arcade: ArcadeRun|undefined;
+let arcadeAxesReady=false;
+let shownArcadeLevel=0;
 let roomMapOpen=false;
 let storyCheckpoint: {offset:number; arena:typeof arena}|undefined;
 let escapeCheckpoint: FlyEscape|undefined;
@@ -149,6 +153,7 @@ function applySettings() {
   const music=Number(musicVolume.value)/100;
   song.setVolume(music);
   gnatMusic.setVolume(music);
+  arcadeMusic.setVolume(music);
   audio.setVolume(Number(effectsVolume.value)/100);
   shell.dataset.subtitles=['normal','large','off'][subtitleMode.selectedIndex];
 }
@@ -214,8 +219,11 @@ function requestMode(next: HuntMode) {
   if (mode===next && song.waiting) return;
   storyCheckpoint=undefined;
   escapeCheckpoint=undefined;
-  startStatus.textContent='Loading soundtrack…';
-  startIntro(next);
+  if (next==='loop') startArcade();
+  else {
+    startStatus.textContent='Loading soundtrack…';
+    startIntro();
+  }
 }
 function enableMenuSound() {
   if (mode || shell.dataset.screen!=='start') return;
@@ -225,7 +233,7 @@ function enableMenuSound() {
 }
 window.addEventListener('pointerdown',()=>{
   if (shell.dataset.screen==='start') enableMenuSound();
-  else if (song.waiting || windowHunt) audio.unlock();
+  else if (song.waiting || windowHunt || arcade) audio.unlock();
 });
 
 function clearFlyScene() {
@@ -239,8 +247,8 @@ function clearFlyScene() {
   endingCode.textContent='';
 }
 
-function startIntro(next: HuntMode,resume=false) {
-  mode=next;
+function startIntro(resume=false) {
+  mode='story';
   opening=true;
   paused=false;
   clearFlyScene();
@@ -256,7 +264,7 @@ function startIntro(next: HuntMode,resume=false) {
   }
   clock.dataset.phase=opening ? 'ready' : 'running';
   captions('');
-  song.play(next,contextAudio,checkpoint?.offset);
+  song.play('story',contextAudio,checkpoint?.offset);
   syncPause();
 }
 
@@ -265,6 +273,11 @@ function showMenu() {
   const practice=windowHunt?.practice;
   const wasWindowHunt=!!windowHunt;
   windowHunt=undefined;
+  arcade=undefined;
+  arcadeMusic.stop();
+  delete shell.dataset.arcade;
+  get('arcade-left').hidden=true;
+  get('arcade-right').hidden=true;
   gnatMusic.reset();
   roomMapOpen=false;
   storyCheckpoint=undefined;
@@ -288,18 +301,104 @@ function showMenu() {
   syncPause();
 }
 
-function showDefeat() {
-  say('');
-  defeatScore.textContent=String(hunt.score);
-  defeat.hidden=false;
-  defeatChoices.select(1,true);
-  if (endlessRun) endlessBoard.finish({runId:endlessRun.id,catches:hunt.score,replay:endlessRun.record.encode()});
+function startArcade() {
+  mode='loop';
+  arcade=createArcade();
+  song.stop();
+  arcadeMusic.stop();
+  shell.dataset.arcade='true';
+  shell.dataset.screen='game';
+  launch.inert=true;
+  worldCanvas.width=arcadeWidth;
+  worldCanvas.height=arcadeHeight;
+  get('arcade-left').hidden=false;
+  get('arcade-right').hidden=false;
+  defeat.hidden=true;
+  paused=false;
+  opening=false;
+  clearFlyScene();
+  captions('');
+  keyboardButtons=0;
+  pendingButtons=0;
+  arcadeAxesReady=false;
+  shownArcadeLevel=0;
+  say('Move, aim or press a button to start.');
+  syncPause();
 }
 
 function retryLoop() {
-  if (defeat.hidden) return;
-  defeat.hidden=true;
-  resetHunt();
+  if (arcade && !defeat.hidden) startArcade();
+}
+
+const arcadeSounds={
+  jump:'jump',attach:'attach',double:'attach',miss:'miss',release:'release',fix:'fix',evict:'fix',
+  catch:'catch',new:'discovery',over:'miss',recover:'discovery',stun:'tension',boss:'tension',
+  hit:'catch',win:'discovery',hurt:'miss',
+} as const;
+
+function arcadeFeedback(event:ArcadeEvent) {
+  audio.play(arcadeSounds[event]);
+  if (event==='attach' || event==='miss') audio.play('launch');
+}
+
+function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined,rawAim:Point,buttons:number,frozen:boolean) {
+  if (!frozen) {
+    const waiting=run.phase==='ready';
+    if (!waiting || Math.max(Math.hypot(move.x,move.y),Math.hypot(rawAim.x,rawAim.y))<.26) arcadeAxesReady=true;
+    const startAxes=arcadeAxesReady && Math.max(Math.hypot(move.x,move.y),Math.hypot(rawAim.x,rawAim.y))>=.51;
+    const axes=waiting && !startAxes && !buttons ? [neutralStick,undefined] as const : [move,aim] as const;
+    pendingButtons|=buttons;
+    const input=arenaInput(...axes);
+    remainder+=elapsed;
+    while (remainder>=arenaStep) {
+      remainder-=arenaStep;
+      input[4]=pendingButtons;
+      pendingButtons=0;
+      advanceArcade(run,input,arcadeFeedback);
+    }
+  }
+  const stage=arcadeStage(run.level);
+  const boss=run.boss;
+  const finished=run.phase==='over' || run.phase==='won';
+  if (run.phase!=='ready') arcadeMusic.sync(contextAudio,stage,frozen && !finished || document.hidden || paused);
+  if (shownArcadeLevel!==run.level) {
+    if (!shownArcadeLevel || arcadeStage(shownArcadeLevel)!==stage) {
+      get('arcade-stage').textContent=stages[stage][0];
+      get('arcade-species').innerHTML=species.slice(0,stage+1).map(([name,description],i)=>
+        `<li>${arcadeIcon(i)}<div><strong>${name}</strong><span>${description}</span></div></li>`).join('');
+    }
+    get('arcade-level').textContent=`Stage ${stage+1} / 10 · Level ${run.level} / 100`;
+    get('arcade-progress').innerHTML=Array.from({length:10},(_,i)=>{
+      const number=stage*10+i+1;
+      const status=number===run.level ? ' aria-current="step"' : number<run.level ? ' data-status="done"' : '';
+      return `<li aria-label="Level ${number}"${status}></li>`;
+    }).join('');
+    shownArcadeLevel=run.level;
+  }
+  const wave=boss ? `Rival · ${boss.hp} / ${boss.max}` : `Wave ${run.wave} · Recovered ${run.recovered} / ${run.level}`;
+  const lives=`Lives · ${run.lives}`;
+  if (get('arcade-wave').textContent!==wave) get('arcade-wave').textContent=wave;
+  if (get('arcade-lives').textContent!==lives) get('arcade-lives').textContent=lives;
+  if (scoreLabel.textContent!==String(run.score)) scoreLabel.textContent=String(run.score);
+  const seconds=Math.max(0,Math.ceil(run.time));
+  if (timeLabel.textContent!==seconds+' s') timeLabel.textContent=seconds+' s';
+  const budget=boss ? 40+stage*4 : 32+stage*2;
+  if (roundLabel.textContent!==budget+' s') roundLabel.textContent=budget+' s';
+  clock.dataset.phase=run.phase==='ready' ? 'ready' : seconds<=5 ? 'urgent' : seconds<=15 ? 'low' : 'running';
+  clockMeter.style.setProperty('--remaining',Math.min(1,seconds/budget).toFixed(3));
+  const beat=reduced() ? 0 : arcadeMusic.pulse;
+  clock.style.setProperty('--pulse',beat.toFixed(2));
+  if (finished && defeat.hidden) {
+    get('defeat-title').textContent=run.phase==='won' ? 'Arcade cleared' : run.lives ? 'Time ran out' : 'Out of lives';
+    defeatScore.textContent=String(run.score);
+    get('endless-status').textContent=`Level ${run.level} / 100`;
+    defeat.hidden=false;
+    defeatChoices.select(run.phase==='won' ? 0 : 1,true);
+  }
+  if (run.phase!=='ready') say(finished ? '' : boss ?
+    (boss.phase==='open' ? 'Rival open · Swing your cargo into it.' : run.cargo ? 'Dodge the charge and build momentum.' : 'Catch and recover another insect.') :
+    (run.cargo ? run.cargo.hot ? 'Cargo ready to stun.' : 'Turn or jump to swing your cargo.' : 'Place a web, then reach the insect in time.'));
+  renderArcade(context,run,beat);
 }
 
 function syncPause() {
@@ -312,7 +411,7 @@ function syncPause() {
   if (!frozen) audio.unlock();
 }
 function togglePause() {
-  if (!(windowHunt || mode && song.started) || !defeat.hidden || windowDefeat.open) return;
+  if (!(arcade || windowHunt || mode && song.started) || !defeat.hidden || windowDefeat.open) return;
   paused = !paused;
   if (paused) {
     pausePanel.showModal();
@@ -348,7 +447,7 @@ window.addEventListener('keydown',event => {
     }
   }
   if (shell.dataset.screen==='start') enableMenuSound();
-  else if (song.waiting || windowHunt) audio.unlock();
+  else if (song.waiting || windowHunt || arcade) audio.unlock();
   if (dialogOpen()) return;
   const choices=activeChoices();
   if (choices && ((choices===menuChoices || choices===pauseChoices) ? /^Arrow(Up|Down)$/ : /^Arrow(Left|Right|Up|Down)$/).test(event.code)) {
@@ -377,7 +476,6 @@ document.addEventListener('visibilitychange',syncPause);
 let arena=createArena('story');
 let hunt=arena.hunt;
 let spider=arena.spider;
-let endlessRun:{id:string;record:ReturnType<typeof recordReplay>}|undefined;
 let difficultyNotice: {text:string; until:number}|undefined;
 let previous: ReturnType<typeof samplePlayStation>['shoulders']|undefined;
 let activePad: number|undefined;
@@ -389,8 +487,7 @@ function say(text: string) { if(message.textContent!==text) message.textContent=
 
 function resetHunt() {
   endlessBoard.clear();
-  endlessRun=mode==='loop' ? {id:newEndlessId(),record:recordReplay(true)} : undefined;
-  arena=endlessRun ? endlessArena(endlessRun.id) : createArena('story');
+  arena=createArena('story');
   hunt=arena.hunt;
   spider=arena.spider;
   difficultyNotice=undefined;
@@ -434,7 +531,6 @@ function arenaFeedback(result:ArenaEvent) {
       difficultyNotice = {text:base+' The fly is '+changes.join(', ')+'.',until:hunt.clock+3};
       say(difficultyNotice.text);
     } else say(base);
-    if (mode==='loop' && hunt.score%10===0) say('Arena changed · '+hunt.score+' catches.');
   }
   if (difficultyNotice && hunt.clock>=difficultyNotice.until) {
     if (message.textContent===difficultyNotice.text) say('');
@@ -701,7 +797,7 @@ function frame(time: number) {
   let crossPressed=false;
   const boardWasOpen=dialogOpen();
   const atMenu=shell.dataset.screen==='start';
-  endlessBoard.handlePad(gamepad,time,(atMenu && menuChoices.selected===1) || !defeat.hidden);
+  endlessBoard.handlePad(gamepad,time,false);
   const navigation=activeChoices();
   if (!navigation && !escape && mode==='story' && !canSwitchPerspective()) leaderboard.handlePad(gamepad);
   if (gamepad) {
@@ -766,6 +862,14 @@ function frame(time: number) {
     requestAnimationFrame(frame);
     return;
   }
+  if (arcade) {
+    const rawAim=keys.aim??(gamepad ? {x:gamepad.axes[2]??0,y:gamepad.axes[3]??0} : neutralStick);
+    const buttons=actions|(input?.jump ? 1 : 0)|(input?.fire ? 2 : 0)|(!navigation && crossPressed ? 4 : 0);
+    arcadeFrame(arcade,elapsed,move,keys.aim??input?.aim,rawAim,buttons,
+      paused || !!navigation || dialogOpen() || document.hidden);
+    requestAnimationFrame(frame);
+    return;
+  }
   song.connect(contextAudio);
   const menu=shell.dataset.screen==='start';
   if (menu && (!mode || !song.started)) {
@@ -808,8 +912,8 @@ function frame(time: number) {
   }
   if (mode==='story') saveStoryCheckpoint(position.track);
   let huntElapsed=elapsed;
-  const introTrack=mode==='loop' ? 'loop' : 'first';
-  const startsAt=mode==='loop' ? infiniteHuntStart : huntStartsAt;
+  const introTrack='first';
+  const startsAt=huntStartsAt;
   if (opening && song.started && position.track===introTrack && position.time>=startsAt) {
     opening=false;
     huntElapsed=Math.min(elapsed,position.time-startsAt);
@@ -826,17 +930,12 @@ function frame(time: number) {
       const command=[...controls] as typeof controls;
       command[4]=pendingButtons;
       pendingButtons=0;
-      endlessRun?.record.add(command);
       if (advanceArena(arena,command,arenaFeedback)!=='over') continue;
       remainder=0;
       audio.play('miss');
-      if (mode==='story') {
-        startIntro('story',true);
-        requestAnimationFrame(frame);
-        return;
-      }
-      showDefeat();
-      break;
+      startIntro(true);
+      requestAnimationFrame(frame);
+      return;
     }
   }
 
@@ -849,7 +948,7 @@ function frame(time: number) {
   const pulse = beat.toFixed(2);
   if (clock.style.getPropertyValue('--pulse')!==pulse) clock.style.setProperty('--pulse',pulse);
   const phase = opening ? 'ready' : hunt.phase==='caught' ? 'running' :
-    seconds<=5 ? 'urgent' : hunt.time<(mode==='loop' ? 10 : 20) ? 'low' : 'running';
+    seconds<=5 ? 'urgent' : hunt.time<20 ? 'low' : 'running';
   if (clock.dataset.phase!==phase) clock.dataset.phase=phase;
   const remaining = (hunt.time/hunt.difficulty.duration).toFixed(3);
   if (clockMeter.style.getPropertyValue('--remaining')!==remaining) clockMeter.style.setProperty('--remaining',remaining);

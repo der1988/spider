@@ -1,12 +1,19 @@
 # Spider vs Fly
 
-Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scorri **Story**, **Endless**, **Open World**, **Practice**, **Settings** e **Top 10** con **↑/↓** sulla croce direzionale o con lo stick sinistro. Premi **×** per confermare. Puoi anche fare clic sul pulsante. Il timer parte appena finisce «Start the clock», anche se il controller è scollegato o lo stick è fermo. Da quel momento puoi usare i comandi.
+Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scorri **Story**, **Endless**, **Open World**, **Practice**, **Settings** e **Top 10** con **↑/↓** sulla croce direzionale o con lo stick sinistro. Premi **×** per confermare. Puoi anche fare clic sul pulsante. In **Story** i comandi e il timer partono appena finisce «Start the clock». In **Endless** la stanza è subito visibile e il primo movimento intenzionale, una mira decisa o una pressione danno il via.
 
 - **Stick sinistro** per correre sul pavimento, sulle pareti e sul soffitto o per dondolare. Sul filo attivo, spingi **su** per risalire e **giù** per staccarti. Con **su** puoi anche aggrapparti a un filo già fissato.
 - **Stick destro** per mirare in ogni direzione. **R1** lancia verso il primo appiglio entro la portata. Pareti, soffitto, pavimento e piattaforme accettano la seta. Se sei su una superficie, il tiro tende subito una ragnatela. Salta prima di sparare per dondolare: il filo si fissa quando tocchi una superficie valida. In aria puoi lanciare un secondo filo per spostare il dondolio sul nuovo appiglio.
 - **L1** salta alla pressione. Premi di nuovo in aria per il doppio salto; un nuovo appoggio lo ripristina. Da appeso, L1 ritira i fili di movimento e ti lancia.
 - Osserva i corridoi ai lati della piattaforma centrale. Avvicinandoti, spingi la mosca a cambiare rotta. Tendi un filo tra due appigli mentre è in manovra. Il filo comincia a lampeggiare prima di sparire, dopo **10 secondi**.
-- Il timer al centro dell’HUD e i dettagli dell’arena pulsano sul battito. La barra sotto il timer indica quanto tempo resta. Ogni mosca è un livello. Il primo è il Livello 1 e ogni cattura vale un punto. In **Story**, dopo ogni cattura la prossima mosca entra con un secondo in meno, da **60 secondi** a un minimo di **10 secondi**. In **Endless** ogni mosca ha **20 secondi**. In entrambe le modalità le vecchie tele spariscono al cambio di mosca. Ogni 5 catture la mosca accelera, ogni 10 reagisce prima alle tele e ogni 20 percepisce il ragno da più lontano.
+- Il timer al centro dell’HUD e i dettagli dell’arena pulsano sul battito. In **Story**, dopo ogni cattura la prossima mosca entra con un secondo in meno, da **60 secondi** a un minimo di **10 secondi**. Ogni 5 catture la mosca accelera, ogni 10 reagisce prima alle tele e ogni 20 percepisce il ragno da più lontano.
+
+## Endless arcade
+
+- Dieci stage da dieci livelli. I livelli aumentano le prede da recuperare e le distribuiscono in ondate. Ogni stage apre con una nuova specie. A sinistra trovi la progressione, a destra il comportamento delle specie incontrate.
+- Raggiungi un insetto sulla ragnatela entro circa tre secondi per contarlo e legarlo al traino. Recuperarne un altro sostituisce quello legato. Muoviti, cambia verso e salta per tendere il filo. La scia gialla indica che la preda ha abbastanza slancio per stordire.
+- Dopo l’ultima ondata dei livelli 10, 20 e così via arriva il rivale. Il tratteggio anticipa la carica. Colpiscilo con una preda veloce quando compare **OPEN**. Il colpo consuma la preda e durante lo scontro continuano ad arrivarne altre. Vinci sconfiggendo il rivale al livello 100.
+- Il round riparte da 32 secondi, con due secondi in più per stage e un bonus al recupero. Hai tre vite contro il rivale. Alla fine puoi scegliere **Retry** o **Main Menu** con la croce direzionale o lo stick e confermare con **×**.
 
 ## Open World e impostazioni
 
@@ -14,16 +21,15 @@ Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scorri
 - Tocca **R1** o **X** per piazzare una tela al rilascio da una superficie. Tieni premuto 220 ms per agganciare la corda. **L1** o **Z** salta e **R2** o **G** afferra una tela fissata.
 - Recupera gli insetti al contatto o dalla tela e portali con te nella catena. Gli insetti comuni sono più in basso, quelli verde acqua cercano varchi attorno alle tele, quelli rosa volano in alto e cambiano quota per sfuggire. Premi **×** o **C** per mangiare una preda della catena e ridurre il bottino. Le prede mangiate ricompaiono dopo qualche secondo, lontano da Spidey. Ragni e api inseguono se vedono Spidey con il bottino o mentre mangia. Una tela li rallenta temporaneamente.
 - **Practice** è una stanza libera con gradoni, piattaforme sfalsate e un pozzo per allenarsi con gli stessi comandi di movimento di Gnat Hunt. Da **Options** o **Esc** puoi tornare al menu.
-- **Endless** ruota fra tre disposizioni delle piattaforme ogni 10 catture, quando entra la mosca successiva.
 - **Settings** è disponibile dal menu e dalla pausa. Puoi regolare musica ed effetti separatamente, ingrandire o nascondere i sottotitoli, ridurre il movimento e tenere premuto il tasto di fuga come alternativa ai tocchi ripetuti. Puoi usare la tastiera con WASD e frecce per movimento e mira, Z per saltare e X per sparare o liberarti.
 
 ## Finale di Story
 
 Durante il terzo brano premi **Spazio** o **△** per cambiare prospettiva. Dopo «Start the clock», il volo della mosca inizia a **18,192 s** del quarto brano con **10 secondi** sul timer. Lo stick sinistro fa volare la mosca, le luci ripristinano i 10 secondi e otto nuove pressioni di **×** la liberano da una tela.
 
-## Endless Top 10
+## Classic Endless Top 10
 
-Seleziona **Top 10** nel menu e conferma con **×**. Premi **○** per chiudere la classifica e tornare alla voce **Top 10**. Dopo una sconfitta puoi aprire la classifica con **△**. Il server registra ogni partita verificata e ordina i punteggi per catture, poi per ordine di registrazione. Se entri nella Top 10, inserisci da una a sei lettere A–Z. Con il controller, **↑/↓** cambiano la lettera, **←/→** spostano il cursore, **□** cancella, **×** conferma e **○** salta. Puoi anche digitare il nome con la tastiera. I risultati in attesa restano in IndexedDB. Se perdi la connessione, riapri **Top 10** e scegli **Try Again**.
+**Top 10** dal menu mostra i punteggi della modalità Endless classica. Premi **○** per chiudere la classifica e tornare alla voce di menu. La campagna arcade usa conteggi diversi e non invia i suoi risultati alla classifica classica.
 
 ### Deploy su Vercel
 
@@ -39,7 +45,7 @@ Il menu usa **Web Trap Loop** (`menusong.mp3`), con battiti misurati a circa 110
 
 **The Fly Has A** accompagna l’introduzione e la caccia. A **240,330 s** parte **The Fly Has an Upgrade** dall’inizio. Dopo **119,580 s** parte **The Room Has a Space Bar**. Durante il terzo brano, una nuova pressione di **Space** passa a **The Fly Is You**. Dopo la cutscene, lo stick sinistro controlla il volo della mosca. Il ragno insegue la mosca con salti frequenti e usa pareti e soffitto per avvicinarsi. All’inizio tende poche tele, poi aumenta la frequenza durante la caccia. La traccia tratteggiata anticipa dove tenderà la prossima tela. Cambia rotta prima che la fissi per sfuggire alla trappola. Attraversare una luce riporta il timer a 10 secondi. Le luci compaiono in punti casuali, distribuiti tra le varie zone della stanza. Premi e rilascia **×** otto volte per uscire da una tela. A ogni cambio di brano Story memorizza un checkpoint per il tentativo in corso. Se perdi, riparti dall’ultimo brano raggiunto. Nel quarto brano riprendi appena la mosca diventa giocabile. Negli ultimi 20 secondi il timer resta fermo fino alla fine della dissolvenza. L’arena e l’HUD diventano codice e si ricompongono nel menu delle modalità. Se il terzo brano arriva alla fine, la playlist torna al primo a **15,330 s**. La musica prosegue durante le catture. **Options** sul joypad o **Esc** sulla tastiera mettono in pausa musica e partita.
 
-In **Endless** il brano Infinite Loop omonimo sblocca il gioco a **10,572 s** dopo «Start the clock». La riproduzione torna da **139,530 s** a **15,330 s**, sul battito prima di «Left stick moves». Quando il tempo finisce, la schermata mostra il totale delle catture. Scegli **Main Menu** per tornare alle modalità o **Retry** per azzerare catture e difficoltà e ripartire da **20 secondi** mentre il brano prosegue. Usa la croce direzionale o lo stick sinistro per scegliere e **×** per confermare.
+In **Endless** la colonna sonora strumentale 16 bit usa dieci arrangiamenti fra 149 e 170 BPM. Ogni stage ripete otto battute. Il timer e i dettagli dell’arena usano la posizione della sorgente Web Audio. La traccia continua durante le ondate e i combattimenti. La pausa conserva la posizione. Gli arrangiamenti funzionano offline.
 
 ## Sviluppo
 
