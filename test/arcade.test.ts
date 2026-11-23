@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {advanceArcade,arcadeLayouts,arcadeStage,createArcade,waveCapacity} from '../src/arcade.ts';
+import {advanceArcade,arcadeEscapeButton,arcadeEscapePresses,arcadeLayouts,arcadeStage,createArcade,waveCapacity} from '../src/arcade.ts';
 import {arenaInput,arenaStep} from '../src/arena-run.ts';
 
 const neutral=arenaInput({x:0,y:0});
@@ -24,7 +24,6 @@ test('Endless holds for intentional input and requires collection while the net 
   advanceArcade(run,neutral);
   assert.equal(run.score,1);
   assert.equal(run.level,2);
-  assert.ok(run.cargo);
   const remaining=run.flies.length;
   run.flies[0].caughtUntil=run.clock+arenaStep*.5;
   advanceArcade(run,neutral);
@@ -42,7 +41,7 @@ test('arcade grows in bounded waves, and every tenth level requires a rival',()=
     run.recovered=level;
     advanceArcade(run,neutral);
     assert.equal(run.phase,'boss');
-    assert.equal(run.flies.length,2);
+    assert.equal(run.flies.length,0);
     const boss=run.boss!;
     assert.equal(boss.phase,'warn');
     assert.equal(boss.hp,2+Math.floor(arcadeStage(level)/2));
@@ -57,27 +56,56 @@ test('arcade grows in bounded waves, and every tenth level requires a rival',()=
   }
 });
 
-test('only fast cargo stuns prey or damages the rival while it is open',()=>{
+function firstBoss() {
   const run=createArcade(10);
   advanceArcade(run,arenaInput({x:1,y:0}));
-  run.recovered=10;
+  run.recovered=run.level;
   advanceArcade(run,neutral);
-  const boss=run.boss!;
-  boss.p={x:122,y:195};
-  boss.phase='warn';
-  run.movement.spider.x=142;
-  run.movement.spider.y=209;
-  const fly=run.flies[0];
-  fly.p={x:116,y:194};
-  run.cargo={p:{x:114,y:196},v:{x:150,y:0},kind:0,hot:false,hitAt:0};
+  return run;
+}
+
+test('a player net stops the boss, allows one contact hit, and tears when the boss breaks free',()=>{
+  const run=firstBoss(),boss=run.boss!;
+  const wire={from:{x:140,y:110},to:{x:140,y:217},shakeUntil:0};
+  run.movement.hunt.strands=[wire];
+  boss.phase='charge';boss.p={x:141,y:202};boss.target={x:95,y:202};
   advanceArcade(run,neutral);
-  assert.ok(fly.stunUntil>run.clock);
+  assert.equal(boss.phase,'trapped');
+  assert.equal(boss.net,wire);
+  ticks(run,.2);
   assert.equal(boss.hp,boss.max);
-  boss.phase='open';
-  boss.at=run.clock+10;
-  run.cargo.hitAt=0;
-  advanceArcade(run,neutral);
+  run.movement.spider.x=134;
+  ticks(run,.8);
   assert.equal(boss.hp,boss.max-1);
-  assert.equal(run.cargo,undefined);
-  assert.equal(run.flies.length,2);
+  ticks(run,1.9);
+  assert.equal(boss.hp,boss.max-1);
+  assert.equal(boss.phase,'warn');
+  assert.equal(run.movement.hunt.strands.includes(wire),false);
+});
+
+test('an unhit rival breaks out on time and its next attack can trap the player',()=>{
+  const run=firstBoss(),boss=run.boss!;
+  const spider=run.movement.spider;
+  run.movement.hunt.strands=[{from:{x:140,y:110},to:{x:140,y:217},shakeUntil:0}];
+  boss.phase='charge';boss.p={x:141,y:202};boss.target={x:95,y:202};
+  advanceArcade(run,neutral);
+  ticks(run,2.9);
+  assert.equal(boss.hp,boss.max);
+  assert.equal(boss.phase,'warn');
+  assert.ok(boss.shot);
+  ticks(run,1);
+  assert.ok(run.snare);
+  const x=spider.x;
+  advanceArcade(run,arenaInput({x:1,y:0},undefined,true,true));
+  assert.equal(run.snare.presses,0);
+  assert.equal(spider.x,x);
+  const cross=arenaInput({x:0,y:0});
+  cross[4]=arcadeEscapeButton;
+  for (let i=1;i<arcadeEscapePresses;i++) {
+    advanceArcade(run,cross);
+    assert.equal(run.snare.presses,i);
+  }
+  advanceArcade(run,cross);
+  assert.equal(run.snare,undefined);
+  assert.equal(run.rivalWebs.length,0);
 });

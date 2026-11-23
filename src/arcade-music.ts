@@ -1,6 +1,17 @@
 import {renderMusic} from './gnat-music';
 
-const tempo=[149,154,152,158,156,162,160,166,164,170] as const;
+const tempo=[100,104,98,106,102,108,103,110,107,112] as const;
+const keys=[0,2,-2,3,5,-4,1,4,-3,7] as const;
+const chords=[
+  [48,55,59,64],[45,55,60,64],[41,53,57,64],[43,55,60,62],
+  [52,55,59,62],[45,55,60,64],[41,53,57,60],[43,53,59,62],
+] as const;
+const melody=[
+  [72,0,76,0,79,0,0,76],[74,0,72,0,69,0,0,67],
+  [69,0,72,0,76,0,74,0],[72,0,0,0,67,0,0,0],
+  [71,0,74,0,79,0,0,74],[76,0,72,0,69,0,0,72],
+  [76,0,77,0,72,0,69,0],[71,0,0,69,67,0,0,0],
+] as const;
 type Track={source:AudioBufferSourceNode;gain:GainNode;started:number;stage:number};
 
 export class ArcadeMusic {
@@ -37,7 +48,7 @@ export class ArcadeMusic {
     this.stage=stage;
     let buffer=this.buffers.get(stage);
     if (!buffer) {
-      buffer=renderMusic(context,'explore',false,tempo[stage],stage);
+      buffer=renderMusic(context,'explore',false,{bpm:tempo[stage],key:keys[stage],chords,melody,arrangement:stage});
       this.buffers.set(stage,buffer);
     }
     const source=context.createBufferSource(),gain=context.createGain();

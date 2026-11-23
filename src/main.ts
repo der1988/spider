@@ -4,7 +4,7 @@ import {renderWindowHunt} from './window-hunt-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
 import {advanceArena,arenaInput,arenaStep,createArena,type ArenaEvent} from './arena-run';
-import {advanceArcade,arcadeHeight,arcadeStage,arcadeWidth,createArcade,species,stages,type ArcadeEvent,type ArcadeRun} from './arcade';
+import {advanceArcade,arcadeEscapeButton,arcadeEscapePresses,arcadeHeight,arcadeStage,arcadeWidth,createArcade,species,stages,type ArcadeEvent,type ArcadeRun} from './arcade';
 import {ArcadeMusic} from './arcade-music';
 import {arcadeIcon,renderArcade} from './arcade-render';
 import {WEB_KEY} from './threads';
@@ -332,7 +332,8 @@ function retryLoop() {
 
 const arcadeSounds={
   jump:'jump',attach:'attach',double:'attach',miss:'miss',release:'release',fix:'fix',evict:'fix',
-  catch:'catch',new:'discovery',over:'miss',recover:'discovery',stun:'tension',boss:'tension',
+  catch:'catch',new:'discovery',over:'miss',recover:'discovery',boss:'tension',
+  'boss-trap':'attach','boss-free':'release',snared:'tension','escape-step':'fix',escape:'release',
   hit:'catch',win:'discovery',hurt:'miss',
 } as const;
 
@@ -396,8 +397,9 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
     defeatChoices.select(run.phase==='won' ? 0 : 1,true);
   }
   if (run.phase!=='ready') say(finished ? '' : boss ?
-    (boss.phase==='open' ? 'Rival open · Swing your cargo into it.' : run.cargo ? 'Dodge the charge and build momentum.' : 'Catch and recover another insect.') :
-    (run.cargo ? run.cargo.hot ? 'Cargo ready to stun.' : 'Turn or jump to swing your cargo.' : 'Place a web, then reach the insect in time.'));
+    (run.snare ? `Press × or X to break free · ${run.snare.presses}/${arcadeEscapePresses}` :
+      boss.phase==='trapped' ? (boss.hit ? 'Hit landed. Move away before the rival breaks free.' : 'Rival trapped. Touch it before it breaks free.') :
+        'Set a web in the rival’s path and dodge its traps.') : 'Place a web, then touch the insect in time.');
   renderArcade(context,run,beat);
 }
 
@@ -442,7 +444,7 @@ window.addEventListener('keydown',event => {
     if (/^(Key[WASDZXCGVQ]|Arrow(Up|Down|Left|Right))$/.test(event.code)) {
       keyboard.add(event.code);
       if (!event.repeat && event.code==='KeyZ') keyboardButtons|=1;
-      if (!event.repeat && event.code==='KeyX') keyboardButtons|=2;
+      if (!event.repeat && event.code==='KeyX') keyboardButtons|=arcade?.snare ? arcadeEscapeButton : 2;
       event.preventDefault();
     }
   }
@@ -864,7 +866,7 @@ function frame(time: number) {
   }
   if (arcade) {
     const rawAim=keys.aim??(gamepad ? {x:gamepad.axes[2]??0,y:gamepad.axes[3]??0} : neutralStick);
-    const buttons=actions|(input?.jump ? 1 : 0)|(input?.fire ? 2 : 0)|(!navigation && crossPressed ? 4 : 0);
+    const buttons=actions|(input?.jump ? 1 : 0)|(input?.fire ? 2 : 0)|(!navigation && crossPressed ? arcadeEscapeButton : 0);
     arcadeFrame(arcade,elapsed,move,keys.aim??input?.aim,rawAim,buttons,
       paused || !!navigation || dialogOpen() || document.hidden);
     requestAnimationFrame(frame);

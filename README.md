@@ -11,8 +11,8 @@ Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scorri
 ## Endless arcade
 
 - Dieci stage da dieci livelli. I livelli aumentano le prede da recuperare e le distribuiscono in ondate. Ogni stage apre con una nuova specie. A sinistra trovi la progressione, a destra il comportamento delle specie incontrate.
-- Raggiungi un insetto sulla ragnatela entro circa tre secondi per contarlo e legarlo al traino. Recuperarne un altro sostituisce quello legato. Muoviti, cambia verso e salta per tendere il filo. La scia gialla indica che la preda ha abbastanza slancio per stordire.
-- Dopo l’ultima ondata dei livelli 10, 20 e così via arriva il rivale. Il tratteggio anticipa la carica. Colpiscilo con una preda veloce quando compare **OPEN**. Il colpo consuma la preda e durante lo scontro continuano ad arrivarne altre. Vinci sconfiggendo il rivale al livello 100.
+- Tocca l’insetto impigliato entro circa tre secondi per completare la cattura. Allo scadere scompare e arriva un sostituto.
+- Ai livelli 10, 20 e così via, piazza un filo nero sulla traiettoria della carica e raggiungi il rivale quando compare **TRAPPED**. Ogni immobilizzazione permette un colpo e dura 2,8 secondi. Il rivale alterna cariche e tele nere con nodi. Se resti impigliato, premi e rilascia **×** o **X** cinque volte. Vinci sconfiggendo il rivale al livello 100.
 - Il round riparte da 32 secondi, con due secondi in più per stage e un bonus al recupero. Hai tre vite contro il rivale. Alla fine puoi scegliere **Retry** o **Main Menu** con la croce direzionale o lo stick e confermare con **×**.
 
 ## Open World e impostazioni
@@ -45,7 +45,7 @@ Il menu usa **Web Trap Loop** (`menusong.mp3`), con battiti misurati a circa 110
 
 **The Fly Has A** accompagna l’introduzione e la caccia. A **240,330 s** parte **The Fly Has an Upgrade** dall’inizio. Dopo **119,580 s** parte **The Room Has a Space Bar**. Durante il terzo brano, una nuova pressione di **Space** passa a **The Fly Is You**. Dopo la cutscene, lo stick sinistro controlla il volo della mosca. Il ragno insegue la mosca con salti frequenti e usa pareti e soffitto per avvicinarsi. All’inizio tende poche tele, poi aumenta la frequenza durante la caccia. La traccia tratteggiata anticipa dove tenderà la prossima tela. Cambia rotta prima che la fissi per sfuggire alla trappola. Attraversare una luce riporta il timer a 10 secondi. Le luci compaiono in punti casuali, distribuiti tra le varie zone della stanza. Premi e rilascia **×** otto volte per uscire da una tela. A ogni cambio di brano Story memorizza un checkpoint per il tentativo in corso. Se perdi, riparti dall’ultimo brano raggiunto. Nel quarto brano riprendi appena la mosca diventa giocabile. Negli ultimi 20 secondi il timer resta fermo fino alla fine della dissolvenza. L’arena e l’HUD diventano codice e si ricompongono nel menu delle modalità. Se il terzo brano arriva alla fine, la playlist torna al primo a **15,330 s**. La musica prosegue durante le catture. **Options** sul joypad o **Esc** sulla tastiera mettono in pausa musica e partita.
 
-In **Endless** la colonna sonora strumentale 16 bit usa dieci arrangiamenti fra 149 e 170 BPM. Ogni stage ripete otto battute. Il timer e i dettagli dell’arena usano la posizione della sorgente Web Audio. La traccia continua durante le ondate e i combattimenti. La pausa conserva la posizione. Gli arrangiamenti funzionano offline.
+In **Endless** la colonna sonora strumentale 16 bit usa dieci arrangiamenti fra 98 e 112 BPM. Ogni stage ripete otto battute. Il timer e i dettagli dell’arena usano la posizione della sorgente Web Audio. La traccia continua durante le ondate e i combattimenti. La pausa conserva la posizione. Gli arrangiamenti funzionano offline.
 
 ## Sviluppo
 
