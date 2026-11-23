@@ -3,8 +3,8 @@ import {createOpenWorld,createWindowHunt,pantryTiers,preyTier,restartOpenWorld,s
 import {renderWindowHunt} from './window-hunt-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
-import {advanceArena,arenaInput,arenaStep,createArena,type ArenaEvent} from './arena-run';
-import {advanceArcade,arcadeBudget,arcadeEscapeButton,arcadeEscapePresses,arcadeHeight,arcadeStage,arcadeWidth,createArcade,species,stages,type ArcadeEvent,type ArcadeRun} from './arcade';
+import {advanceArena,arenaInput,arenaStep,releaseSilkButton,createArena,type ArenaEvent} from './arena-run';
+import {advanceArcade,arcadeBudget,arcadeWebLimit,arcadeEscapeButton,arcadeEscapePresses,arcadeHeight,arcadeStage,arcadeWidth,createArcade,species,stages,type ArcadeEvent,type ArcadeRun} from './arcade';
 import {arcadeLevels,dialogueFor,heartsPerRun,insectMark} from './arcade-dialogue';
 import {ArcadeMusic} from './arcade-music';
 import {arcadeIcon,renderArcade} from './arcade-render';
@@ -365,7 +365,7 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
   const boss=run.boss;
   shell.toggleAttribute('data-arcade-intro',!!run.intro);
   const finished=run.phase==='over' || run.phase==='won';
-  if (run.phase!=='ready') arcadeMusic.sync(contextAudio,run.level,frozen && !finished || document.hidden || paused);
+  if (run.phase!=='ready') arcadeMusic.sync(contextAudio,run.level,frozen && !finished || document.hidden || paused,!!run.intro);
   const encounter=dialogueFor(run.level);
   if (shownArcadeLevel!==run.level) {
     get('arcade-stage').textContent=stages[stage][0];
@@ -381,6 +381,13 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
   }
   const wave=boss ? `${encounter.name} · ${boss.hp} / ${boss.max}` : `Left to catch · ${run.quota-run.recovered}`;
   if (get('arcade-wave').textContent!==wave) get('arcade-wave').textContent=wave;
+  const nets=get('arcade-webs');
+  const webCount=run.movement.hunt.strands.length;
+  const webLabel=`Silk ${'◆'.repeat(webCount)}${'◇'.repeat(Math.max(0,arcadeWebLimit-webCount))}`;
+  if (nets.textContent!==webLabel) {
+    nets.textContent=webLabel;
+    nets.setAttribute('aria-label',`Fixed silk ${webCount} of ${arcadeWebLimit}`);
+  }
   const hearts=get('arcade-lives');
   if (hearts.dataset.lives!==String(run.lives)) {
     hearts.dataset.lives=String(run.lives);
@@ -405,7 +412,7 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
   }
   if (run.phase!=='ready') say(finished ? '' : run.restartIn>0 ? 'Out of hearts. Back to level 1…' : run.intro ? 'Press × or Enter to skip.' : boss ?
     (run.snare ? `Press × or X to break free · ${run.snare.presses}/${arcadeEscapePresses}` :
-      'Set a web, then touch the rival while he’s tangled.') : 'Trap the insects first. Touch them while they’re tangled.');
+      'Set a web, then touch the rival while he’s tangled.') : 'Hold R1 to swing. Release to fix silk. Touch a trapped insect to catch it.');
   renderArcade(context,run,beat,reduced());
 }
 
@@ -479,6 +486,7 @@ window.addEventListener('keydown',event => {
   beginFly();
 });
 window.addEventListener('keyup',event => {
+  if (arcade && event.code==='KeyX' && keyboard.has(event.code)) keyboardButtons|=releaseSilkButton;
   keyboard.delete(event.code);
   if (event.code==='Space') spaceHeld=false;
 });
@@ -876,7 +884,9 @@ function frame(time: number) {
   }
   if (arcade) {
     const rawAim=keys.aim??(gamepad ? {x:gamepad.axes[2]??0,y:gamepad.axes[3]??0} : neutralStick);
-    const buttons=actions|(input?.jump ? 1 : 0)|(input?.fire ? 2 : 0)|(!navigation && crossPressed ? arcadeEscapeButton : 0);
+    const held=keyboard.has('KeyX') || !!gamepad?.buttons[5]?.pressed;
+    const release=arcade.movement.spider.rope && !held ? releaseSilkButton : 0;
+    const buttons=actions|(input?.jump ? 1 : 0)|(input?.fire ? 2 : 0)|release|(!navigation && crossPressed ? arcadeEscapeButton : 0);
     arcadeFrame(arcade,elapsed,move,keys.aim??input?.aim,rawAim,buttons,
       paused || !!navigation || dialogOpen() || document.hidden);
     requestAnimationFrame(frame);

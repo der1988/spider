@@ -20,11 +20,11 @@ Da **73,672 s** a **85,552 s** le pareti e il soffitto definiti in `src/fly-room
 
 ## Endless arcade
 
-`src/arcade.ts` usa il movimento condiviso di `src/arena-run.ts` e una simulazione a 120 Hz. Il gruppo, i nomi individuali e il dialogo di ogni incontro sono definiti in `src/arcade-dialogue.ts`. Le scene sospendono la simulazione. Nei primi nove livelli, la velocità media e la capacità di leggere Spidey e la seta crescono. Un insetto libero infligge danno al primo contatto. Se è in trappola, il contatto vale una cattura. Alla scadenza resta nella stessa posizione per quel passo e la tela da cui è uscito rimane inerte per lui finché se ne separa. I tre cuori persistono tra i livelli. La perdita dell’ultimo riavvia la campagna.
+`src/arcade.ts` usa il movimento condiviso di `src/arena-run.ts` e una simulazione a 120 Hz. Il gruppo, i nomi individuali e il dialogo di ogni incontro sono definiti in `src/arcade-dialogue.ts`. Le scene sospendono la simulazione. Nei primi nove livelli, la velocità media e la capacità di leggere Spidey e la seta crescono. Un insetto libero alterna pattuglia, preparazione, attacco e recupero. Evita la seta prima di impegnarsi e infligge danno al primo contatto. I membri delle squadre avanzate possono arrivare da lati opposti. Se è in trappola, il contatto vale una cattura. Alla scadenza resta nella stessa posizione per quel passo e la tela da cui è uscito rimane inerte per lui finché se ne separa. La corda di Endless si sgancia al rilascio di R1. Con tre tele fisse lo sgancio non lascia un capo da fissare e nessuna tela viene sostituita. I tre cuori persistono tra i livelli. La perdita dell’ultimo riavvia la campagna.
 
 Il livello 10 presenta direttamente il rivale. Il primo incrocio con una tela di Spidey interrompe la carica. Il contatto nei 2,8 secondi di blocco concede un solo colpo. Alla scadenza la tela si strappa. Le tele del rivale durano fino alla scadenza o, se trattengono Spidey, fino alla liberazione con cinque pressioni.
 
-`src/arcade-music.ts` aggiunge una traccia strumentale a ogni livello. Tutte le tracce condividono il tempo e il punto del loop, così l’arrangiamento cresce senza riavviare la melodia. Le sigle d’ingresso sono sintetizzate a parte, con un accento più grave al livello 10.
+`src/arcade-music.ts` aggiunge una traccia strumentale a ogni livello. Tutte le tracce condividono il tempo e il punto del loop, così l’arrangiamento cresce senza riavviare la melodia. Le sigle d’ingresso riprendono quattro note del tema. L’accento a 0,66 secondi accompagna la posa di rivelazione e il mix riporta in primo piano il loop anche dopo il salto della scena.
 
 ## Progressione e punteggi
 

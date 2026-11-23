@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {advanceArcade,arcadeBudget,arcadeEscapeButton,arcadeEscapePresses,arcadeLayouts,createArcade} from '../src/arcade.ts';
-import {arenaInput,arenaStep} from '../src/arena-run.ts';
+import {advanceArcade,arcadeBudget,arcadeEscapeButton,arcadeEscapePresses,arcadeLayouts,arcadeWebLimit,createArcade} from '../src/arcade.ts';
+import {sweptHit} from '../src/threads.ts';
+import {arenaInput,arenaStep,releaseSilkButton} from '../src/arena-run.ts';
 import {arcadeLevels,campaign,insectMark,levelIntroDuration} from '../src/arcade-dialogue.ts';
 
 const neutral=arenaInput({x:0,y:0});
@@ -35,7 +36,7 @@ test('all ten encounters have their own dialogue, insect names and silhouettes, 
   assert.equal(new Set(names).size,names.length);
   const shapes=campaign.flatMap((level,index)=>level.insects.map(([,kind],slot)=>kind+':'+insectMark(index+1,slot)));
   assert.equal(new Set(shapes).size,names.length);
-  assert.equal(new Set(campaign.flatMap(({line,reply})=>[line,reply])).size,20);
+  assert.equal(new Set(campaign.flatMap(({line,reply,closing})=>[line,reply,closing])).size,30);
   assert.equal(new Set(arcadeLayouts.map(layout=>JSON.stringify(layout))).size,10);
   for (let level=1;level<=arcadeLevels;level++) {
     const run=createArcade(level);
@@ -75,6 +76,7 @@ test('silk catches the first gnat, which escapes from the exact caught position 
   const run=createArcade();
   start(run);
   advanceArcade(run,arenaInput({x:0,y:0},{x:.75,y:-.8},false,true));
+  advanceArcade(run,[0,0,0,0,releaseSilkButton]);
   ticks(run,.8);
   const fly=run.flies[0],point={...fly.p};
   assert.ok(fly.caughtUntil>run.clock);
@@ -138,6 +140,54 @@ test('each full roster advances exactly one level and the tenth opens directly o
   assert.equal(run.phase,'boss');
   assert.equal(run.flies.length,0);
   assert.equal(run.boss?.phase,'warn');
+});
+
+test('a free insect avoids the net, winds up and becomes catchable after committing',()=>{
+  const run=createArcade();
+  start(run);
+  const fly=run.flies[0],wire={from:{x:94,y:170},to:{x:94,y:217},shakeUntil:0};
+  Object.assign(fly,{p:{x:118,y:190},target:{x:118,y:190},phaseAt:0,age:2});
+  run.movement.hunt.strands=[wire];
+  advanceArcade(run,neutral);
+  assert.equal(fly.phase,'patrol');
+  assert.equal(sweptHit(fly.p,fly.target,wire),undefined);
+  run.movement.hunt.strands=[];
+  for (let frame=0;fly.phase!=='strike' && frame<220;frame++) advanceArcade(run,neutral);
+  assert.equal(fly.phase,'strike');
+  run.movement.hunt.strands=[wire];
+  for (let frame=0;!fly.caughtUntil && frame<100;frame++) advanceArcade(run,neutral);
+  assert.ok(fly.caughtUntil);
+  assert.equal(fly.trappedBy,wire);
+  const {spider}=run.movement;
+  spider.x=fly.p.x;
+  spider.y=fly.p.y;
+  advanceArcade(run,neutral);
+  assert.equal(run.score,1);
+});
+
+test('at three nets the rope still fires and detaches without evicting, then fills the first freed slot',()=>{
+  const run=createArcade();
+  start(run);
+  const hunt=run.movement.hunt,spider=run.movement.spider;
+  const webs=Array.from({length:arcadeWebLimit},(_,i)=>({from:{x:230+i*10,y:40},to:{x:230+i*10,y:80},shakeUntil:0,expiresAt:5}));
+  hunt.strands=[...webs];
+  const cast=arenaInput({x:0,y:0},{x:.75,y:-.8},false,true);
+  const release:[number,number,number,number,number]=[0,0,0,0,releaseSilkButton];
+  advanceArcade(run,cast);
+  assert.ok(spider.rope);
+  advanceArcade(run,release);
+  assert.equal(spider.rope,undefined);
+  assert.deepEqual(hunt.strands,webs);
+  assert.equal(hunt.loose.length,0);
+  webs[0].expiresAt=run.clock;
+  advanceArcade(run,cast);
+  assert.ok(spider.rope);
+  advanceArcade(run,release);
+  assert.equal(spider.rope,undefined);
+  assert.equal(hunt.strands.length,arcadeWebLimit);
+  assert.equal(hunt.strands[0],webs[1]);
+  assert.equal(hunt.strands[1],webs[2]);
+  assert.ok(!webs.includes(hunt.strands[2]));
 });
 
 test('the rival takes one hit per trap and four hits clear level ten',()=>{

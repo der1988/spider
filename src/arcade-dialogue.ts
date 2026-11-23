@@ -4,29 +4,50 @@ type Encounter={
   insects:readonly Insect[];
   line:string;
   reply:string;
+  closing:string;
 };
 
 export const campaign=[
   {name:'Pip',insects:[['Pip',0]],
-    line:'I’ve reserved the low lane for a slow lap.',reply:'Good. I’ve reserved the middle of it for some silk.'},
+    line:'May I have your full attention for one pass?',
+    reply:'I can spare the side of my head.',
+    closing:'Perfect. I was aiming for that.'},
   {name:'Rush Hour',insects:[['Zip',1],['Meter',0]],
-    line:'Zip takes the express lane. Meter stops at every leaf.',reply:'So the same ticket gets me two entirely different delays.'},
+    line:'I need the whole lane to build up speed.',
+    reply:'Who gave you a runway permit?',
+    closing:'Meter. He’s billing me by the impact.'},
   {name:'The Exit Rows',insects:[['Veera',2],['Crumb',1]],
-    line:'When you come near, I move out. Crumb charges for the empty seat.',reply:'I’ll set the trap where the usher can’t see it.'},
+    line:'Crumb takes the front. I charge extra for the back.',
+    reply:'What does a surprise from the side cost?',
+    closing:'Oh. That one’s complimentary.'},
   {name:'Second Storey',insects:[['Peck',3],['Lint',2],['Hush',0]],
-    line:'I go up when you get close. Lint and Hush cover the exits.',reply:'At last, a building with stairs that are actively against me.'},
+    line:'The penthouse offers complimentary dives.',
+    reply:'Can I opt out at reception?',
+    closing:'Certainly. Reception is directly below me.'},
   {name:'The Runway Ends',insects:[['Dash',4],['Taxi',1],['Permit',3]],
-    line:'Turns are a fad. We’ve cancelled them on the runway.',reply:'I’ll hang the closing notice right across it.'},
+    line:'I’ve leased a straight line through the arena.',
+    reply:'Did the lease mention my head?',
+    closing:'Yes. It’s listed as a fixture.'},
   {name:'The Fine Print',insects:[['Fern',5],['Staples',2],['Tab',1]],
-    line:'We saw your net in the contract. We’ve elected to go around.',reply:'I’ve started putting amendments at the end of the detour.'},
+    line:'I drew a detour around your silk.',
+    reply:'Did you bring a copy for me?',
+    closing:'Yes. The arrow points behind you.'},
   {name:'The Roundabouts',insects:[['Orbit',6],['Kerb',4],['Penny',3],['Clove',5]],
-    line:'Put a net across the middle and we’ll each take a different exit.',reply:'That explains why your reunion tour needs four separate venues.'},
+    line:'We’ll circle you from four different directions.',
+    reply:'That sounds difficult to rehearse.',
+    closing:'It was. We hired four different directors.'},
   {name:'The Low Notes',insects:[['Dusty',7],['Mica',6],['Lift',3],['Tread',4]],
-    line:'I descend. Lift ascends. We split the manager’s fee at the landing.',reply:'I’ll meet whichever one of you actually reads the floor plan.'},
+    line:'I’m practicing a dignified descent.',
+    reply:'On your feet this time?',
+    closing:'I was hoping to borrow yours.'},
   {name:'Last Light',insects:[['Glow',9],['Nibs',8],['Wick',5],['Vesper',6],['Flint',4]],
-    line:'We’ve lit the detours. Nibs can slip a knot before the encore.',reply:'I’ll make the first verse count, then.'},
+    line:'Wick lights a path. Nibs slips the knots.',
+    reply:'What do you do?',
+    closing:'I stand where you should have been looking.'},
   {name:'Duke Wobbleknees',insects:[],
-    line:'I have brought my own silk and a very formal approach.',reply:'Does the formal approach usually involve charging at the host?'},
+    line:'A formal duel begins with a silk invitation.',
+    reply:'How do I decline?',
+    closing:'Run. It lends the charge a little ceremony.'},
 ] as const satisfies readonly Encounter[];
 
 export const arcadeLevels=campaign.length;
@@ -39,8 +60,8 @@ export function deliverySeconds(line:string) {
   return Math.max(2.25,1.05+line.split(' ').length*.195);
 }
 export function levelIntroDuration(level:number) {
-  const {line,reply}=dialogueFor(level);
-  return levelEntranceSeconds+deliverySeconds(line)+deliverySeconds(reply);
+  const {line,reply,closing}=dialogueFor(level);
+  return levelEntranceSeconds+deliverySeconds(line)+deliverySeconds(reply)+deliverySeconds(closing);
 }
 
 export function insectMark(level:number,index:number) {

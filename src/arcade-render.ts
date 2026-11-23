@@ -108,58 +108,90 @@ function speech(ctx:CanvasRenderingContext2D,p:Point,text:string,ink:string,ligh
   ctx.restore();
 }
 
+const entrances=[
+  [-128,13,-14,9,.16],[148,-13,15,4,-.22],[-125,-32,-13,20,.2],
+  [-28,-66,-8,24,-.16],[187,-2,23,2,-.26],[-145,19,-21,14,.28],
+  [-108,-56,-14,22,-.35],[32,-62,12,26,.17],[145,-33,18,16,-.25],[0,-46,4,6,0],
+] as const;
+const ease=(n:number)=>1-(1-Math.max(0,Math.min(1,n)))**3;
+
 function introduction(ctx:CanvasRenderingContext2D,run:ArcadeRun,ink:string,light:string,pulse:number,reducedMotion:boolean) {
-  const intro=run.intro!;
-  const rival=intro.kind==='rival';
-  const {name,line,reply:retort,insects}=dialogueFor(run.level);
-  const reply=intro.elapsed>=levelEntranceSeconds+deliverySeconds(line);
+  const {elapsed,kind}=run.intro!;
+  const rival=kind==='rival';
+  const {name,line,reply,closing,insects}=dialogueFor(run.level);
+  const [enterX,enterY,pan,lift,tilt]=entrances[run.level-1];
+  const reveal=levelEntranceSeconds+deliverySeconds(line);
+  const retort=elapsed>=reveal && elapsed<reveal+deliverySeconds(reply);
+  const progress=reducedMotion ? 1 : ease(elapsed/(rival ? .82 : .75));
+  const accent=reducedMotion ? 0 : Math.max(0,1-Math.abs(elapsed-levelEntranceSeconds)*6);
+  const focus=reducedMotion ? 0 : retort ? ease((elapsed-reveal)/.34)*-4 : 0;
+  const zoom=.91+progress*(rival ? .14 : .12);
+  const project=(x:number,y:number)=>({
+    x:200+(x-200)*zoom+pan*(1-progress)+focus,
+    y:108+(y-108)*zoom,
+  });
   const spider=run.movement.spider;
-  const hero={x:326,y:115};
-  const leader={x:rival || run.quota===1 ? 185 : 185-(run.quota-1)*21,y:108};
+  const hero=project(325,118);
+  const leader={x:rival || run.quota===1 ? 186 : 183-(run.quota-1)*20,y:109};
+  const floorScene=project(0,140).y;
   ctx.save();
-  ctx.globalAlpha=.58;block(ctx,0,0,width,height,ink);ctx.globalAlpha=1;
-  ctx.globalAlpha=.24+pulse*.23;
-  block(ctx,38,79,width-76,60,light);
-  ctx.globalAlpha=1;
-  for (const x of [41,52,342,353]) block(ctx,x,134,5,Math.round(2+pulse*4),light);
-  block(ctx,36,139,width-72,2,light);
+  block(ctx,0,12,width,52,ink);
+  ctx.globalAlpha=.64;block(ctx,0,64,width,height-64,ink);ctx.globalAlpha=1;
   ctx.fillStyle=light;ctx.textAlign='center';
   ctx.font='bold 10px monospace';
-  ctx.fillText(rival ? 'DUEL · LEVEL '+run.level : 'LEVEL '+run.level+' / '+arcadeLevels,width/2,31);
+  ctx.fillText(rival ? 'FINAL DUEL · LEVEL '+run.level : 'LEVEL '+run.level+' / '+arcadeLevels,width/2,28);
   ctx.font='bold 19px monospace';
-  ctx.fillText(name,width/2,62,width-38);
+  ctx.fillText(name,width/2,54,width-36);
+  ctx.globalAlpha=(rival ? .09 : .18)+pulse*.12+accent*.25;
+  ctx.beginPath();
+  ctx.moveTo(185,63);
+  ctx.lineTo(project(44,140).x,floorScene);
+  ctx.lineTo(project(340,140).x,floorScene);
+  ctx.lineTo(211,63);
+  ctx.fillStyle=light;ctx.fill();
+  ctx.globalAlpha=.65;block(ctx,33,floorScene,width-66,1,light);ctx.globalAlpha=1;
+  for (const x of [39,53,347,361]) block(ctx,x,floorScene-3-Math.round(pulse*3),3,1,light);
+
+  let speaker=project(leader.x,leader.y);
   if (rival) {
+    const entrance=reducedMotion ? 1 : ease((elapsed-.14)/.65);
+    speaker=project(leader.x+enterX*(1-entrance),leader.y+enterY*(1-entrance));
     ctx.save();
-    ctx.translate(185,106);ctx.scale(2.8,2.8);
-    drawSpider(ctx,{...spider,x:0,y:0,vx:0,vy:0,support:'floor',rope:undefined,facing:1},intro.elapsed,{time:intro.elapsed,beat:pulse},'aim');
+    ctx.translate(speaker.x,speaker.y);ctx.scale(3.25*zoom,3.25*zoom);
+    ctx.globalAlpha=.45+entrance*.55;
+    drawSpider(ctx,{...spider,x:0,y:0,vx:0,vy:0,support:'floor',rope:undefined,facing:1},elapsed,{time:elapsed,beat:accent},'aim');
+    block(ctx,1,-2,4,1,rival && entrance>.8 ? light : ink);
     ctx.restore();
   } else {
     run.flies.forEach((fly,index)=>{
-      const fraction=reducedMotion ? 1 : Math.max(0,Math.min(1,(intro.elapsed-index*.035)/.54));
-      const x=leader.x+index*42-(1-fraction)**3*(leader.x+33);
-      const glide=Math.sin(fraction*Math.PI)*(fly.kind===3 ? 26 : fly.kind===7 ? -5 : 12);
-      const y=leader.y+(index%2)*11-glide;
-      const scale=index===0 ? 3.15+pulse*.15 : 2.65;
+      const arrived=reducedMotion ? 1 : ease((elapsed-index*.055)/.47);
+      const side=run.level>=7 && index%2 ? -1 : 1;
+      const x=leader.x+index*40+enterX*(1-arrived)*side;
+      const y=leader.y+index%2*12+enterY*(1-arrived)-Math.sin(arrived*Math.PI)*lift;
+      const center=project(x,y);
+      if (index===0) speaker=center;
+      const scale=(index===0 ? 3.25+accent*.12 : 2.65)*zoom;
       ctx.save();
-      ctx.translate(Math.round(x),Math.round(y));
+      ctx.translate(Math.round(center.x),Math.round(center.y));ctx.rotate(tilt*(1-arrived));
       ctx.scale(scale,scale);
-      insect(ctx,{x:0,y:0},fly.kind,insectMark(run.level,index),intro.elapsed+index*.05,reducedMotion);
+      insect(ctx,{x:0,y:0},fly.kind,insectMark(run.level,index),elapsed+index*.05,reducedMotion || arrived<1);
       ctx.restore();
-      if (fraction===1 && insects.length>1) {
-        block(ctx,x-19,y-28,38,12,ink);
+      if (arrived>=.999 && insects.length>1) {
+        block(ctx,center.x-18,center.y-28,36,11,ink);
         ctx.fillStyle=light;ctx.font='bold 9px monospace';
-        ctx.fillText(insects[index][0],x,y-19,35);
+        ctx.fillText(insects[index][0],center.x,center.y-20,34);
       }
     });
   }
   ctx.save();
-  ctx.translate(hero.x,hero.y);ctx.scale(1.8,1.8);
-  drawSpider(ctx,{...spider,x:0,y:0,vx:0,vy:0,support:'floor',rope:undefined,facing:-1},intro.elapsed,{time:intro.elapsed,beat:pulse});
+  ctx.translate(hero.x,hero.y);ctx.scale(1.7,1.7);
+  drawSpider(ctx,{...spider,x:0,y:0,vx:0,vy:0,support:'floor',rope:undefined,facing:-1},elapsed,{time:elapsed,beat:pulse});
   ctx.restore();
-  ctx.fillStyle=light;ctx.textAlign='center';ctx.font='bold 10px monospace';
-  ctx.fillText('Spidey',hero.x,149);
-  if (intro.elapsed>=levelEntranceSeconds) {
-    speech(ctx,{x:reply ? hero.x : leader.x,y:158},reply ? retort : line,ink,light,true);
+  ctx.fillStyle=light;ctx.font='bold 10px monospace';
+  ctx.fillText('Spidey',hero.x,152);
+  if (elapsed>=levelEntranceSeconds) {
+    const words=elapsed<reveal ? line : retort ? reply : closing;
+    speech(ctx,{x:retort ? hero.x : speaker.x,y:162},words,ink,light,true);
   }
   ctx.restore();
 }
@@ -201,7 +233,16 @@ export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:nu
   if (spider.firstAnchor && spider.rope) silk(ctx,spider,spider.firstAnchor,ink);
   if (spider.rope) silk(ctx,spider,spider.rope,ink);
   for (const fly of run.flies) {
-    insect(ctx,fly.p,fly.kind,insectMark(run.level,fly.actor),clock,!!fly.caughtUntil);
+    if (!fly.caughtUntil && fly.phase==='strike') {
+      const speed=Math.hypot(fly.v.x,fly.v.y)||1;
+      const tail={x:fly.p.x-fly.v.x/speed*11,y:fly.p.y-fly.v.y/speed*11};
+      silk(ctx,tail,fly.p,ink);
+    }
+    if (!fly.caughtUntil && fly.phase==='windup') {
+      block(ctx,fly.p.x-2,fly.p.y-9,4,1,ink);
+      block(ctx,fly.p.x,fly.p.y-13,1,3,light);
+    }
+    insect(ctx,fly.p,fly.kind,insectMark(run.level,fly.actor),clock,!!fly.caughtUntil || fly.phase==='windup' || fly.phase==='recover');
     if (fly.caughtUntil) {
       block(ctx,fly.p.x-6,fly.p.y-9,12,3,ink);
       const left=fly.caughtUntil-clock;

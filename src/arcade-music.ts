@@ -3,16 +3,19 @@ import {arcadeLevels} from './arcade-dialogue';
 const bpm=112;
 const beat=60/bpm;
 const rate=16000;
-const loopLength=Math.round(32*beat*rate);
 const chords=[
-  [48,55,59,64],[45,55,60,64],[41,53,57,64],[43,55,60,62],
-  [52,55,59,62],[45,55,60,64],[41,53,57,60],[43,53,59,62],
+  [50,57,60,65],[46,53,57,62],[43,55,58,62],[45,55,61,64],
+  [50,57,60,65],[48,55,60,64],[46,53,57,62],[45,55,61,64],
+  [53,57,60,65],[43,55,58,62],[46,53,57,62],[45,55,61,64],
 ];
+const loopLength=Math.round(chords.length*4*beat*rate);
 const melody=[
-  [72,0,76,0,79,0,0,76],[74,0,72,0,69,0,0,67],
-  [69,0,72,0,76,0,74,0],[72,0,0,0,67,0,0,0],
-  [71,0,74,0,79,0,0,74],[76,0,72,0,69,0,0,72],
-  [76,0,77,0,72,0,69,0],[71,0,0,69,67,0,0,0],
+  [74,0,77,79,81,0,77,0],[74,0,72,69,65,0,69,0],
+  [67,0,70,72,74,0,77,0],[76,0,73,0,69,0,0,73],
+  [74,0,77,79,86,0,84,81],[79,0,76,72,79,0,77,0],
+  [74,0,77,81,82,0,81,77],[76,0,73,76,81,0,0,0],
+  [84,0,81,77,79,81,84,0],[82,0,79,74,77,0,79,82],
+  [86,0,81,77,74,0,77,0],[76,0,73,69,73,0,0,0],
 ];
 
 const circle=Math.PI*2;
@@ -51,7 +54,9 @@ export function renderCampaignStem(context:BaseAudioContext,voice:number) {
       addNote(data,voice,midi,on+offset,length,volume,swell);
     switch (voice) {
       case 0:
-        melody[bar].forEach((pitch,i)=>{if (pitch) note(pitch,i*.5,melody[bar][i+1]===0 ? .78 : .41,.19);});
+        melody[bar].forEach((pitch,i)=>{
+          if (pitch) note(pitch,i*.5+(i%2 && bar%3===1 ? .08 : 0),melody[bar][i+1]===0 ? .82 : .39,.188);
+        });
         break;
       case 1: note(root,0,1.6,.16);note(bar%2 ? root+7 : root,2,1.55,.14);break;
       case 2: [1,2,3,3.5].forEach((offset,i)=>note(harmony[(i+bar)%3]+12,offset,.28,.062));break;
@@ -60,7 +65,11 @@ export function renderCampaignStem(context:BaseAudioContext,voice:number) {
       case 5: note(harmony[2]+24,1.5,.68,.048);if (bar%2) note(harmony[1]+24,3,.73,.041);break;
       case 6: note(harmony[0],.75,.5,.069);note(harmony[1],2.75,.46,.067);break;
       case 7: note(root+12,0,1.64,.081,.059);note(harmony[0],2,1.54,.071,.07);break;
-      case 8: note(harmony[2]+12,0,1.48,.06,.06);note(harmony[1]+12,2.5,1.37,.051,.074);break;
+      case 8:
+        note(harmony[2]+12,1.75,.59,.057,.055);
+        note(harmony[1]+12,2.5,.72,.051,.074);
+        if (bar%3) note(harmony[0]+12,3.5,.44,.047);
+        break;
       case 9: note(34+bar%4,0,.83,.135);note(41,2.5,.62,.094);break;
     }
   }
@@ -69,13 +78,16 @@ export function renderCampaignStem(context:BaseAudioContext,voice:number) {
 
 function renderFanfare(context:BaseAudioContext,level:number) {
   const boss=level===arcadeLevels;
-  const buffer=context.createBuffer(1,Math.round((boss ? 1.18 : .82)*rate),rate);
+  const buffer=context.createBuffer(1,Math.round((boss ? 1.32 : 1.02)*rate),rate);
   const data=buffer.getChannelData(0);
-  const root=boss ? 48 : [67,69,65,71,64,70,66,72,68][level-1];
-  const steps=boss ? [0,7,12,15] : [0,7,12,16];
-  steps.forEach((interval,index)=>addNote(data,boss ? 7 : 2,root+interval,index*(boss ? .36 : .21),index===3 ? .86 : .28,.19));
-  addNote(data,3,boss ? 31 : 41,0,.46,boss ? .20 : .12);
-  if (boss) addNote(data,9,38,1.1,.87,.16);
+  const phrase=melody[(level-1)%melody.length].filter(Boolean).slice(0,4);
+  phrase.forEach((pitch,index)=>{
+    const at=[.025,.19,.39,.66][index]/beat;
+    addNote(data,boss ? 7 : 2,pitch-(boss ? 12 : 0),at,index===3 ? .57 : .24,.17);
+    if (boss && index>1) addNote(data,4,pitch-24,at,.7,.081);
+  });
+  addNote(data,3,boss ? 34 : 42,.66/beat,.49,boss ? .20 : .12);
+  if (boss) addNote(data,9,38,.66/beat,.87,.16);
   return buffer;
 }
 
@@ -85,6 +97,9 @@ export class ArcadeMusic {
   private buffers=new Map<number,AudioBuffer>();
   private fanfares=new Map<number,AudioBuffer>();
   private output?:GainNode;
+  private bed?:GainNode;
+  private cueGain?:GainNode;
+  private cinematic=false;
   private volume=.58;
   private origin=0;
   private offset=0;
@@ -113,7 +128,7 @@ export class ArcadeMusic {
 
   entrance(context:AudioContext|undefined,level:number) {
     if (!context || context.state!=='running') return;
-    this.cue?.stop();
+    this.fadeCue(context.currentTime);
     let buffer=this.fanfares.get(level);
     if (!buffer) {
       buffer=renderFanfare(context,level);
@@ -121,16 +136,39 @@ export class ArcadeMusic {
     }
     const source=context.createBufferSource();
     source.buffer=buffer;
-    source.connect(this.master(context));
-    source.onended=()=>{if (this.cue===source) this.cue=undefined;};
+    const gain=context.createGain();
+    source.connect(gain).connect(this.master(context));
+    source.onended=()=>{
+      gain.disconnect();
+      if (this.cue===source) {this.cue=undefined;this.cueGain=undefined;}
+    };
     source.start();
-    this.cue=source;
+    this.cue=source;this.cueGain=gain;
   }
 
-  sync(context:AudioContext|undefined,level:number,frozen:boolean) {
+  private fadeCue(now:number) {
+    if (this.cue && this.cueGain) {
+      this.cueGain.gain.setTargetAtTime(0,now,.035);
+      this.cue.stop(now+.13);
+    }
+    this.cue=undefined;this.cueGain=undefined;
+  }
+
+  sync(context:AudioContext|undefined,level:number,frozen:boolean,cinematic=false) {
     if (frozen) {this.stop(true);return;}
-    if (!context || context.state!=='running' || this.stems.size===level) return;
-    const output=this.master(context),now=context.currentTime+.02;
+    if (!context || context.state!=='running') return;
+    const now=context.currentTime+.02;
+    if (!this.bed) {
+      this.bed=context.createGain();
+      this.bed.gain.value=cinematic ? .22 : 1;
+      this.bed.connect(this.master(context));
+    }
+    if (cinematic!==this.cinematic) {
+      this.bed.gain.setTargetAtTime(cinematic ? .22 : 1,now,cinematic ? .045 : .095);
+      if (!cinematic) this.fadeCue(now);
+      this.cinematic=cinematic;
+    }
+    if (this.stems.size===level) return;
     if (!this.stems.size) this.origin=now-this.offset;
     for (const [voice,stem] of this.stems) {
       if (voice>=level) {
@@ -150,7 +188,7 @@ export class ArcadeMusic {
       const at=Math.max(now,context.currentTime+.01);
       source.buffer=buffer;source.loop=true;
       panner.pan.value=pans[voice];
-      source.connect(panner).connect(gain).connect(output);
+      source.connect(panner).connect(gain).connect(this.bed);
       gain.gain.setValueAtTime(0,at);
       gain.gain.linearRampToValueAtTime(1,at+.16);
       source.onended=()=>gain.disconnect();
@@ -160,8 +198,7 @@ export class ArcadeMusic {
   }
 
   stop(preserve=false) {
-    this.cue?.stop();
-    this.cue=undefined;
+    if (this.output) this.fadeCue(this.output.context.currentTime);
     if (this.stems.size && this.output) {
       const now=this.output.context.currentTime,source=this.stems.values().next().value!;
       this.offset=preserve ? Math.max(0,now-this.origin)%source.source.buffer!.duration : 0;
@@ -171,6 +208,6 @@ export class ArcadeMusic {
       }
       this.stems.clear();
     }
-    if (!preserve) this.offset=0;
+    if (!preserve) {this.offset=0;this.cinematic=false;this.bed?.gain.setTargetAtTime(1,this.bed.context.currentTime,.02);}
   }
 }

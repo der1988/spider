@@ -11,9 +11,9 @@ Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scorri
 ## Endless arcade
 
 - **Nove cacce e un duello finale**, con tre cuori condivisi. Ogni livello ha il proprio gruppo di insetti, presentato con nomi, sagome e un breve dialogo. Premi **×** o **Invio** per saltare la scena. Per avanzare, recupera ogni insetto mentre è ancora nella tela.
-- Gli insetti liberi fanno perdere un cuore al contatto. Il bordo luminoso intorno a Spidey indica l’invulnerabilità. Una preda che scade riprende il volo dal punto in cui era impigliata. Finire i cuori riporta automaticamente al livello 1.
+- Gli insetti liberi evitano la seta, preparano un attacco e cercano il contatto. Dopo la carica rallentano prima di ripartire. Il bordo luminoso intorno a Spidey indica l’invulnerabilità. Una preda che scade riprende il volo dal punto in cui era impigliata. Finire i cuori riporta automaticamente al livello 1.
 - Il livello 10 comincia direttamente con **Duke Wobbleknees**. Ogni immobilizzazione permette un colpo e dura 2,8 secondi. Il rivale alterna cariche e tele scure con nodi. Per liberarti dalle sue tele, premi e rilascia **×** o **X** cinque volte.
-- Sul filo attivo, tieni **su** per accorciarlo e **giù** per allungarlo. Una sigla 16 bit apre ogni incontro. La melodia di gioco segue lo stesso tempo per tutta la campagna e aggiunge uno strumento a ogni livello.
+- Tieni **R1** per usare la corda e rilascialo per fissare la seta quando trovi un secondo appiglio valido. Puoi mantenere tre tele fisse. La corda resta disponibile a capienza piena. Sul filo, tieni **su** per accorciarlo e **giù** per allungarlo. La sigla 16 bit riprende il motivo della colonna sonora, che aggiunge uno strumento a ogni livello.
 
 ## Open World e impostazioni
 
