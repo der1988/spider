@@ -1,3 +1,4 @@
+import {cast,exchangeSeconds,idleQuips,rivalIntroSeconds} from './arcade-script.ts';
 import {arenaStep,createArena,moveArena,type ArenaInput,type ArenaEvent} from './arena-run.ts';
 import {closeCrawlerRopes,createCrawler} from './crawler.ts';
 import {crossesSolid,sweptHit,type Strand} from './threads.ts';
@@ -26,7 +27,7 @@ export const arcadeLayouts=stages.map((_,stage)=>[
   wall(256-stage*3,49+stage%4*9,62,7),wall(161+(stage%3-1)*26,102+stage%4*6,80-stage%4*9,8),
   ...(stage ? [wall(62+stage*2,146+stage%2*10,54,7),wall(272-stage*3,158-stage%3*7,58,7)] : []),
 ]);
-type Fly={p:Point;v:Point;target:Point;kind:number;age:number;aimAt:number;caughtUntil:number};
+type Fly={p:Point;v:Point;target:Point;kind:number;actor:number;age:number;aimAt:number;caughtUntil:number;returnsAt:number};
 type Boss={p:Point;target:Point;hp:number;max:number;size:number;phase:'warn'|'charge'|'recover'|'trapped';at:number;turn:number;side:number;repeated:number;shot?:Strand;net?:Strand;hit:boolean};
 export type ArcadeEvent=ArenaEvent|'recover'|'boss'|'boss-trap'|'boss-free'|'snared'|'escape-step'|'escape'|'hit'|'win'|'hurt';
 const len=(p:Point)=>Math.hypot(p.x,p.y);
@@ -44,7 +45,9 @@ export function createArcade(startLevel=1) {
     movement,level:startLevel,clock:0,phase:'ready' as 'ready'|'wave'|'boss'|'over'|'won',
     flies:[] as Fly[],boss:undefined as Boss|undefined,
     rivalWebs:[] as Strand[],snare:undefined as {web:Strand;presses:number}|undefined,
-    recovered:0,score:0,spawned:0,wave:1,waveGoal:0,time:32,lives:3,invincible:0,
+    recovered:0,score:0,quota:0,time:32,lives:3,invincible:0,
+    intro:undefined as {kind:'level'|'rival';elapsed:number}|undefined,
+    idle:0,idleLine:0,
   };
   prepareLevel(run);
   return run;
@@ -60,27 +63,26 @@ function prepareLevel(run:ArcadeRun) {
     movement.down=false;
   }
   hunt.strands=[];hunt.loose=[];
-  run.recovered=0;run.spawned=0;run.flies=[];
-  run.wave=1;run.waveGoal=run.level%10===1 ? 1 : Math.min(run.level,waveCapacity(run.level));
+  run.recovered=0;
+  run.quota=Math.min(run.level,waveCapacity(run.level));
+  run.flies=Array.from({length:run.quota},(_,index)=>{
+    const kind=(stage+index+((run.level-1)%10===0 ? 0 : (run.level-1)%10))%(stage+1);
+    const actor=((run.level-1)*7+index*3)%cast.length;
+    return {p:{...flySpawn(run.level,index)},v:{x:0,y:0},target:{...flySpawn(run.level,index)},kind,actor,age:0,aimAt:0,caughtUntil:0,returnsAt:0};
+  });
+  run.intro=run.phase==='ready' ? undefined : {kind:'level',elapsed:0};
+  run.idle=0;
   run.time=32+stage*2;
   run.boss=undefined;run.rivalWebs=[];run.snare=undefined;
 }
 
 const nodes=[{x:44,y:102},{x:354,y:103},{x:128,y:32},{x:300,y:36},{x:102,y:184},{x:304,y:183},{x:187,y:75},{x:211,y:138}];
-function bringFly(run:ArcadeRun) {
-  const stage=arcadeStage(run.level),id=run.spawned++;
-  const kind=run.recovered===0 && run.level%10===1 ? stage : (id+run.level-1)%(stage+1);
-  const start=run.level===1 && id===0 ? nodes[4] : nodes[(id*3+run.level-1)%nodes.length];
-  run.flies.push({p:{...start},v:{x:0,y:0},target:{...start},kind,age:0,aimAt:0,caughtUntil:0});
+function flySpawn(level:number,index:number) {
+  return level===1 ? nodes[4] : nodes[(index*3+level-1)%nodes.length];
 }
 
-function topUp(run:ArcadeRun) {
-  if (run.phase==='wave' && run.recovered===run.waveGoal && run.recovered<run.level) {
-    run.wave++;
-    run.waveGoal=Math.min(run.level,run.recovered+waveCapacity(run.level));
-  }
-  const target=run.waveGoal-run.recovered;
-  while (run.flies.length<target) bringFly(run);
+export function arcadeIdleSpeech(run:ArcadeRun) {
+  if (run.idle>=5 && run.idle<7.9) return idleQuips[run.idleLine];
 }
 
 function tickFlies(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
@@ -93,7 +95,14 @@ function tickFlies(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
     return true;
   }
   run.flies=run.flies.filter(fly=>{
-    if (fly.caughtUntil && run.clock>=fly.caughtUntil) return false;
+    if (fly.returnsAt>run.clock) return true;
+    if (fly.returnsAt) fly.returnsAt=0;
+    if (fly.caughtUntil && run.clock>=fly.caughtUntil) {
+      const entrance=nodes.reduce((far,node)=>dist(node,spider)>dist(far,spider) ? node : far);
+      fly.p={...entrance};fly.target={...entrance};
+      fly.v={x:0,y:0};fly.caughtUntil=0;fly.aimAt=0;fly.returnsAt=run.clock+.65;
+      return true;
+    }
     if (capture(fly.p)) return false;
     if (fly.caughtUntil) return true;
     fly.age+=arenaStep;
@@ -261,9 +270,19 @@ export function advanceArcade(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeE
   if (run.phase==='ready') {
     if (!intentionalArcadeInput(input)) return;
     run.phase='wave';
-    topUp(run);
+    run.intro={kind:'level',elapsed:0};
   }
   if (run.phase==='over' || run.phase==='won') return;
+  if (run.intro) {
+    const intro=run.intro;
+    intro.elapsed+=arenaStep;
+    const duration=intro.kind==='rival' ? rivalIntroSeconds : .6+run.quota*2*exchangeSeconds;
+    if (intro.elapsed>=duration || intro.elapsed>=.4 && (input[4]&arcadeEscapeButton)!==0) {
+      if (intro.kind==='rival') warnBoss(run,run.boss!);
+      run.intro=undefined;
+    }
+    return;
+  }
   run.clock+=arenaStep;run.time-=arenaStep;
   run.movement.hunt.clock=run.clock;
   run.movement.hunt.strands=run.movement.hunt.strands.filter(wire=>(wire.expiresAt??Infinity)>run.clock);
@@ -275,7 +294,14 @@ export function advanceArcade(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeE
       if (run.snare.presses>=arcadeEscapePresses) {releasePlayer(run);emit('escape');}
       else emit('escape-step');
     }
-  } else moveArena(run.movement,input,emit,{climbSilk:false});
+  } else moveArena(run.movement,input,emit,{climbSilk:false,adjustRope:true});
+  if (run.snare || intentionalArcadeInput(input) || dist(spider,from)>.045) {
+    if (run.idle>=5) run.idleLine=(run.idleLine+1)%idleQuips.length;
+    run.idle=0;
+  } else {
+    run.idle+=arenaStep;
+    if (run.idle>=19) {run.idle=0;run.idleLine=(run.idleLine+1)%idleQuips.length;}
+  }
   tickFlies(run,emit);
   if (run.phase==='boss') {
     tickRivalWebs(run,from,emit);
@@ -284,18 +310,17 @@ export function advanceArcade(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeE
       if (run.level===100) {run.phase='won';emit('win');}
       else {run.level++;run.phase='wave';prepareLevel(run);emit('new');}
     }
-  } else if (run.recovered>=run.level) {
+  } else if (run.flies.length===0) {
     if (run.level%10===0) {
       const stage=arcadeStage(run.level),size=12+stage*1.2;
       const hp=2+Math.floor(stage/2),p={x:350,y:Math.min(200,floor-size-6)};
       run.boss={p,target:p,hp,max:hp,size,phase:'recover',at:0,turn:0,side:0,repeated:0,hit:false};
-      warnBoss(run,run.boss);
-      run.phase='boss';run.time=Math.max(run.time,40+stage*4);run.flies=[];
+      run.intro={kind:'rival',elapsed:0};run.idle=0;
+      run.phase='boss';run.time=Math.max(run.time,40+stage*4);
       emit('boss');
     } else {run.level++;prepareLevel(run);emit('new');}
   }
   if ((run.phase==='wave' || run.phase==='boss') && run.lives>0) {
     if (run.time<=0) {run.phase='over';emit('over');}
-    else if (run.phase==='wave') topUp(run);
   }
 }

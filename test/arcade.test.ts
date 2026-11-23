@@ -8,11 +8,24 @@ function ticks(run:ReturnType<typeof createArcade>,seconds:number) {
   for (let i=0;i<Math.round(seconds/arenaStep);i++) advanceArcade(run,neutral);
 }
 
+function start(run:ReturnType<typeof createArcade>) {
+  advanceArcade(run,arenaInput({x:1,y:0}));
+  skip(run);
+}
+function skip(run:ReturnType<typeof createArcade>) {
+  const cross=arenaInput({x:0,y:0});
+  cross[4]=arcadeEscapeButton;
+  ticks(run,.45);
+  advanceArcade(run,cross);
+  assert.equal(run.intro,undefined);
+}
+
 test('Endless holds for intentional input and expired prey cannot be collected',()=>{
   const run=createArcade();
   advanceArcade(run,arenaInput({x:.3,y:0},{x:0,y:.35}));
   assert.equal(run.phase,'ready');
   assert.equal(run.time,32);
+  start(run);
   advanceArcade(run,arenaInput({x:0,y:0},{x:.75,y:-.8},false,true));
   ticks(run,.7);
   const fly=run.flies[0];
@@ -24,18 +37,22 @@ test('Endless holds for intentional input and expired prey cannot be collected',
   advanceArcade(run,neutral);
   assert.equal(run.score,1);
   assert.equal(run.level,2);
+  skip(run);
   const remaining=run.flies.length;
+  const actor=run.flies[0].actor;
   run.flies[0].p={x:run.movement.spider.x,y:run.movement.spider.y};
   run.flies[0].caughtUntil=run.clock+arenaStep*.5;
   advanceArcade(run,neutral);
   assert.equal(run.score,1);
   assert.equal(run.flies.length,remaining);
+  assert.equal(run.flies[0].actor,actor);
+  assert.ok(run.flies[0].returnsAt>run.clock);
 });
 
 test('touching an insect in flight counts without firing silk',()=>{
   const run=createArcade();
   const right=arenaInput({x:1,y:0});
-  advanceArcade(run,right);
+  start(run);
   const spider=run.movement.spider;
   const fly=run.flies[0];
   fly.p={x:spider.x+29,y:spider.y-11};
@@ -47,10 +64,10 @@ test('touching an insect in flight counts without firing silk',()=>{
   assert.equal(run.movement.hunt.strands.length,0);
 });
 
-test('Endless ignores fixed webs as footholds and does not reel in active silk',()=>{
+test('Endless ignores fixed webs as footholds and lets the active rope reel or pay out',()=>{
   const run=createArcade(),spider=run.movement.spider;
   const up=arenaInput({x:0,y:-1});
-  advanceArcade(run,up);
+  start(run);
   const strands=run.movement.hunt.strands;
   strands.push({from:{x:7,y:183},to:{x:393,y:183},shakeUntil:0});
   Object.assign(spider,{x:150,y:168,vy:80,support:undefined,grounded:false});
@@ -59,21 +76,30 @@ test('Endless ignores fixed webs as footholds and does not reel in active silk',
   assert.equal(spider.thread,undefined);
   Object.assign(spider,{x:110,y:150,vx:0,vy:0,support:undefined,grounded:false,rope:{x:90,y:63,length:90}});
   for (let i=0;i<15;i++) advanceArcade(run,up);
-  assert.equal(spider.rope?.length,90);
+  const reeled=spider.rope!.length;
+  assert.ok(reeled<90);
+  const down=arenaInput({x:0,y:1});
+  for (let i=0;i<15;i++) advanceArcade(run,down);
+  assert.ok(spider.rope!.length>reeled);
 });
 
-test('arcade grows in bounded waves, and every tenth level requires a rival',()=>{
+test('a fixed roster must be cleared and every tenth level introduces the rival',()=>{
   assert.equal(new Set(arcadeLayouts.map(layout=>JSON.stringify(layout))).size,10);
   assert.equal(waveCapacity(100),6);
   for (const level of [10,60,100]) {
     const run=createArcade(level);
-    advanceArcade(run,arenaInput({x:1,y:0}));
-    assert.ok(run.flies.length<=waveCapacity(level));
-    run.recovered=level;
+    start(run);
+    assert.equal(run.flies.length,waveCapacity(level));
+    assert.equal(new Set(run.flies.map(fly=>fly.actor)).size,run.quota);
+    run.flies=[];
     advanceArcade(run,neutral);
     assert.equal(run.phase,'boss');
     assert.equal(run.flies.length,0);
     const boss=run.boss!;
+    assert.equal(run.intro?.kind,'rival');
+    const before=run.time;
+    skip(run);
+    assert.equal(run.time,before);
     assert.equal(boss.phase,'warn');
     assert.equal(boss.hp,2+Math.floor(arcadeStage(level)/2));
     boss.hp=0;
@@ -81,7 +107,8 @@ test('arcade grows in bounded waves, and every tenth level requires a rival',()=
     if (level===100) assert.equal(run.phase,'won');
     else {
       assert.equal(run.level,level+1);
-      assert.deepEqual(run.flies.map(fly=>fly.kind),[arcadeStage(level+1)]);
+      assert.equal(run.intro?.kind,'level');
+      assert.equal(run.flies[0].kind,arcadeStage(level+1));
       assert.equal(run.movement.hunt.surfaces,arcadeLayouts[arcadeStage(level+1)]);
     }
   }
@@ -89,9 +116,10 @@ test('arcade grows in bounded waves, and every tenth level requires a rival',()=
 
 function firstBoss() {
   const run=createArcade(10);
-  advanceArcade(run,arenaInput({x:1,y:0}));
-  run.recovered=run.level;
+  start(run);
+  run.flies=[];
   advanceArcade(run,neutral);
+  skip(run);
   return run;
 }
 

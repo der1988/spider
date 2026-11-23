@@ -105,7 +105,7 @@ export function renderMusic(context:AudioContext,mood:GnatMood,accent=false,scor
       for (let step=0;step<8;step++) {
         const at=start+step*eighth;
         const bass=step===7 ? root+7 : step===4 ? root+12 : root;
-        if (score) {
+        if (score && !danger) {
           const style=score.arrangement;
           if (step===0 || step===4) note('bass',step===4 && style%2 ? root+7 : root,at,eighth*2.65,.113);
           if (step%4===style%3+1) note('keys',harmony[(index+step+style)%3]+12,at,eighth*1.35,.068,.48);

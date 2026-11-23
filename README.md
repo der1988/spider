@@ -1,8 +1,8 @@
 # Spider vs Fly
 
-Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scorri **Story**, **Endless**, **Open World**, **Practice**, **Settings** e **Top 10** con **↑/↓** sulla croce direzionale o con lo stick sinistro. Premi **×** per confermare. Puoi anche fare clic sul pulsante. In **Story** i comandi e il timer partono appena finisce «Start the clock». In **Endless** la stanza è subito visibile e il primo movimento intenzionale, una mira decisa o una pressione danno il via.
+Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scorri **Story**, **Endless**, **Open World**, **Practice**, **Settings** e **Top 10** con **↑/↓** sulla croce direzionale o con lo stick sinistro. Premi **×** per confermare. Puoi anche fare clic sul pulsante. In **Story** i comandi e il timer partono appena finisce «Start the clock». In **Endless** la stanza è subito visibile e il primo movimento intenzionale, una mira decisa o una pressione avviano la presentazione del livello.
 
-- **Stick sinistro** per correre sul pavimento, sulle pareti e sul soffitto o per dondolare. Sul filo attivo, spingi **giù** per staccarti. In **Story**, con **su** puoi risalire o aggrapparti a un filo già fissato.
+- **Stick sinistro** per correre sul pavimento, sulle pareti e sul soffitto o per dondolare. In **Story**, spingi **giù** per staccarti dal filo attivo e **su** per risalire o aggrapparti a un filo già fissato.
 - **Stick destro** per mirare in ogni direzione. **R1** lancia verso il primo appiglio entro la portata. Pareti, soffitto, pavimento e piattaforme accettano la seta. Se sei su una superficie, il tiro tende subito una ragnatela. Salta prima di sparare per dondolare: il filo si fissa quando tocchi una superficie valida. In aria puoi lanciare un secondo filo per spostare il dondolio sul nuovo appiglio.
 - **L1** salta alla pressione. Premi di nuovo in aria per il doppio salto; un nuovo appoggio lo ripristina. Da appeso, L1 ritira i fili di movimento e ti lancia.
 - Osserva i corridoi ai lati della piattaforma centrale. Avvicinandoti, spingi la mosca a cambiare rotta. Tendi un filo tra due appigli mentre è in manovra. Il filo comincia a lampeggiare prima di sparire, dopo **10 secondi**.
@@ -10,9 +10,9 @@ Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scorri
 
 ## Endless arcade
 
-- Dieci stage da dieci livelli. I livelli aumentano le prede da recuperare e le distribuiscono in ondate. Ogni stage apre con una nuova specie. A sinistra trovi la progressione, a destra il comportamento delle specie incontrate.
-- Tocca un insetto in volo o intrappolato per catturarlo. Se resta impigliato per circa tre secondi, scompare e arriva un sostituto. Il filo attivo serve per dondolare. Spidey attraversa le proprie tele fisse.
-- Ai livelli 10, 20 e così via, piazza un filo scuro sulla traiettoria della carica e raggiungi il rivale quando compare **TRAPPED**. Ogni immobilizzazione permette un colpo e dura 2,8 secondi. Il rivale alterna cariche e tele scure con nodi. Se resti impigliato, premi e rilascia **×** o **X** cinque volte. Vinci sconfiggendo il rivale al livello 100.
+- Dieci stage da dieci livelli. Ogni livello presenta un gruppo fisso di 1–6 insetti con un breve scambio fra ciascun insetto e Spidey. Catturali tutti per avanzare. Premi **×** o **Invio** per saltare la presentazione.
+- Tocca un insetto in volo o intrappolato per catturarlo. Se resta impigliato per circa tre secondi, scompare e torna dall’altro lato della stanza. Sul filo attivo, tieni **su** per accorciarlo e **giù** per allungarlo. Spidey attraversa le proprie tele fisse.
+- Ai livelli 10, 20 e così via, piazza un filo scuro sulla traiettoria della carica e raggiungi il rivale mentre è impigliato. A ogni ingresso di **Duke Wobbleknees** parte una breve presentazione con un tema più aggressivo a 146 BPM. Ogni immobilizzazione permette un colpo e dura 2,8 secondi. Il rivale alterna cariche e tele scure con nodi. Se resti impigliato, premi e rilascia **×** o **X** cinque volte. Vinci sconfiggendo il rivale al livello 100.
 - Il round riparte da 32 secondi, con due secondi in più per stage e un bonus al recupero. Hai tre vite contro il rivale. Alla fine puoi scegliere **Retry** o **Main Menu** con la croce direzionale o lo stick e confermare con **×**.
 
 ## Open World e impostazioni

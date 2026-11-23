@@ -5,6 +5,7 @@ import {trackStarts} from './playlist';
 import type {Point} from './spider';
 import {advanceArena,arenaInput,arenaStep,createArena,type ArenaEvent} from './arena-run';
 import {advanceArcade,arcadeEscapeButton,arcadeEscapePresses,arcadeHeight,arcadeStage,arcadeWidth,createArcade,species,stages,type ArcadeEvent,type ArcadeRun} from './arcade';
+import {rivalName} from './arcade-script';
 import {ArcadeMusic} from './arcade-music';
 import {arcadeIcon,renderArcade} from './arcade-render';
 import {WEB_KEY} from './threads';
@@ -361,7 +362,7 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
   const stage=arcadeStage(run.level);
   const boss=run.boss;
   const finished=run.phase==='over' || run.phase==='won';
-  if (run.phase!=='ready') arcadeMusic.sync(contextAudio,stage,frozen && !finished || document.hidden || paused);
+  if (run.phase!=='ready') arcadeMusic.sync(contextAudio,stage,!!boss,frozen && !finished || document.hidden || paused);
   if (shownArcadeLevel!==run.level) {
     if (!shownArcadeLevel || arcadeStage(shownArcadeLevel)!==stage) {
       get('arcade-stage').textContent=stages[stage][0];
@@ -376,7 +377,7 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
     }).join('');
     shownArcadeLevel=run.level;
   }
-  const wave=boss ? `Rival · ${boss.hp} / ${boss.max}` : `Wave ${run.wave} · Recovered ${run.recovered} / ${run.level}`;
+  const wave=boss ? `${rivalName} · ${boss.hp} / ${boss.max}` : `Caught ${run.recovered} / ${run.quota}`;
   const lives=`Lives · ${run.lives}`;
   if (get('arcade-wave').textContent!==wave) get('arcade-wave').textContent=wave;
   if (get('arcade-lives').textContent!==lives) get('arcade-lives').textContent=lives;
@@ -385,7 +386,7 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
   if (timeLabel.textContent!==seconds+' s') timeLabel.textContent=seconds+' s';
   const budget=boss ? 40+stage*4 : 32+stage*2;
   if (roundLabel.textContent!==budget+' s') roundLabel.textContent=budget+' s';
-  clock.dataset.phase=run.phase==='ready' ? 'ready' : seconds<=5 ? 'urgent' : seconds<=15 ? 'low' : 'running';
+  clock.dataset.phase=run.phase==='ready' || run.intro ? 'ready' : seconds<=5 ? 'urgent' : seconds<=15 ? 'low' : 'running';
   clockMeter.style.setProperty('--remaining',Math.min(1,seconds/budget).toFixed(3));
   const beat=reduced() ? 0 : arcadeMusic.pulse;
   clock.style.setProperty('--pulse',beat.toFixed(2));
@@ -396,10 +397,9 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
     defeat.hidden=false;
     defeatChoices.select(run.phase==='won' ? 0 : 1,true);
   }
-  if (run.phase!=='ready') say(finished ? '' : boss ?
+  if (run.phase!=='ready') say(finished ? '' : run.intro ? 'Press × or Enter to skip.' : boss ?
     (run.snare ? `Press × or X to break free · ${run.snare.presses}/${arcadeEscapePresses}` :
-      boss.phase==='trapped' ? (boss.hit ? 'Hit landed. Move away before the rival breaks free.' : 'Rival trapped. Touch it before it breaks free.') :
-        'Set a web in the rival’s path and dodge its traps.') : 'Touch insects to catch them. A web holds them for about 3 seconds.');
+      'Set a web, then touch the rival while he’s tangled.') : 'Touch insects to catch them. A web holds them for about 3 seconds.');
   renderArcade(context,run,beat);
 }
 
@@ -441,6 +441,10 @@ window.addEventListener('keydown',event => {
     event.preventDefault();
   }
   if (!pausePanel.open && shell.dataset.screen==='game' && !dialogOpen() && !windowDefeat.open && defeat.hidden) {
+    if (arcade?.intro && event.code==='Enter' && !event.repeat) {
+      keyboardButtons|=arcadeEscapeButton;
+      event.preventDefault();
+    }
     if (/^(Key[WASDZXCGVQ]|Arrow(Up|Down|Left|Right))$/.test(event.code)) {
       keyboard.add(event.code);
       if (!event.repeat && event.code==='KeyZ') keyboardButtons|=1;
