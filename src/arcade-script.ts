@@ -1,4 +1,3 @@
-export const rivalName='Duke Wobbleknees';
 export const idleQuips=[
   'I could use a chair. Or eight.',
   'This is my impression of a well-adjusted spider.',
@@ -13,5 +12,3 @@ export const rivalQuips=[
   'I meant to stop here. Mind the dignity.',
   'My tailor assures me this is a normal number of knees.',
 ] as const;
-
-export const rivalIntroSeconds=4;

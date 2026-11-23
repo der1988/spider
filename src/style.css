@@ -339,3 +339,10 @@ dialog h2 { margin: 0; font-size: 16px; }
   .shell[data-arcade][data-arcade-intro] .playfield { grid-template-columns: minmax(0,1fr); }
   .shell[data-arcade][data-arcade-intro] .arcade-rail { display: none; }
 }
+
+#arcade-lives {
+  color: #f4a694;
+  font-size: clamp(19px,3vw,28px);
+  letter-spacing: .1em;
+  white-space: nowrap;
+}

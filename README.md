@@ -10,10 +10,10 @@ Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scorri
 
 ## Endless arcade
 
-- Dieci stage da dieci livelli. Ogni livello si apre con una presentazione animata al centro dell’arena e uno dei **100 dialoghi originali**. Il primo livello di ogni stage presenta un solista. Le squadre hanno un nome collettivo e combinano specie con traiettorie e reazioni diverse. Cattura tutto il gruppo per avanzare. Premi **×** o **Invio** per saltare la presentazione.
-- Tocca un insetto in volo o intrappolato per catturarlo. Se resta impigliato per circa tre secondi, scompare e torna dall’altro lato della stanza. Sul filo attivo, tieni **su** per accorciarlo e **giù** per allungarlo. Spidey attraversa le proprie tele fisse.
-- Ai livelli 10, 20 e così via, piazza un filo scuro sulla traiettoria della carica e raggiungi il rivale mentre è impigliato. A ogni ingresso di **Duke Wobbleknees** parte una breve presentazione con un tema più aggressivo a 146 BPM. Ogni immobilizzazione permette un colpo e dura 2,8 secondi. Il rivale alterna cariche e tele scure con nodi. Se resti impigliato, premi e rilascia **×** o **X** cinque volte. Vinci sconfiggendo il rivale al livello 100.
-- Il round riparte da 32 secondi, con due secondi in più per stage e un bonus al recupero. Hai tre vite contro il rivale. Alla fine puoi scegliere **Retry** o **Main Menu** con la croce direzionale o lo stick e confermare con **×**.
+- **Nove cacce e un duello finale**, con tre cuori condivisi. Ogni livello ha il proprio gruppo di insetti, presentato con nomi, sagome e un breve dialogo. Premi **×** o **Invio** per saltare la scena. Per avanzare, recupera ogni insetto mentre è ancora nella tela.
+- Gli insetti liberi fanno perdere un cuore al contatto. Il bordo luminoso intorno a Spidey indica l’invulnerabilità. Una preda che scade riprende il volo dal punto in cui era impigliata. Finire i cuori riporta automaticamente al livello 1.
+- Il livello 10 comincia direttamente con **Duke Wobbleknees**. Ogni immobilizzazione permette un colpo e dura 2,8 secondi. Il rivale alterna cariche e tele scure con nodi. Per liberarti dalle sue tele, premi e rilascia **×** o **X** cinque volte.
+- Sul filo attivo, tieni **su** per accorciarlo e **giù** per allungarlo. Una sigla 16 bit apre ogni incontro. La melodia di gioco segue lo stesso tempo per tutta la campagna e aggiunge uno strumento a ogni livello.
 
 ## Open World e impostazioni
 
@@ -45,7 +45,7 @@ Il menu usa **Web Trap Loop** (`menusong.mp3`), con battiti misurati a circa 110
 
 **The Fly Has A** accompagna l’introduzione e la caccia. A **240,330 s** parte **The Fly Has an Upgrade** dall’inizio. Dopo **119,580 s** parte **The Room Has a Space Bar**. Durante il terzo brano, una nuova pressione di **Space** passa a **The Fly Is You**. Dopo la cutscene, lo stick sinistro controlla il volo della mosca. Il ragno insegue la mosca con salti frequenti e usa pareti e soffitto per avvicinarsi. All’inizio tende poche tele, poi aumenta la frequenza durante la caccia. La traccia tratteggiata anticipa dove tenderà la prossima tela. Cambia rotta prima che la fissi per sfuggire alla trappola. Attraversare una luce riporta il timer a 10 secondi. Le luci compaiono in punti casuali, distribuiti tra le varie zone della stanza. Premi e rilascia **×** otto volte per uscire da una tela. A ogni cambio di brano Story memorizza un checkpoint per il tentativo in corso. Se perdi, riparti dall’ultimo brano raggiunto. Nel quarto brano riprendi appena la mosca diventa giocabile. Negli ultimi 20 secondi il timer resta fermo fino alla fine della dissolvenza. L’arena e l’HUD diventano codice e si ricompongono nel menu delle modalità. Se il terzo brano arriva alla fine, la playlist torna al primo a **15,330 s**. La musica prosegue durante le catture. **Options** sul joypad o **Esc** sulla tastiera mettono in pausa musica e partita.
 
-In **Endless** la colonna sonora strumentale 16 bit usa dieci arrangiamenti fra 98 e 112 BPM. Ogni stage ripete otto battute. Il timer e i dettagli dell’arena usano la posizione della sorgente Web Audio. La traccia continua durante le ondate e i combattimenti. La pausa conserva la posizione. Gli arrangiamenti funzionano offline.
+In **Endless** la colonna sonora strumentale 16 bit ripete la stessa melodia a 112 BPM e sovrappone fino a dieci strumenti sincronizzati. Il timer e i dettagli dell’arena usano la posizione della sorgente Web Audio. La traccia continua durante le ondate e i combattimenti. La pausa conserva la posizione. Gli arrangiamenti funzionano offline.
 
 ## Sviluppo
 

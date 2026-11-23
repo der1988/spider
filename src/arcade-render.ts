@@ -1,5 +1,5 @@
-import {deliverySeconds,dialogueFor,levelEntranceSeconds} from './arcade-dialogue';
-import {rivalName,rivalQuips} from './arcade-script';
+import {arcadeLevels,deliverySeconds,dialogueFor,insectMark,levelEntranceSeconds} from './arcade-dialogue';
+import {rivalQuips} from './arcade-script';
 import {arcadeEscapePresses,arcadeHeight,arcadeIdleSpeech,arcadeStage,arcadeWidth,bossTrapSeconds,flyTrapSeconds,stages,type ArcadeRun} from './arcade';
 import {block,drawAimMarker,drawSpider} from './hunt-render';
 import type {Point} from './spider';
@@ -23,11 +23,19 @@ const colors=['#e8f6b7','#ffc86c','#d6edff','#ffd7ed','#ffe7c2','#a8ffb8','#edcc
 const icons=wings.map(path=>new Path2D(path));
 const bodyIcons=bodies.map(path=>new Path2D(path));
 
-export function arcadeIcon(kind:number) {
-  return `<svg viewBox="0 0 12 11" aria-hidden="true"><path fill="${colors[kind]}" d="${wings[kind]}"/><path fill="#24252d" d="${bodies[kind]}"/><path fill="#fff9d2" d="M5 3h2v1H5z"/></svg>`;
+function silhouette(mark:number) {
+  return (mark&1 ? 'M5 0h1v3H5zM7 1h1v2H7z' : '')+
+    (mark&2 ? 'M0 5h3v1H0zM9 5h3v1H9z' : '')+
+    (mark&4 ? 'M7 7h1v3H7zM4 7h1v3H4z' : '');
 }
 
-function insect(ctx:CanvasRenderingContext2D,p:Point,kind:number,time:number,caught=false) {
+const markings=Array.from({length:8},(_,mark)=>new Path2D(silhouette(mark)));
+
+export function arcadeIcon(kind:number,mark:number) {
+  return `<svg viewBox="0 0 12 11" aria-hidden="true"><path fill="${colors[kind]}" d="${wings[kind]}"/><path fill="#24252d" d="${bodies[kind]+silhouette(mark)}"/><path fill="#fff9d2" d="M5 3h2v1H5z"/></svg>`;
+}
+
+function insect(ctx:CanvasRenderingContext2D,p:Point,kind:number,mark:number,time:number,caught=false) {
   ctx.save();
   ctx.translate(Math.round(p.x)-6,Math.round(p.y)-5);
   ctx.fillStyle=colors[kind];
@@ -35,6 +43,7 @@ function insect(ctx:CanvasRenderingContext2D,p:Point,kind:number,time:number,cau
   ctx.fill(icons[kind]);
   ctx.fillStyle='#24252d';
   ctx.fill(bodyIcons[kind]);
+  if (mark) ctx.fill(markings[mark]);
   block(ctx,5,3,2,1,'#fff9d2');
   ctx.restore();
 }
@@ -43,7 +52,7 @@ function silk(ctx:CanvasRenderingContext2D,from:Point,to:Point,color:string,dott
   const size=Math.ceil(Math.max(Math.abs(to.x-from.x),Math.abs(to.y-from.y))) || 1;
   for (let i=0;i<=size;i++) {
     if (dotted && i%9>=4) continue;
-    block(ctx,from.x+(to.x-from.x)*i/size,from.y+(to.y-from.y)*i/size,2,2,color);
+    block(ctx,from.x+(to.x-from.x)*i/size,from.y+(to.y-from.y)*i/size,1,1,color);
   }
 }
 
@@ -102,13 +111,11 @@ function speech(ctx:CanvasRenderingContext2D,p:Point,text:string,ink:string,ligh
 function introduction(ctx:CanvasRenderingContext2D,run:ArcadeRun,ink:string,light:string,pulse:number,reducedMotion:boolean) {
   const intro=run.intro!;
   const rival=intro.kind==='rival';
-  const [name,line,retort]=rival ?
-    [rivalName,'I demand satisfaction. And a chair with lumbar support.','A title and four pairs of knees. That seems excessive.'] :
-    dialogueFor(run.level);
-  const reply=intro.elapsed>=(rival ? 2.05 : levelEntranceSeconds+deliverySeconds(line));
+  const {name,line,reply:retort,insects}=dialogueFor(run.level);
+  const reply=intro.elapsed>=levelEntranceSeconds+deliverySeconds(line);
   const spider=run.movement.spider;
   const hero={x:326,y:115};
-  const leader={x:rival || run.quota===1 ? 185 : 185-(run.quota-1)*17,y:108};
+  const leader={x:rival || run.quota===1 ? 185 : 185-(run.quota-1)*21,y:108};
   ctx.save();
   ctx.globalAlpha=.58;block(ctx,0,0,width,height,ink);ctx.globalAlpha=1;
   ctx.globalAlpha=.24+pulse*.23;
@@ -118,7 +125,7 @@ function introduction(ctx:CanvasRenderingContext2D,run:ArcadeRun,ink:string,ligh
   block(ctx,36,139,width-72,2,light);
   ctx.fillStyle=light;ctx.textAlign='center';
   ctx.font='bold 10px monospace';
-  ctx.fillText(rival ? 'DUEL · LEVEL '+run.level : 'LEVEL '+run.level+' / 100',width/2,31);
+  ctx.fillText(rival ? 'DUEL · LEVEL '+run.level : 'LEVEL '+run.level+' / '+arcadeLevels,width/2,31);
   ctx.font='bold 19px monospace';
   ctx.fillText(name,width/2,62,width-38);
   if (rival) {
@@ -129,15 +136,20 @@ function introduction(ctx:CanvasRenderingContext2D,run:ArcadeRun,ink:string,ligh
   } else {
     run.flies.forEach((fly,index)=>{
       const fraction=reducedMotion ? 1 : Math.max(0,Math.min(1,(intro.elapsed-index*.035)/.54));
-      const x=leader.x+index*34-(1-fraction)**3*(leader.x+33);
+      const x=leader.x+index*42-(1-fraction)**3*(leader.x+33);
       const glide=Math.sin(fraction*Math.PI)*(fly.kind===3 ? 26 : fly.kind===7 ? -5 : 12);
       const y=leader.y+(index%2)*11-glide;
       const scale=index===0 ? 3.15+pulse*.15 : 2.65;
       ctx.save();
       ctx.translate(Math.round(x),Math.round(y));
       ctx.scale(scale,scale);
-      insect(ctx,{x:0,y:0},fly.kind,intro.elapsed+index*.05,reducedMotion);
+      insect(ctx,{x:0,y:0},fly.kind,insectMark(run.level,index),intro.elapsed+index*.05,reducedMotion);
       ctx.restore();
+      if (fraction===1 && insects.length>1) {
+        block(ctx,x-19,y-28,38,12,ink);
+        ctx.fillStyle=light;ctx.font='bold 9px monospace';
+        ctx.fillText(insects[index][0],x,y-19,35);
+      }
     });
   }
   ctx.save();
@@ -146,7 +158,7 @@ function introduction(ctx:CanvasRenderingContext2D,run:ArcadeRun,ink:string,ligh
   ctx.restore();
   ctx.fillStyle=light;ctx.textAlign='center';ctx.font='bold 10px monospace';
   ctx.fillText('Spidey',hero.x,149);
-  if (rival || intro.elapsed>=levelEntranceSeconds) {
+  if (intro.elapsed>=levelEntranceSeconds) {
     speech(ctx,{x:reply ? hero.x : leader.x,y:158},reply ? retort : line,ink,light,true);
   }
   ctx.restore();
@@ -189,11 +201,15 @@ export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:nu
   if (spider.firstAnchor && spider.rope) silk(ctx,spider,spider.firstAnchor,ink);
   if (spider.rope) silk(ctx,spider,spider.rope,ink);
   for (const fly of run.flies) {
-    if (fly.returnsAt>clock) continue;
-    insect(ctx,fly.p,fly.kind,clock,!!fly.caughtUntil);
+    insect(ctx,fly.p,fly.kind,insectMark(run.level,fly.actor),clock,!!fly.caughtUntil);
     if (fly.caughtUntil) {
       block(ctx,fly.p.x-6,fly.p.y-9,12,3,ink);
-      block(ctx,fly.p.x-5,fly.p.y-8,Math.ceil((fly.caughtUntil-clock)/flyTrapSeconds*10),1,light);
+      const left=fly.caughtUntil-clock;
+      block(ctx,fly.p.x-5,fly.p.y-8,Math.ceil(left/flyTrapSeconds*10),1,left<.8 ? '#ffc184' : light);
+      if (left<.8) {
+        block(ctx,fly.p.x-1,fly.p.y+5,3,1,'#ffc184');
+        block(ctx,fly.p.x-5,fly.p.y+3,2,1,'#ffc184');
+      }
     }
   }
   if (boss) {
@@ -213,7 +229,11 @@ export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:nu
       block(ctx,p.x-10,p.y+10,Math.ceil(Math.max(0,left/bossTrapSeconds)*20),2,left<.75 ? '#ffc184' : light);
     }
   }
-  if (clock>=run.invincible || Math.floor(clock*15)%2===0) drawSpider(ctx,spider,clock,{time:clock,beat:pulse});
+  if (clock>=run.invincible || reducedMotion || Math.floor(clock*12)%2===0) drawSpider(ctx,spider,clock,{time:clock,beat:pulse});
+  if (clock<run.invincible) {
+    ctx.strokeStyle='#f6d395';
+    ctx.strokeRect(Math.round(spider.x)-9,Math.round(spider.y)-9,18,18);
+  }
   if (snare) status(ctx,{x:spider.x,y:spider.y-14},`× ${snare.presses}/${arcadeEscapePresses}`,light,snare.presses/arcadeEscapePresses,'#e9f4b9');
   else drawAimMarker(ctx,spider,aim,width,height);
   if (run.phase==='wave' || run.phase==='boss') {
