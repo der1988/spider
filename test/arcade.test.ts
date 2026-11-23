@@ -8,7 +8,7 @@ function ticks(run:ReturnType<typeof createArcade>,seconds:number) {
   for (let i=0;i<Math.round(seconds/arenaStep);i++) advanceArcade(run,neutral);
 }
 
-test('Endless holds for intentional input and requires collection while the net still holds',()=>{
+test('Endless holds for intentional input and expired prey cannot be collected',()=>{
   const run=createArcade();
   advanceArcade(run,arenaInput({x:.3,y:0},{x:0,y:.35}));
   assert.equal(run.phase,'ready');
@@ -25,10 +25,41 @@ test('Endless holds for intentional input and requires collection while the net 
   assert.equal(run.score,1);
   assert.equal(run.level,2);
   const remaining=run.flies.length;
+  run.flies[0].p={x:run.movement.spider.x,y:run.movement.spider.y};
   run.flies[0].caughtUntil=run.clock+arenaStep*.5;
   advanceArcade(run,neutral);
   assert.equal(run.score,1);
   assert.equal(run.flies.length,remaining);
+});
+
+test('touching an insect in flight counts without firing silk',()=>{
+  const run=createArcade();
+  const right=arenaInput({x:1,y:0});
+  advanceArcade(run,right);
+  const spider=run.movement.spider;
+  const fly=run.flies[0];
+  fly.p={x:spider.x+29,y:spider.y-11};
+  fly.target={x:380,y:fly.p.y};
+  fly.aimAt=5;fly.age=5;
+  for (let i=0;i<160 && !run.score;i++) advanceArcade(run,right);
+  assert.equal(run.score,1);
+  assert.equal(run.level,2);
+  assert.equal(run.movement.hunt.strands.length,0);
+});
+
+test('Endless ignores fixed webs as footholds and does not reel in active silk',()=>{
+  const run=createArcade(),spider=run.movement.spider;
+  const up=arenaInput({x:0,y:-1});
+  advanceArcade(run,up);
+  const strands=run.movement.hunt.strands;
+  strands.push({from:{x:7,y:183},to:{x:393,y:183},shakeUntil:0});
+  Object.assign(spider,{x:150,y:168,vy:80,support:undefined,grounded:false});
+  for (let i=0;i<22;i++) advanceArcade(run,up);
+  assert.ok(spider.y>183);
+  assert.equal(spider.thread,undefined);
+  Object.assign(spider,{x:110,y:150,vx:0,vy:0,support:undefined,grounded:false,rope:{x:90,y:63,length:90}});
+  for (let i=0;i<15;i++) advanceArcade(run,up);
+  assert.equal(spider.rope?.length,90);
 });
 
 test('arcade grows in bounded waves, and every tenth level requires a rival',()=>{

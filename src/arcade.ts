@@ -85,16 +85,17 @@ function topUp(run:ArcadeRun) {
 
 function tickFlies(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
   const {spider,hunt}=run.movement;
+  function capture(point:Point) {
+    if (Math.abs(point.x-spider.x)>SPIDER_HALF_WIDTH+4 || Math.abs(point.y-spider.y)>SPIDER_HALF_HEIGHT+4 ||
+        !clear(point,spider,hunt.surfaces)) return false;
+    run.recovered++;run.score++;run.time=Math.min(42+arcadeStage(run.level)*2,run.time+6);
+    emit('recover');
+    return true;
+  }
   run.flies=run.flies.filter(fly=>{
-    if (fly.caughtUntil) {
-      if (run.clock>=fly.caughtUntil) return false;
-      if (Math.abs(fly.p.x-spider.x)<=SPIDER_HALF_WIDTH+4 && Math.abs(fly.p.y-spider.y)<=SPIDER_HALF_HEIGHT+4 &&
-          clear(fly.p,spider,hunt.surfaces)) {
-        run.recovered++;run.score++;run.time=Math.min(42+arcadeStage(run.level)*2,run.time+6);
-        emit('recover');return false;
-      }
-      return true;
-    }
+    if (fly.caughtUntil && run.clock>=fly.caughtUntil) return false;
+    if (capture(fly.p)) return false;
+    if (fly.caughtUntil) return true;
     fly.age+=arenaStep;
     if (run.clock>=fly.aimAt || dist(fly.p,fly.target)<12) {
       const playerNear=dist(fly.p,spider)<85;
@@ -129,11 +130,12 @@ function tickFlies(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
       fly.p=hit.point;fly.caughtUntil=run.clock+(fly.kind===8 ? 2.7 : flyTrapSeconds);
       wire.expiresAt=Math.max(wire.expiresAt??0,fly.caughtUntil);
       wire.shakeUntil=run.clock+.42;
+      if (capture(fly.p)) return false;
       emit('catch');return true;
     }
     if (clear(fly.p,next,hunt.surfaces)) fly.p=next;
     else fly.aimAt=0;
-    return true;
+    return !capture(fly.p);
   });
 }
 
@@ -273,7 +275,7 @@ export function advanceArcade(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeE
       if (run.snare.presses>=arcadeEscapePresses) {releasePlayer(run);emit('escape');}
       else emit('escape-step');
     }
-  } else moveArena(run.movement,input,emit);
+  } else moveArena(run.movement,input,emit,{climbSilk:false});
   tickFlies(run,emit);
   if (run.phase==='boss') {
     tickRivalWebs(run,from,emit);

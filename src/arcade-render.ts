@@ -30,26 +30,25 @@ function insect(ctx:CanvasRenderingContext2D,p:Point,kind:number,time:number,cau
   ctx.restore();
 }
 
-const black='#000';
-function silk(ctx:CanvasRenderingContext2D,from:Point,to:Point,thickness:number,dotted=false) {
+function silk(ctx:CanvasRenderingContext2D,from:Point,to:Point,color:string,dotted=false) {
   const size=Math.ceil(Math.max(Math.abs(to.x-from.x),Math.abs(to.y-from.y))) || 1;
   for (let i=0;i<=size;i++) {
     if (dotted && i%9>=4) continue;
-    block(ctx,from.x+(to.x-from.x)*i/size,from.y+(to.y-from.y)*i/size,thickness,thickness,black);
+    block(ctx,from.x+(to.x-from.x)*i/size,from.y+(to.y-from.y)*i/size,2,2,color);
   }
 }
 
-function web(ctx:CanvasRenderingContext2D,net:Strand,clock:number,rival=false,dotted=false) {
+function web(ctx:CanvasRenderingContext2D,net:Strand,clock:number,color:string,rival=false,dotted=false) {
   const {from,to}=net;
   const shake=net.shakeUntil>clock ? Math.sin(clock*100)*1.25 : 0;
   const mid={x:(from.x+to.x)/2+shake,y:(from.y+to.y)/2+shake};
-  silk(ctx,from,mid,2,dotted);silk(ctx,mid,to,2,dotted);
+  silk(ctx,from,mid,color,dotted);silk(ctx,mid,to,color,dotted);
   if (rival && !dotted) {
     const distance=Math.hypot(to.x-from.x,to.y-from.y);
     for (let n=10;n<distance;n+=14) {
       const x=from.x+(to.x-from.x)*n/distance,y=from.y+(to.y-from.y)*n/distance;
-      block(ctx,x-2,y,6,2,black);
-      block(ctx,x-1,y-1,4,4,black);
+      block(ctx,x-2,y,6,2,color);
+      block(ctx,x-1,y-1,4,4,color);
     }
   }
 }
@@ -59,7 +58,7 @@ function status(ctx:CanvasRenderingContext2D,p:Point,label:string,light:string,r
   ctx.font='bold 8px monospace';ctx.textAlign='center';
   const w=Math.max(27,Math.ceil(ctx.measureText(label).width)+8);
   const x=Math.max(w/2+8,Math.min(width-w/2-8,p.x)),y=Math.max(22,p.y);
-  block(ctx,x-w/2,y-9,w,14,black);
+  block(ctx,x-w/2,y-9,w,14,'#000');
   ctx.fillStyle=light;ctx.fillText(label,x,y);
   block(ctx,x-w/2+2,y+2,Math.round((w-4)*Math.min(1,Math.max(0,ratio))),2,accent);
   ctx.restore();
@@ -91,10 +90,10 @@ export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:nu
   }
   const nets=new Set(hunt.strands);
   if (boss?.net) nets.add(boss.net);
-  for (const net of nets) web(ctx,net,clock);
-  for (const net of run.rivalWebs) web(ctx,net,clock,true);
-  if (spider.firstAnchor && spider.rope) silk(ctx,spider,spider.firstAnchor,2);
-  if (spider.rope) silk(ctx,spider,spider.rope,2);
+  for (const net of nets) web(ctx,net,clock,ink);
+  for (const net of run.rivalWebs) web(ctx,net,clock,ink,true);
+  if (spider.firstAnchor && spider.rope) silk(ctx,spider,spider.firstAnchor,ink);
+  if (spider.rope) silk(ctx,spider,spider.rope,ink);
   for (const fly of run.flies) {
     insect(ctx,fly.p,fly.kind,clock,!!fly.caughtUntil);
     if (fly.caughtUntil) {
@@ -105,7 +104,7 @@ export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:nu
   if (boss) {
     const {p,target,phase,size,hp,max}=boss;
     if (phase==='warn') {
-      if (boss.shot) web(ctx,boss.shot,clock,true,true);
+      if (boss.shot) web(ctx,boss.shot,clock,ink,true,true);
       else line(ctx,p,target,'#882f35',true);
     }
     ctx.save();

@@ -399,7 +399,7 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
   if (run.phase!=='ready') say(finished ? '' : boss ?
     (run.snare ? `Press × or X to break free · ${run.snare.presses}/${arcadeEscapePresses}` :
       boss.phase==='trapped' ? (boss.hit ? 'Hit landed. Move away before the rival breaks free.' : 'Rival trapped. Touch it before it breaks free.') :
-        'Set a web in the rival’s path and dodge its traps.') : 'Place a web, then touch the insect in time.');
+        'Set a web in the rival’s path and dodge its traps.') : 'Touch insects to catch them. A web holds them for about 3 seconds.');
   renderArcade(context,run,beat);
 }
 
