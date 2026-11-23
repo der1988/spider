@@ -1,12 +1,13 @@
 import {arcadeLevels,dialogueFor,heartsPerRun,levelIntroDuration} from './arcade-dialogue.ts';
 import {idleQuips} from './arcade-script.ts';
-import {arenaStep,createArena,moveArena,type ArenaInput,type ArenaEvent} from './arena-run.ts';
+import {arenaStep,createArena,moveArena,placeSilkButton,releaseSilkButton,type ArenaInput,type ArenaEvent} from './arena-run.ts';
 import {closeCrawlerRopes,createCrawler} from './crawler.ts';
 import {crossesSolid,sweptHit,type Strand} from './threads.ts';
 import {aimHit,SPIDER_HALF_HEIGHT,SPIDER_HALF_WIDTH,type Point,type Rect} from './spider.ts';
 
 export const arcadeWidth=400,arcadeHeight=224;
 export const arcadeWebLimit=3;
+export const arcadeRopeHold=.18;
 export const arcadeEscapePresses=5,arcadeEscapeButton=4;
 export const flyTrapSeconds=3,bossTrapSeconds=2.8;
 export const species=[
@@ -59,7 +60,7 @@ export function createArcade(startLevel=1) {
     rivalWebs:[] as Strand[],snare:undefined as {web:Strand;presses:number}|undefined,
     recovered:0,score:0,quota:0,time:0,lives:heartsPerRun,invincible:0,restartIn:0,
     intro:undefined as {kind:'level'|'rival';elapsed:number}|undefined,
-    idle:0,idleLine:0,
+    idle:0,idleLine:0,silkGesture:undefined as {held:number;long:boolean}|undefined,
   };
   prepareLevel(run);
   return run;
@@ -83,6 +84,7 @@ function prepareLevel(run:ArcadeRun) {
   const final=run.level===arcadeLevels;
   run.intro=run.phase==='ready' ? undefined : {kind:final ? 'rival' : 'level',elapsed:0};
   run.idle=0;
+  run.silkGesture=undefined;
   run.time=arcadeBudget(run.level);
   const p={x:350,y:193};
   run.boss=final ? {p,target:p,hp:4,max:4,size:18,phase:'recover',at:0,turn:0,side:0,repeated:0,hit:false} : undefined;
@@ -159,7 +161,7 @@ function tickFlies(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
   run.flies=run.flies.filter(fly=>{
     if (!run.lives) return true;
     if (fly.caughtUntil) {
-      if (run.clock<fly.caughtUntil) return !capture(fly.p);
+      if (run.clock<fly.caughtUntil && (!fly.trappedBy || hunt.strands.includes(fly.trappedBy))) return !capture(fly.p);
       fly.caughtUntil=0;
       fly.aimAt=0;fly.phase='recover';fly.phaseAt=run.clock+.8;
       return true;
@@ -280,7 +282,7 @@ function tickBoss(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
   const {spider,hunt}=run.movement;
   const touches=()=>dist(boss.p,spider)<boss.size+SPIDER_HALF_WIDTH && clear(boss.p,spider,hunt.surfaces);
   if (boss.phase==='trapped') {
-    if (run.clock>=boss.at) {
+    if (run.clock>=boss.at || boss.net && !hunt.strands.includes(boss.net)) {
       hunt.strands=hunt.strands.filter(web=>web!==boss.net);
       boss.net=undefined;
       warnBoss(run,boss);
@@ -340,8 +342,27 @@ function tickRivalWebs(run:ArcadeRun,from:Point,emit:(event:ArcadeEvent)=>void) 
   spider.thread=undefined;
   spider.vx=0;spider.vy=0;
   run.snare={web,presses:0};
+  run.silkGesture=undefined;
   web.shakeUntil=run.clock+.35;
   emit('snared');
+}
+function arcadeSilk(run:ArcadeRun,input:ArenaInput):ArenaInput {
+  const buttons=input[4];
+  let actions=buttons&~(2|releaseSilkButton);
+  if (buttons&2) run.silkGesture={held:0,long:false};
+  const gesture=run.silkGesture;
+  if (buttons&releaseSilkButton) {
+    if (gesture && !gesture.long) actions|=placeSilkButton;
+    else actions|=releaseSilkButton;
+    run.silkGesture=undefined;
+  } else if (gesture && !gesture.long) {
+    gesture.held+=arenaStep;
+    if (gesture.held>=arcadeRopeHold) {
+      gesture.long=true;
+      actions|=2;
+    }
+  }
+  return [input[0],input[1],input[2],input[3],actions];
 }
 export function advanceArcade(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeEvent)=>void=()=>{}) {
   if (run.restartIn>0) {
@@ -382,7 +403,7 @@ export function advanceArcade(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeE
       if (run.snare.presses>=arcadeEscapePresses) {releasePlayer(run);emit('escape');}
       else emit('escape-step');
     }
-  } else moveArena(run.movement,input,emit,{climbSilk:false,adjustRope:true,webLimit:arcadeWebLimit});
+  } else moveArena(run.movement,arcadeSilk(run,input),emit,{climbSilk:false,adjustRope:true,webLimit:arcadeWebLimit});
   if (run.snare || intentionalArcadeInput(input) || dist(spider,from)>.045) {
     if (run.idle>=5) run.idleLine=(run.idleLine+1)%idleQuips.length;
     run.idle=0;
