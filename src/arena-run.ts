@@ -1,13 +1,12 @@
-import {anchorCrawlerRope,castCrawler,closeCrawlerRopes,createCrawler,jumpCrawler,tickCrawler} from './crawler.ts';
+import {anchorCrawlerRope,castCrawler,closeCrawlerRopes,createCrawler,jumpCrawler,normals,tickCrawler} from './crawler.ts';
 import {capStrands,createHunt,platforms,spawn,tickHunt,WEB_SECONDS} from './hunt.ts';
 import {silkMotion} from './pad-controls.ts';
-import {aimHit,DEFAULT_TUNING,SPIDER_HALF_HEIGHT,type Point} from './spider.ts';
-import {anchorSilk,fixSilk,leaveSilk} from './threads.ts';
+import {DEFAULT_TUNING,moveAxis,type Point} from './spider.ts';
+import {fixSilk,leaveSilk} from './threads.ts';
 import type {HuntMode} from './difficulty.ts';
 
 export const arenaStep=1/120;
 export const releaseSilkButton=8;
-export const placeSilkButton=16;
 const axisRange=127;
 export type ArenaInput=[x:number,y:number,aimX:number,aimY:number,buttons:number];
 export type ArenaEvent='jump'|'attach'|'double'|'miss'|'release'|'fix'|'evict'|'catch'|'new'|'over';
@@ -23,7 +22,7 @@ export function createArena(mode:HuntMode,seed?:number,rotate=mode==='loop') {
 }
 export type ArenaRun=ReturnType<typeof createArena>;
 
-function finishWebs(run:ArenaRun,before:number,emit?: (event:ArenaEvent)=>void,webLimit?:number) {
+export function finishWebs(run:ArenaRun,before:number,emit?: (event:ArenaEvent)=>void,webLimit?:number) {
   const {hunt}=run;
   if (hunt.strands.length===before) return;
   for (let i=before;i<hunt.strands.length;i++) hunt.strands[i].expiresAt=hunt.clock+WEB_SECONDS;
@@ -32,7 +31,7 @@ function finishWebs(run:ArenaRun,before:number,emit?: (event:ArenaEvent)=>void,w
   emit?.(evicted ? 'evict' : 'fix');
 }
 
-export function moveArena(run:ArenaRun,input:ArenaInput,emit?: (event:ArenaEvent)=>void,{climbSilk=true,adjustRope=false,webLimit}: {climbSilk?:boolean;adjustRope?:boolean;webLimit?:number}={}) {
+export function moveArena(run:ArenaRun,input:ArenaInput,emit?: (event:ArenaEvent)=>void,{climbSilk=true,adjustRope=false,webLimit,ropeRange=DEFAULT_TUNING.range,directionalJump=false}: {climbSilk?:boolean;adjustRope?:boolean;webLimit?:number;ropeRange?:number;directionalJump?:boolean}={}) {
   const {hunt,spider}=run;
   const {surfaces}=hunt;
   const [x,y,ax,ay,buttons]=input;
@@ -40,16 +39,20 @@ export function moveArena(run:ArenaRun,input:ArenaInput,emit?: (event:ArenaEvent
     const length=Math.hypot(ax,ay);
     run.aim={x:ax/length,y:ay/length};
   }
-  if ((buttons&1) && jumpCrawler(spider)) emit?.('jump');
-  const target={x:spider.x+run.aim.x*70,y:spider.y+run.aim.y*70};
-  if (webLimit!==undefined && (buttons&placeSilkButton)) {
-    const anchor=aimHit(spider,surfaces,target);
-    const before=hunt.strands.length;
-    if (anchor && anchorSilk(hunt.strands,anchor,DEFAULT_TUNING.range+SPIDER_HALF_HEIGHT,spider,surfaces)) {
-      finishWebs(run,before,emit,webLimit);
-    } else emit?.('miss');
+  if (buttons&1) {
+    const stick=Math.hypot(x,y)>32 ? {x,y} : {x:ax,y:ay};
+    const length=Math.hypot(stick.x,stick.y);
+    const direction=directionalJump && length>28 ? {x:stick.x/length,y:stick.y/length} : undefined;
+    const normal=spider.support ? normals[spider.support] : undefined;
+    if (jumpCrawler(spider,undefined,direction)) {
+      if (direction && normal && Math.abs(normal.x*direction.x+normal.y*direction.y)<.04) {
+        moveAxis(spider,surfaces,normal.x ? 'x' : 'y',2*(normal.x||normal.y));
+      }
+      emit?.('jump');
+    }
   }
   if (buttons&2) {
+    const target={x:spider.x+run.aim.x*70,y:spider.y+run.aim.y*70};
     if (castCrawler(spider,surfaces,target)) {
       emit?.('attach');
       const before=hunt.strands.length;
@@ -59,9 +62,9 @@ export function moveArena(run:ArenaRun,input:ArenaInput,emit?: (event:ArenaEvent
   }
   if (webLimit!==undefined && (buttons&releaseSilkButton) && spider.rope) {
     const before=hunt.strands.length;
-    if (!anchorCrawlerRope(spider,surfaces,hunt.strands)) {
+    if (!anchorCrawlerRope(spider,surfaces,hunt.strands,ropeRange)) {
       const anchor=closeCrawlerRopes(spider);
-      if (anchor) leaveSilk(hunt,anchor,DEFAULT_TUNING.range);
+      if (anchor) leaveSilk(hunt,anchor,ropeRange);
     }
     finishWebs(run,before,emit,webLimit);
     emit?.('release');
@@ -70,7 +73,7 @@ export function moveArena(run:ArenaRun,input:ArenaInput,emit?: (event:ArenaEvent
   const motion=silkMotion(move,run.down);
   run.down=motion.down;
   if (adjustRope && motion.down && spider.rope) {
-    spider.rope.length=Math.min(DEFAULT_TUNING.range,spider.rope.length+DEFAULT_TUNING.reelSpeed*arenaStep);
+    spider.rope.length=Math.min(ropeRange,spider.rope.length+DEFAULT_TUNING.reelSpeed*arenaStep);
   } else if (motion.detach && spider.rope) {
     const old=closeCrawlerRopes(spider);
     if (old) leaveSilk(hunt,old,DEFAULT_TUNING.range);

@@ -79,18 +79,19 @@ export function anchorCrawlerRope(spider: Crawler,surfaces: readonly Rect[],stra
   return true;
 }
 
-export function jumpCrawler(spider: Crawler,speed=JUMP) {
-  if (spider.rope) {
-    closeCrawlerRopes(spider);
-    spider.vy=-speed;
-  } else if (spider.support) {
+export function jumpCrawler(spider: Crawler,speed=JUMP,direction?:Point) {
+  const tethered=!!spider.rope;
+  if (!tethered && !spider.support && !spider.airJump) return false;
+  if (tethered) closeCrawlerRopes(spider);
+  else if (!spider.support) spider.airJump=false;
+  if (direction) {
+    spider.vx=direction.x*speed;
+    spider.vy=direction.y*speed;
+  } else if (!tethered && spider.support) {
     const away=normals[spider.support];
     if (away.x) spider.vx=away.x*speed;
     else spider.vy=away.y*speed;
-  } else if (spider.airJump) {
-    spider.airJump=false;
-    spider.vy=-speed;
-  } else return false;
+  } else spider.vy=-speed;
   spider.support=undefined;
   spider.thread=undefined;
   spider.grounded=false;

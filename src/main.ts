@@ -333,7 +333,7 @@ function retryLoop() {
 }
 
 const arcadeSounds={
-  jump:'jump',attach:'attach',double:'attach',miss:'miss',release:'release',fix:'fix',evict:'fix',
+  launch:'launch',jump:'jump',attach:'attach',double:'attach',miss:'miss',release:'release',fix:'fix',evict:'fix',
   catch:'catch',entrance:'discovery',new:'discovery',over:'miss',recover:'discovery',boss:'tension',
   'boss-trap':'attach','boss-free':'release',snared:'tension','escape-step':'fix',escape:'release',
   hit:'catch',win:'discovery',hurt:'miss',
@@ -342,7 +342,6 @@ const arcadeSounds={
 function arcadeFeedback(event:ArcadeEvent) {
   if ((event==='entrance' || event==='boss') && arcade) arcadeMusic.entrance(contextAudio,arcade.level);
   else audio.play(arcadeSounds[event]);
-  if (event==='attach' || event==='miss') audio.play('launch');
 }
 
 function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined,rawAim:Point,buttons:number,frozen:boolean) {
@@ -412,7 +411,7 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
   }
   if (run.phase!=='ready') say(finished ? '' : run.restartIn>0 ? 'Out of hearts. Back to level 1…' : run.intro ? 'Press × or Enter to skip.' : boss ?
     (run.snare ? `Press × or X to break free · ${run.snare.presses}/${arcadeEscapePresses}` :
-      'Set a web, then touch the rival while he’s tangled.') : 'Tap R1 to set silk. Hold R1 for the rope, then press ↑ to climb.');
+      'Set a web, then touch the rival while he’s tangled.') : 'Aim with RS. Tap R1 for a web or hold it to catch the line.');
   renderArcade(context,run,beat,reduced());
 }
 

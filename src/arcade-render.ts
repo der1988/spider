@@ -209,6 +209,17 @@ export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:nu
   }
   for (const net of hunt.strands) web(ctx,net,clock,ink);
   for (const net of run.rivalWebs) web(ctx,net,clock,ink,true);
+  for (const shot of run.silkShots) {
+    const tail=shot.mode==='trap' ? shot.origin : spider;
+    ctx.save();
+    const opacity=shot.fade===undefined ? 1 : shot.fade/.08;
+    ctx.globalAlpha=.55*opacity;
+    silk(ctx,tail,shot.p,ink);
+    ctx.globalAlpha=opacity;
+    block(ctx,shot.p.x-1,shot.p.y-1,3,3,ink);
+    block(ctx,shot.p.x,shot.p.y,1,1,light);
+    ctx.restore();
+  }
   if (spider.firstAnchor && spider.rope) silk(ctx,spider,spider.firstAnchor,ink);
   if (spider.rope) silk(ctx,spider,spider.rope,ink);
   for (const fly of run.flies) {

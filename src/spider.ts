@@ -104,13 +104,12 @@ function rayDistance(origin: Point, direction: Point, surface: Rect): number {
   return near
 }
 
-export function aimHit(spider: Point, surfaces: readonly Rect[], target: Point, tuning?: Partial<Tuning>): Point | undefined {
+export function traceSurface(spider: Point, surfaces: readonly Rect[], target: Point, range: number) {
   const dx = target.x - spider.x
   const dy = target.y - spider.y
   const magnitude = Math.hypot(dx, dy)
   if (!Number.isFinite(magnitude) || magnitude < EPSILON) return
   const direction = {x: dx / magnitude, y: dy / magnitude}
-  const range = tuning?.range ?? DEFAULT_TUNING.range
   let nearest = Infinity
   let grip = false
   for (const surface of surfaces) {
@@ -122,9 +121,14 @@ export function aimHit(spider: Point, surfaces: readonly Rect[], target: Point, 
       grip = false
     }
   }
-  if (grip && nearest <= range) {
-    return {x: spider.x + direction.x * nearest, y: spider.y + direction.y * nearest}
+  if (Number.isFinite(nearest) && nearest <= range) {
+    return {point:{x: spider.x + direction.x * nearest, y: spider.y + direction.y * nearest},grip}
   }
+}
+
+export function aimHit(spider: Point, surfaces: readonly Rect[], target: Point, tuning?: Partial<Tuning>): Point | undefined {
+  const hit=traceSurface(spider,surfaces,target,tuning?.range??DEFAULT_TUNING.range)
+  return hit?.grip ? hit.point : undefined
 }
 
 export function shoot(spider: Spider, surfaces: readonly Rect[], target: Point, tuning?: Partial<Tuning>): boolean {

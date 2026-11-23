@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {advanceArcade,arcadeBudget,arcadeEscapeButton,arcadeEscapePresses,arcadeLayouts,arcadeRopeHold,arcadeWebLimit,createArcade} from '../src/arcade.ts';
+import {advanceArcade,arcadeBudget,arcadeEscapeButton,arcadeEscapePresses,arcadeLayouts,arcadeWebLimit,createArcade} from '../src/arcade.ts';
 import {sweptHit} from '../src/threads.ts';
 import {arenaInput,arenaStep,releaseSilkButton} from '../src/arena-run.ts';
 import {arcadeLevels,campaign,insectMark,levelIntroDuration} from '../src/arcade-dialogue.ts';
@@ -181,6 +181,7 @@ test('R1 tap only fixes silk, keeping the newest three distinct webs',()=>{
   assert.deepEqual(hunt.strands,webs);
   advanceArcade(run,release);
   assert.equal(spider.rope,undefined);
+  ticks(run,.38);
   assert.equal(hunt.loose.length,0);
   assert.equal(hunt.strands.length,arcadeWebLimit);
   assert.deepEqual(hunt.strands.slice(0,2),webs.slice(1));
@@ -189,6 +190,7 @@ test('R1 tap only fixes silk, keeping the newest three distinct webs',()=>{
   const newest=hunt.strands.slice();
   advanceArcade(run,cast);
   advanceArcade(run,release);
+  ticks(run,.38);
   assert.deepEqual(hunt.strands,newest);
 });
 
@@ -197,7 +199,7 @@ test('holding R1 attaches a rope without an automatic rise, and Up reels it in',
   start(run);
   const {hunt,spider}=run.movement;
   advanceArcade(run,arenaInput({x:0,y:0},{x:.75,y:-.8},false,true));
-  ticks(run,arcadeRopeHold+.06);
+  ticks(run,.39);
   assert.ok(spider.rope);
   const length=spider.rope.length,y=spider.y;
   ticks(run,.25);
@@ -210,6 +212,50 @@ test('holding R1 attaches a rope without an automatic rise, and Up reels it in',
   assert.ok(spider.y<y);
   advanceArcade(run,[0,0,0,0,releaseSilkButton]);
   assert.equal(spider.rope,undefined);
+});
+
+test('directional jumps use screen axes at the wall and right-stick aim when movement is neutral',()=>{
+  for (const [side,move,aim,sign] of [
+    ['left',{x:0,y:1},undefined,1],
+    ['right',{x:0,y:0},{x:0,y:-1},-1],
+  ] as const) {
+    const run=createArcade();
+    start(run);
+    const spider=run.movement.spider;
+    Object.assign(spider,{x:side==='left' ? 14 : 386,y:155,support:side,grounded:true});
+    advanceArcade(run,arenaInput(move,aim,true));
+    assert.equal(spider.support,undefined);
+    assert.ok(spider.vy*sign>150);
+    assert.ok(Math.abs(spider.vx)<1);
+  }
+});
+
+test('silk heads travel and slow on a miss, with a longer connection preserving airborne momentum',()=>{
+  const run=createArcade();
+  start(run);
+  const spider=run.movement.spider;
+  const shoot=arenaInput({x:0,y:0},{x:1,y:0},false,true);
+  const release:[number,number,number,number,number]=[0,0,0,0,releaseSilkButton];
+  Object.assign(spider,{x:52,y:130,support:undefined,grounded:false});
+  advanceArcade(run,shoot);
+  const shot=run.silkShots[0],early=shot.v.x;
+  advanceArcade(run,release);
+  ticks(run,.42);
+  assert.equal(run.silkShots[0],shot);
+  assert.ok(shot.p.x>180 && shot.v.x<early/2);
+  assert.equal(spider.rope,undefined);
+  ticks(run,.75);
+  assert.equal(run.silkShots.length,0);
+  assert.equal(run.movement.hunt.strands.length,0);
+
+  Object.assign(spider,{x:183,y:130,vx:47,vy:-30,support:undefined,grounded:false});
+  advanceArcade(run,shoot);
+  for (let i=0;i<130 && !spider.rope;i++) advanceArcade(run,neutral);
+  assert.ok(spider.rope);
+  assert.equal(spider.rope.x,393);
+  assert.ok(spider.rope.length>155);
+  assert.equal(spider.vx,47);
+  assert.ok(spider.vy>30);
 });
 
 test('the rival takes one hit per trap and four hits clear level ten',()=>{
