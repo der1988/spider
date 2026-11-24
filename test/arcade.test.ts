@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {advanceArcade,arcadeBudget,arcadeEscapeButton,arcadeEscapePresses,arcadeLayouts,arcadeWebLimit,createArcade} from '../src/arcade.ts';
+import {advanceArcade,arcadeEscapeButton,arcadeEscapePresses,arcadeLayouts,arcadeWebLimit,createArcade} from '../src/arcade.ts';
 import {sweptHit} from '../src/threads.ts';
 import {arenaInput,arenaStep,releaseSilkButton} from '../src/arena-run.ts';
 import {arcadeLevels,campaign,insectMark,levelIntroDuration} from '../src/arcade-dialogue.ts';
@@ -43,11 +43,11 @@ test('all ten encounters have their own dialogue, insect names and silhouettes, 
     advanceArcade(run,right);
     ticks(run,levelIntroDuration(level)-.1);
     assert.ok(run.intro);
-    assert.equal(run.time,arcadeBudget(level));
+    assert.equal(run.clock,0);
     for (let frame=0;run.intro && frame<30;frame++) advanceArcade(run,neutral);
     assert.equal(run.intro,undefined);
     advanceArcade(run,neutral);
-    assert.ok(run.time<arcadeBudget(level));
+    assert.ok(run.clock>0);
     assert.equal(run.phase,level===10 ? 'boss' : 'wave');
   }
 });
@@ -96,7 +96,9 @@ test('the last heart sends the player straight back to level one with three hear
   run.lives=1;
   run.score=12;
   putNextToSpider(run);
-  advanceArcade(run,neutral);
+  const losses:string[]=[];
+  advanceArcade(run,neutral,event=>losses.push(event));
+  assert.deepEqual(losses,['hurt']);
   assert.equal(run.lives,0);
   assert.ok(run.restartIn>0);
   ticks(run,1.05);
@@ -230,7 +232,7 @@ test('directional jumps use screen axes at the wall and right-stick aim when mov
   }
 });
 
-test('silk heads travel and slow on a miss, with a longer connection preserving airborne momentum',()=>{
+test('silk heads travel and slow on a miss, with a longer connection from a supported launch',()=>{
   const run=createArcade();
   start(run);
   const spider=run.movement.spider;
@@ -248,14 +250,91 @@ test('silk heads travel and slow on a miss, with a longer connection preserving 
   assert.equal(run.silkShots.length,0);
   assert.equal(run.movement.hunt.strands.length,0);
 
-  Object.assign(spider,{x:183,y:130,vx:47,vy:-30,support:undefined,grounded:false});
+  Object.assign(spider,{x:183,y:209,vx:0,vy:0,support:'floor',grounded:true});
   advanceArcade(run,shoot);
   for (let i=0;i<130 && !spider.rope;i++) advanceArcade(run,neutral);
   assert.ok(spider.rope);
   assert.equal(spider.rope.x,393);
   assert.ok(spider.rope.length>155);
-  assert.equal(spider.vx,47);
-  assert.ok(spider.vy>30);
+  assert.equal(spider.y,209);
+});
+
+test('horizontal jumps from the floor gain enough lift to clear it',()=>{
+  for (const x of [-1,1]) {
+    const run=createArcade();
+    start(run);
+    advanceArcade(run,arenaInput({x,y:0},undefined,true));
+    ticks(run,.1);
+    const spider=run.movement.spider;
+    assert.ok(spider.y<201);
+    assert.ok((spider.x-52)*x>12);
+  }
+});
+
+const silkRelease=arenaInput({x:0,y:0});
+silkRelease[4]=releaseSilkButton;
+const towardWeb=arenaInput({x:0,y:0},{x:.75,y:-.8},false,true);
+function existingWeb(run:ReturnType<typeof createArcade>) {
+  const web={from:{x:77,y:125},to:{x:150,y:167},shakeUntil:0,expiresAt:5};
+  run.movement.hunt.strands=[web];
+  return web;
+}
+
+test('a solid stance allows a diagonal web join or a swinging anchor on the same strand',()=>{
+  const run=createArcade();
+  start(run);
+  const {hunt,spider}=run.movement,web=existingWeb(run);
+  advanceArcade(run,towardWeb);
+  advanceArcade(run,silkRelease);
+  ticks(run,.45);
+  assert.equal(hunt.strands.length,2);
+  const {from,to}=hunt.strands[1];
+  assert.ok(Math.abs((from.y-web.from.y)*(web.to.x-web.from.x)-(from.x-web.from.x)*(web.to.y-web.from.y))<1e-5);
+  assert.ok(from.x>web.from.x && from.x<web.to.x);
+  assert.ok(Math.abs(to.x-from.x)>2 && Math.abs(to.y-from.y)>2);
+  hunt.strands=[web];
+  advanceArcade(run,towardWeb);
+  for (let i=0;i<100 && !spider.rope;i++) advanceArcade(run,neutral);
+  assert.equal(run.ropeWeb,web);
+  assert.ok(spider.rope);
+  const {length}=spider.rope!;
+  ticks(run,.15);
+  assert.equal(spider.rope?.length,length);
+  const up=arenaInput({x:0,y:-1});
+  for (let i=0;i<26;i++) advanceArcade(run,up);
+  assert.ok(spider.y<205);
+  advanceArcade(run,silkRelease);
+  assert.equal(spider.rope,undefined);
+  ticks(run,.55);
+  assert.deepEqual(hunt.strands,[web]);
+  assert.equal(hunt.loose.length,0);
+});
+
+test('vertical and near-horizontal strands are rejected, as are shots after takeoff',()=>{
+  for (const aim of [{x:0,y:-1},{x:1,y:0}]) {
+    const run=createArcade();
+    start(run);
+    if (aim.x) {
+      Object.assign(run.movement.spider,{x:14,y:150,support:'left',grounded:true});
+      run.movement.hunt.strands=[{from:{x:65,y:137},to:{x:86,y:169},shakeUntil:0}];
+    }
+    const initial=run.movement.hunt.strands.slice();
+    advanceArcade(run,arenaInput({x:0,y:0},aim,false,true));
+    advanceArcade(run,silkRelease);
+    ticks(run,1);
+    assert.deepEqual(run.movement.hunt.strands,initial);
+  }
+  for (const release of [true,false]) {
+    const run=createArcade();
+    start(run);
+    const web=existingWeb(run);
+    advanceArcade(run,towardWeb);
+    advanceArcade(run,arenaInput({x:0,y:0},undefined,true));
+    if (release) advanceArcade(run,silkRelease);
+    ticks(run,.75);
+    assert.equal(run.movement.spider.rope,undefined);
+    assert.deepEqual(run.movement.hunt.strands,[web]);
+  }
 });
 
 test('the rival takes one hit per trap and four hits clear level ten',()=>{

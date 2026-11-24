@@ -1,6 +1,6 @@
 import {deliverySeconds,dialogueFor,insectMark,levelEntranceSeconds} from './arcade-dialogue';
 import {rivalQuips} from './arcade-script';
-import {arcadeEscapePresses,arcadeHeight,arcadeIdleSpeech,arcadeStage,arcadeWidth,bossTrapSeconds,flyTrapSeconds,stages,type ArcadeRun} from './arcade';
+import {arcadeAttackStyle,arcadeEscapePresses,arcadeHeight,arcadeIdleSpeech,arcadeStage,arcadeWidth,bossTrapSeconds,flyTrapSeconds,stages,type ArcadeRun} from './arcade';
 import {block,drawAimMarker,drawSpider} from './hunt-render';
 import type {Point} from './spider';
 import type {Strand} from './threads';
@@ -229,8 +229,18 @@ export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:nu
       silk(ctx,tail,fly.p,ink);
     }
     if (!fly.caughtUntil && fly.phase==='windup') {
-      block(ctx,fly.p.x-2,fly.p.y-9,4,1,ink);
-      block(ctx,fly.p.x,fly.p.y-13,1,3,light);
+      const style=arcadeAttackStyle(fly.kind),x=fly.p.x,y=fly.p.y-11;
+      if (style==='dive') {
+        block(ctx,x-2,y-2,5,1,ink);
+        block(ctx,x-1,y-1,3,1,light);block(ctx,x,y,1,1,light);
+      } else if (style==='dash') {
+        block(ctx,x-4,y,9,2,ink);
+        block(ctx,x-2,y,5,1,light);
+      } else if (style==='feint') {
+        block(ctx,x-4,y,2,2,light);block(ctx,x+3,y-2,2,2,light);
+      } else {
+        block(ctx,x,y-3,1,3,ink);block(ctx,x,y+1,1,1,light);
+      }
     }
     insect(ctx,fly.p,fly.kind,insectMark(run.level,fly.actor),clock,!!fly.caughtUntil || fly.phase==='windup' || fly.phase==='recover');
     if (fly.caughtUntil) {

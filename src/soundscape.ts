@@ -1,7 +1,7 @@
 const notes = {
   start:[440,620], launch:[390,610], attach:[860,1140], miss:[260,170],
   tension:[180,245], release:[500,295], jump:[285,460], land:[145], discovery:[530,690,880],
-  catch:[790,470,1150], fix:[610,470],
+  heart:[310,207,122], catch:[790,470,1150], fix:[610,470],
 };
 export type Sound = keyof typeof notes;
 

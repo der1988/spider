@@ -113,9 +113,9 @@ export function leaveSilk(web: Pick<Web,'loose'>, from: Point, reach: number) {
   if (web.loose.length > 8) web.loose.shift();
 }
 
-function anchorAt(strands: Strand[],from: Point,reach: number,points: Point[],surfaces: readonly Rect[],limit=MAX_STRANDS) {
+function anchorAt(strands: Strand[],from: Point,reach: number,points: Point[],surfaces: readonly Rect[],limit=MAX_STRANDS,accept?: (point:Point)=>boolean) {
   const to = points.find(point => distance(point,from) >= 9 &&
-    distance(point,from) <= reach && !surfaces.some(r => crossesSolid(from,point,r)));
+    distance(point,from) <= reach && (!accept || accept(point)) && !surfaces.some(r => crossesSolid(from,point,r)));
   if (!to) return false;
   const duplicate = strands.some(strand =>
     (distance(strand.from,from) < 2 && distance(strand.to,to) < 2) ||
@@ -126,8 +126,8 @@ function anchorAt(strands: Strand[],from: Point,reach: number,points: Point[],su
   return true;
 }
 
-export function anchorSilk(strands: Strand[],from: Point,reach: number,body: Point,surfaces: readonly Rect[],limit=MAX_STRANDS) {
-  return anchorAt(strands,from,reach,contacts(body,surfaces),surfaces,limit);
+export function anchorSilk(strands: Strand[],from: Point,reach: number,body: Point,surfaces: readonly Rect[],limit=MAX_STRANDS,accept?: (point:Point)=>boolean) {
+  return anchorAt(strands,from,reach,contacts(body,surfaces),surfaces,limit,accept);
 }
 
 export function fixSilk(web: Pick<Web,'loose'|'strands'>, body: Point, surfaces: readonly Rect[],limit=MAX_STRANDS) {

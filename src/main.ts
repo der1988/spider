@@ -4,7 +4,7 @@ import {renderWindowHunt} from './window-hunt-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
 import {advanceArena,arenaInput,arenaStep,releaseSilkButton,createArena,type ArenaEvent} from './arena-run';
-import {advanceArcade,arcadeBudget,arcadeWebLimit,arcadeEscapeButton,arcadeEscapePresses,arcadeHeight,arcadeStage,arcadeWidth,createArcade,species,stages,type ArcadeEvent,type ArcadeRun} from './arcade';
+import {advanceArcade,arcadeWebLimit,arcadeEscapeButton,arcadeEscapePresses,arcadeHeight,arcadeStage,arcadeWidth,createArcade,species,stages,type ArcadeEvent,type ArcadeRun} from './arcade';
 import {arcadeLevels,dialogueFor,heartsPerRun,insectMark} from './arcade-dialogue';
 import {ArcadeMusic} from './arcade-music';
 import {arcadeIcon,renderArcade} from './arcade-render';
@@ -336,7 +336,7 @@ const arcadeSounds={
   launch:'launch',jump:'jump',attach:'attach',double:'attach',miss:'miss',release:'release',fix:'fix',evict:'fix',
   catch:'catch',entrance:'discovery',new:'discovery',over:'miss',recover:'discovery',boss:'tension',
   'boss-trap':'attach','boss-free':'release',snared:'tension','escape-step':'fix',escape:'release',
-  hit:'catch',win:'discovery',hurt:'miss',
+  hit:'catch',win:'discovery',hurt:'heart',
 } as const;
 
 function arcadeFeedback(event:ArcadeEvent) {
@@ -363,7 +363,7 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
   const stage=arcadeStage(run.level);
   const boss=run.boss;
   shell.toggleAttribute('data-arcade-intro',!!run.intro);
-  const finished=run.phase==='over' || run.phase==='won';
+  const finished=run.phase==='won';
   if (run.phase!=='ready') arcadeMusic.sync(contextAudio,run.level,frozen && !finished || document.hidden || paused,!!run.intro);
   const encounter=dialogueFor(run.level);
   if (shownArcadeLevel!==run.level) {
@@ -394,20 +394,13 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
     hearts.textContent='♥'.repeat(run.lives)+'♡'.repeat(heartsPerRun-run.lives);
   }
   if (scoreLabel.textContent!==String(run.score)) scoreLabel.textContent=String(run.score);
-  const seconds=Math.max(0,Math.ceil(run.time));
-  if (timeLabel.textContent!==seconds+' s') timeLabel.textContent=seconds+' s';
-  const budget=arcadeBudget(run.level);
-  if (roundLabel.textContent!==budget+' s') roundLabel.textContent=budget+' s';
-  clock.dataset.phase=run.phase==='ready' || run.intro ? 'ready' : seconds<=5 ? 'urgent' : seconds<=15 ? 'low' : 'running';
-  clockMeter.style.setProperty('--remaining',Math.min(1,seconds/budget).toFixed(3));
   const beat=reduced() ? 0 : arcadeMusic.pulse;
-  clock.style.setProperty('--pulse',beat.toFixed(2));
   if (finished && defeat.hidden) {
-    get('defeat-title').textContent=run.phase==='won' ? 'Arcade cleared' : run.lives ? 'Time ran out' : 'Out of lives';
+    get('defeat-title').textContent='Arcade cleared';
     defeatScore.textContent=String(run.score);
     get('endless-status').textContent=`Level ${run.level} / ${arcadeLevels}`;
     defeat.hidden=false;
-    defeatChoices.select(run.phase==='won' ? 0 : 1,true);
+    defeatChoices.select(0,true);
   }
   if (run.phase!=='ready') say(finished ? '' : run.restartIn>0 ? 'Out of hearts. Back to level 1…' : run.intro ? 'Press × or Enter to skip.' : boss ?
     (run.snare ? `Press × or X to break free · ${run.snare.presses}/${arcadeEscapePresses}` :

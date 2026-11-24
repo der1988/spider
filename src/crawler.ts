@@ -37,6 +37,10 @@ function supports(spider: Spider,surfaces: readonly Rect[]) {
   return [...faces].filter(face=>dot({x:spider.vx,y:spider.vy},face)<=EPSILON);
 }
 
+export function crawlerIsSupported(spider:Crawler,surfaces:readonly Rect[]) {
+  return supports(spider,surfaces).length>0;
+}
+
 function grip(spider: Crawler,face: Support|undefined) {
   spider.support=face;
   if (face) {
@@ -69,11 +73,11 @@ export function closeCrawlerRopes(spider: Crawler) {
   return old;
 }
 
-export function anchorCrawlerRope(spider: Crawler,surfaces: readonly Rect[],strands: Strand[],range=DEFAULT_TUNING.range) {
+export function anchorCrawlerRope(spider: Crawler,surfaces: readonly Rect[],strands: Strand[],range=DEFAULT_TUNING.range,accept?: (point:Point)=>boolean) {
   const rope=spider.rope;
   if (!rope) return false;
   const face=supports(spider,surfaces)[0];
-  if (!face || !anchorSilk(strands,rope,range+SPIDER_HALF_HEIGHT,spider,surfaces)) return false;
+  if (!face || !anchorSilk(strands,rope,range+SPIDER_HALF_HEIGHT,spider,surfaces,undefined,accept)) return false;
   closeCrawlerRopes(spider);
   grip(spider,face);
   return true;

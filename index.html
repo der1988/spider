@@ -51,22 +51,24 @@
       <span class="clock-rhythm" aria-hidden="true"></span>
       <div class="clock-track" aria-hidden="true"><span id="clock-meter"></span></div>
     </div>
+    <section id="arcade-summary" aria-label="Endless status">
+      <p id="arcade-level"></p>
+      <p id="arcade-wave"></p>
+      <p id="arcade-lives"></p>
+    </section>
     <code id="ending-code" class="ending-code" aria-hidden="true"></code>
   </header>
   <div class="playfield">
     <aside id="arcade-left" class="arcade-rail" aria-label="Stage progress" hidden>
       <h2 id="arcade-stage"></h2>
-      <p id="arcade-level"></p>
       <ol id="arcade-progress" aria-label="Levels in this stage"></ol>
-      <p id="arcade-wave"></p>
       <p id="arcade-webs" aria-label="Fixed silk"></p>
-      <p id="arcade-lives"></p>
     </aside>
     <section class="stage" aria-label="Hunting arena">
     <canvas id="world" width="360" height="204" aria-label="Spider, fly and webs"></canvas>
     <section id="loop-defeat" class="defeat" aria-labelledby="defeat-title" hidden>
       <div class="defeat-panel">
-        <h2 id="defeat-title">Time ran out</h2>
+        <h2 id="defeat-title">Arcade cleared</h2>
         <div class="defeat-score">
           <label for="defeat-score">Total catches</label>
           <output id="defeat-score">0</output>

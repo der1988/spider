@@ -1,8 +1,8 @@
 import {arcadeLevels,dialogueFor,heartsPerRun,levelIntroDuration} from './arcade-dialogue.ts';
-import {advanceSilk,arcadeSilkReach,launchSilk,ropeAt,type SilkShot} from './arcade-silk.ts';
+import {advanceSilk,arcadeSilkReach,diagonalWeb,launchSilk,ropeAt,type SilkShot} from './arcade-silk.ts';
 import {idleQuips} from './arcade-script.ts';
 import {arenaStep,createArena,finishWebs,moveArena,releaseSilkButton,type ArenaInput,type ArenaEvent} from './arena-run.ts';
-import {closeCrawlerRopes,createCrawler} from './crawler.ts';
+import {closeCrawlerRopes,createCrawler,crawlerIsSupported} from './crawler.ts';
 import {anchorSilk,crossesSolid,sweptHit,type Strand} from './threads.ts';
 import {aimHit,SPIDER_HALF_HEIGHT,SPIDER_HALF_WIDTH,type Point,type Rect} from './spider.ts';
 
@@ -13,9 +13,9 @@ export const arcadeEscapePresses=5,arcadeEscapeButton=4;
 export const flyTrapSeconds=3,bossTrapSeconds=2.8;
 export const species=[
   ['Gnat','Steady, medium-speed flight',{speed:55,steer:7,think:1.15,fear:0,silk:0}],
-  ['Dart','Accelerates in bursts',{speed:59,steer:5,think:1.2,fear:0,silk:0,burst:115}],
-  ['Veil','Gives Spidey a wide berth',{speed:47,steer:10,think:.66,fear:1,silk:0}],
-  ['Skipper','Changes height quickly',{speed:51,steer:13,think:.56,fear:0,silk:0,vertical:.72}],
+  ['Dart','Dashes in straight bursts',{speed:59,steer:5,think:1.2,fear:0,silk:0,burst:115}],
+  ['Veil','Feints and switches sides',{speed:47,steer:10,think:.66,fear:1,silk:0}],
+  ['Skipper','Climbs and dives',{speed:51,steer:13,think:.56,fear:0,silk:0,vertical:.72}],
   ['Comet','Very fast, slow to turn',{speed:113,steer:2.8,think:2.1,fear:0,silk:0,straight:.54}],
   ['Leafwing','Spots silk and reroutes',{speed:44,steer:11,think:.62,fear:0,silk:190}],
   ['Looper','Bends its flight into arcs',{speed:58,steer:9,think:1.18,fear:0,silk:0,curve:.53}],
@@ -41,7 +41,7 @@ export const arcadeLayouts=stages.map((_,stage)=>[
   ...(stage ? [wall(62+stage*2,146+stage%2*10,54,7),wall(272-stage*3,158-stage%3*7,58,7)] : []),
 ]);
 type FlightPhase='patrol'|'windup'|'strike'|'recover';
-type Fly={phase:FlightPhase;phaseAt:number;p:Point;v:Point;target:Point;kind:number;actor:number;age:number;aimAt:number;caughtUntil:number;trappedBy?:Strand;touching:boolean};
+type Fly={phase:FlightPhase;phaseAt:number;feinted?:boolean;p:Point;v:Point;target:Point;kind:number;actor:number;age:number;aimAt:number;caughtUntil:number;trappedBy?:Strand;touching:boolean};
 type Boss={p:Point;target:Point;hp:number;max:number;size:number;phase:'warn'|'charge'|'recover'|'trapped';at:number;turn:number;side:number;repeated:number;shot?:Strand;net?:Strand;hit:boolean};
 export type ArcadeEvent=ArenaEvent|'launch'|'entrance'|'recover'|'boss'|'boss-trap'|'boss-free'|'snared'|'escape-step'|'escape'|'hit'|'win'|'hurt';
 const len=(p:Point)=>Math.hypot(p.x,p.y);
@@ -50,18 +50,17 @@ const dist=(a:Point,b:Point)=>len(sub(a,b));
 const clamp=(x:number,min:number,max:number)=>Math.min(max,Math.max(min,x));
 const clear=(a:Point,b:Point,surfaces:readonly Rect[])=>!surfaces.some(r=>crossesSolid(a,b,r));
 export const arcadeStage=(level:number)=>level-1;
-export const arcadeBudget=(level:number)=>level===arcadeLevels ? 72 : 38+level*2;
 export const intentionalArcadeInput=([x,y,ax,ay,buttons]:ArenaInput)=>!!buttons || Math.max(Math.hypot(x,y),Math.hypot(ax,ay))>=64;
 
 export function createArcade(startLevel=1) {
   const movement=createArena('loop',3,false);
   const run={
-    movement,level:startLevel,clock:0,phase:'ready' as 'ready'|'wave'|'boss'|'over'|'won',
+    movement,level:startLevel,clock:0,phase:'ready' as 'ready'|'wave'|'boss'|'won',
     flies:[] as Fly[],boss:undefined as Boss|undefined,
     rivalWebs:[] as Strand[],snare:undefined as {web:Strand;presses:number}|undefined,
-    recovered:0,score:0,quota:0,time:0,lives:heartsPerRun,invincible:0,restartIn:0,
+    recovered:0,score:0,quota:0,lives:heartsPerRun,invincible:0,restartIn:0,
     intro:undefined as {kind:'level'|'rival';elapsed:number}|undefined,
-    idle:0,idleLine:0,silkGesture:undefined as SilkShot|undefined,silkShots:[] as SilkShot[],
+    idle:0,idleLine:0,silkGesture:undefined as SilkShot|undefined,silkShots:[] as SilkShot[],ropeWeb:undefined as Strand|undefined,
   };
   prepareLevel(run);
   return run;
@@ -85,8 +84,7 @@ function prepareLevel(run:ArcadeRun) {
   const final=run.level===arcadeLevels;
   run.intro=run.phase==='ready' ? undefined : {kind:final ? 'rival' : 'level',elapsed:0};
   run.idle=0;
-  run.silkGesture=undefined;run.silkShots=[];
-  run.time=arcadeBudget(run.level);
+  run.silkGesture=undefined;run.silkShots=[];run.ropeWeb=undefined;
   const p={x:350,y:193};
   run.boss=final ? {p,target:p,hp:4,max:4,size:18,phase:'recover',at:0,turn:0,side:0,repeated:0,hit:false} : undefined;
   if (final && run.phase!=='ready') run.phase='boss';
@@ -106,11 +104,18 @@ function silkAcross(from:Point,to:Point,strands:readonly Strand[]) {
   return strands.some(wire=>sweptHit(from,to,wire));
 }
 
+export function arcadeAttackStyle(kind:number) {
+  if (kind===1 || kind===4) return 'dash';
+  if (kind===3 || kind===7) return 'dive';
+  if (kind===2 || kind===6 || kind===9) return 'feint';
+  return 'pounce';
+}
+
 function attackFlight(run:ArcadeRun,fly:Fly,profile:Flight,reading:number) {
   const {spider,hunt:{surfaces,strands}}=run.movement;
   const now=run.clock;
-  const steep=fly.kind===3 || fly.kind===7;
-  const sideways=fly.kind===1 || fly.kind===4;
+  const style=arcadeAttackStyle(fly.kind);
+  const steep=style==='dive',sideways=style==='dash';
   const player={x:clamp(spider.x+spider.vx*reading*.22,15,385),y:clamp(spider.y+spider.vy*reading*.22,14,207)};
   const clearLane=(from:Point,to:Point)=>clear(from,to,surfaces) && !silkAcross(from,to,strands);
   if (fly.phase==='patrol') {
@@ -124,10 +129,20 @@ function attackFlight(run:ArcadeRun,fly:Fly,profile:Flight,reading:number) {
     if (!approach && (steep || sideways || run.quota>1 && dist(fly.p,player)>85)) return;
     if (!approach && !clearLane(fly.p,player)) return;
     fly.phase='windup';
-    fly.phaseAt=now+.78-reading*.28;
+    fly.phaseAt=now+(steep ? 1.12 : style==='feint' ? .97 : .78)-reading*.28;
+    fly.feinted=false;
     fly.target=approach??{...fly.p};
   }
   if (fly.phase==='windup') {
+    if (style==='feint' && !fly.feinted && fly.phaseAt-now<.43) {
+      fly.feinted=true;
+      const side=fly.target.x<player.x ? 1 : -1;
+      const other={x:clamp(player.x+side*49,14,386),y:clamp(player.y-39,14,207)};
+      if (clearLane(fly.p,other) && clearLane(other,player)) {
+        fly.target=other;
+        fly.phaseAt+=.53;
+      }
+    }
     if (now<fly.phaseAt) return;
     if (!clearLane(fly.p,player)) {
       fly.phase='patrol';fly.phaseAt=now+.25;fly.aimAt=0;
@@ -136,10 +151,10 @@ function attackFlight(run:ArcadeRun,fly:Fly,profile:Flight,reading:number) {
     const vector=sub(player,fly.p),distance=len(vector)||1;
     const overshoot=sideways ? 48 : 24;
     fly.target={x:clamp(player.x+vector.x/distance*overshoot,14,386),y:clamp(player.y+vector.y/distance*overshoot,14,207)};
-    fly.phase='strike';fly.phaseAt=now+(sideways ? .95 : 1.05);
+    fly.phase='strike';fly.phaseAt=now+(sideways ? .91 : steep ? .82 : 1.05);
   }
   if (fly.phase==='strike' && (now>=fly.phaseAt || dist(fly.p,fly.target)<5 || fly.touching)) {
-    fly.phase='recover';fly.phaseAt=now+(profile.straight ? 1.1 : .87)-reading*.24;fly.aimAt=0;
+    fly.phase='recover';fly.phaseAt=now+(sideways || steep ? 1.15 : .95)-reading*.24;fly.aimAt=0;
   }
   if (fly.phase==='recover' && now>=fly.phaseAt) {
     fly.phase='patrol';fly.phaseAt=now+.47+fly.actor*.12;fly.aimAt=0;
@@ -155,7 +170,7 @@ function tickFlies(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
     Math.abs(point.y-spider.y)<=SPIDER_HALF_HEIGHT+4 && clear(point,spider,hunt.surfaces);
   function capture(point:Point) {
     if (!overlaps(point)) return false;
-    run.recovered++;run.score++;run.time=Math.min(arcadeBudget(run.level)+10,run.time+6);
+    run.recovered++;run.score++;
     emit('recover');
     return true;
   }
@@ -199,10 +214,12 @@ function tickFlies(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
     const direction=sub(fly.target,fly.p),length=len(direction)||1;
     const curve=fly.phase==='patrol' ? Math.sin(fly.age*8)*(profile.curve??0) : 0;
     const baseSpeed=(profile.burst && fly.age%1.45<.32 ? profile.burst : profile.speed)/average*(50+(run.level-1)*6);
-    const speed=fly.phase==='strike' ? baseSpeed*1.22+57+reading*22 : fly.phase==='windup' ? baseSpeed*.8 : fly.phase==='recover' ? baseSpeed*.55 : baseSpeed;
+    const style=arcadeAttackStyle(fly.kind);
+    const preparing=style==='dive' ? 104 : style==='feint' ? (fly.age%.24<.13 ? 142 : 40) : baseSpeed*.8;
+    const speed=fly.phase==='strike' ? baseSpeed*1.22+57+reading*22 : fly.phase==='windup' ? preparing : fly.phase==='recover' ? baseSpeed*.49 : baseSpeed;
     const x=(direction.x-direction.y*curve)/length*speed;
     const y=(direction.y+direction.x*curve)/length*speed;
-    const mix=arenaStep*(fly.phase==='strike' ? 15 : profile.steer);
+    const mix=arenaStep*(fly.phase==='strike' ? style==='dash' ? 7 : 15 : fly.phase==='windup' && style==='dive' ? 12 : profile.steer);
     fly.v.x+=(x-fly.v.x)*mix;
     fly.v.y+=(y+(fly.phase==='patrol' ? profile.sink??0 : 0)-fly.v.y)*mix;
     const next={x:clamp(fly.p.x+fly.v.x*arenaStep,14,386),y:clamp(fly.p.y+fly.v.y*arenaStep,14,207)};
@@ -245,14 +262,16 @@ function hurt(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
   if (run.clock<run.invincible) return;
   run.lives--;run.invincible=run.clock+1.5;
   releasePlayer(run);
-  if (!run.lives) {run.restartIn=.95;emit('over');}
-  else emit('hurt');
+  if (!run.lives) run.restartIn=.95;
+  emit('hurt');
 }
 
 function aimRivalWeb(target:Point,surfaces:readonly Rect[]) {
-  const from=aimHit(target,surfaces,{x:target.x,y:target.y-1},{range:arcadeHeight});
-  const to=aimHit(target,surfaces,{x:target.x,y:target.y+1},{range:arcadeHeight});
-  if (from && to && to.y-from.y>=30) return {from,to,shakeUntil:0};
+  for (const tilt of [.3,-.3]) {
+    const from=aimHit(target,surfaces,{x:target.x-tilt,y:target.y-1},{range:arcadeHeight});
+    const to=aimHit(target,surfaces,{x:target.x+tilt,y:target.y+1},{range:arcadeHeight});
+    if (from && to && to.y-from.y>=30 && diagonalWeb(from,to)) return {from,to,shakeUntil:0};
+  }
 }
 function warnBoss(run:ArcadeRun,boss:Boss) {
   const {spider,hunt}=run.movement;
@@ -335,7 +354,7 @@ function tickBoss(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
 
 function tickRivalWebs(run:ArcadeRun,from:Point,emit:(event:ArcadeEvent)=>void) {
   run.rivalWebs=run.rivalWebs.filter(web=>web===run.snare?.web || (web.expiresAt??Infinity)>run.clock);
-  if (run.snare || run.clock<run.invincible || run.phase==='over') return;
+  if (run.snare || run.clock<run.invincible) return;
   const {spider}=run.movement;
   const web=run.rivalWebs.find(wire=>sweptHit(from,spider,wire) || nearWire(spider,wire,5));
   if (!web) return;
@@ -343,7 +362,7 @@ function tickRivalWebs(run:ArcadeRun,from:Point,emit:(event:ArcadeEvent)=>void) 
   spider.thread=undefined;
   spider.vx=0;spider.vy=0;
   run.snare={web,presses:0};
-  run.silkGesture=undefined;run.silkShots=[];
+  run.silkGesture=undefined;run.silkShots=[];run.ropeWeb=undefined;
   web.shakeUntil=run.clock+.35;
   emit('snared');
 }
@@ -353,14 +372,17 @@ function arcadeSilk(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeEvent)=>voi
     const {spider,aim}=run.movement;
     const length=Math.hypot(ax,ay);
     const direction=length ? {x:ax/length,y:ay/length} : aim;
-    const shot=launchSilk(spider,direction,{x:spider.vx,y:spider.vy});
+    const shot=launchSilk(spider,direction,{x:spider.vx,y:spider.vy},crawlerIsSupported(spider,run.movement.hunt.surfaces));
     run.silkGesture=shot;
     run.silkShots.push(shot);
     emit('launch');
   }
   const gesture=run.silkGesture;
   if (buttons&releaseSilkButton) {
-    if (gesture) gesture.mode='trap';
+    if (gesture) {
+      gesture.mode='trap';
+      if (!crawlerIsSupported(run.movement.spider,run.movement.hunt.surfaces)) gesture.grounded=false;
+    }
     run.silkGesture=undefined;
   }
   return [input[0],input[1],ax,ay,buttons&~2];
@@ -373,29 +395,43 @@ function tickSilkShots(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
       shot.fade-=arenaStep;
       return shot.fade>0;
     }
-    if (!advanceSilk(shot,hunt.surfaces,arenaStep)) {
+    shot.grounded &&= crawlerIsSupported(spider,hunt.surfaces);
+    if (!advanceSilk(shot,hunt.surfaces,hunt.strands,arenaStep)) {
       emit('miss');
       shot.fade=.08;
       return true;
     }
     if (shot.mode==='pending' && shot.age>=arcadeRopeHold) shot.mode='rope';
     if (!shot.hit || shot.mode==='pending') return true;
-    const {point}=shot.hit;
+    const {point,web}=shot.hit;
+    if (!shot.grounded || web && !hunt.strands.includes(web)) {
+      emit('miss');
+      shot.fade=.08;
+      return true;
+    }
     if (shot.mode==='rope') {
       const rope=ropeAt(point,spider);
       if (rope && clear(spider,point,hunt.surfaces)) {
         spider.rope=rope;
+        run.ropeWeb=web;
         spider.support=undefined;spider.thread=undefined;spider.grounded=false;
         emit('attach');
       } else emit('miss');
     } else {
       const before=hunt.strands.length;
-      if (anchorSilk(hunt.strands,point,arcadeSilkReach+SPIDER_HALF_HEIGHT,shot.origin,hunt.surfaces)) {
+      if (anchorSilk(hunt.strands,point,arcadeSilkReach+SPIDER_HALF_HEIGHT,spider,hunt.surfaces,undefined,to=>diagonalWeb(point,to))) {
         finishWebs(movement,before,emit,arcadeWebLimit);
       } else emit('miss');
     }
     return false;
   });
+}
+
+function checkRopeWeb(run:ArcadeRun) {
+  if (run.ropeWeb && !run.movement.hunt.strands.includes(run.ropeWeb)) {
+    closeCrawlerRopes(run.movement.spider);
+    run.ropeWeb=undefined;
+  }
 }
 
 export function advanceArcade(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeEvent)=>void=()=>{}) {
@@ -415,7 +451,7 @@ export function advanceArcade(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeE
     run.intro={kind:run.boss ? 'rival' : 'level',elapsed:0};
     emit(run.boss ? 'boss' : 'entrance');
   }
-  if (run.phase==='over' || run.phase==='won') return;
+  if (run.phase==='won') return;
   if (run.intro) {
     const intro=run.intro;
     intro.elapsed+=arenaStep;
@@ -426,9 +462,10 @@ export function advanceArcade(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeE
     }
     return;
   }
-  run.clock+=arenaStep;run.time-=arenaStep;
+  run.clock+=arenaStep;
   run.movement.hunt.clock=run.clock;
   run.movement.hunt.strands=run.movement.hunt.strands.filter(wire=>(wire.expiresAt??Infinity)>run.clock);
+  checkRopeWeb(run);
   const {spider}=run.movement,from={x:spider.x,y:spider.y};
   if (run.snare) {
     if ((input[4]&arcadeEscapeButton)!==0) {
@@ -438,9 +475,13 @@ export function advanceArcade(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeE
       else emit('escape-step');
     }
   } else {
-    moveArena(run.movement,arcadeSilk(run,input,emit),emit,{
-      climbSilk:false,adjustRope:true,webLimit:arcadeWebLimit,ropeRange:arcadeSilkReach,directionalJump:true,
+    moveArena(run.movement,arcadeSilk(run,input,emit),event=>{
+      if (event==='jump') for (const shot of run.silkShots) shot.grounded=false;
+      emit(event);
+    },{
+      climbSilk:false,adjustRope:true,webLimit:arcadeWebLimit,ropeRange:arcadeSilkReach,directionalJump:true,acceptWebEnd:diagonalWeb,
     });
+    if (!spider.rope) run.ropeWeb=undefined;
     tickSilkShots(run,emit);
   }
   if (run.snare || intentionalArcadeInput(input) || dist(spider,from)>.045) {
@@ -461,5 +502,5 @@ export function advanceArcade(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeE
     prepareLevel(run);
     emit(run.boss ? 'boss' : 'entrance');
   }
-  if (run.lives>0 && run.time<=0 && run.phase!=='won') {run.phase='over';emit('over');}
+  checkRopeWeb(run);
 }

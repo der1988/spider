@@ -346,3 +346,10 @@ dialog h2 { margin: 0; font-size: 16px; }
   letter-spacing: .1em;
   white-space: nowrap;
 }
+
+#arcade-summary { display:none; }
+.shell[data-arcade] header { grid-template-columns:minmax(0,1fr) auto; }
+.shell[data-arcade] .clock { display:none; }
+.shell[data-arcade] #arcade-summary { display:grid; gap:2px; justify-items:end; text-align:right; }
+#arcade-summary p { margin:0; }
+#arcade-wave { font-size:clamp(10px,2vw,14px); }
