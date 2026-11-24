@@ -2,7 +2,7 @@ import {arcadeFrame,arcadeLayouts,arcadeScenes} from './arcade-scenery';
 import {dialogueFor,insectMark,lineAt} from './arcade-dialogue';
 import {rivalQuips} from './arcade-script';
 import {arcadeAttackStyle,arcadeDirectHits,arcadeEscapePresses,arcadeHeight,arcadeIdleSpeech,arcadeStage,arcadeWidth,bossTrapSeconds,flyEscapeGrace,flyTrapSeconds,type ArcadeRun} from './arcade';
-import {block,drawSpider} from './hunt-render';
+import {block,drawAimMarker,drawSpider} from './hunt-render';
 import type {Point} from './spider';
 import type {Strand} from './threads';
 
@@ -131,23 +131,6 @@ function openingSpeech(ctx:CanvasRenderingContext2D,run:ArcadeRun):ArcadeSpeech|
     words:line.words,
     portrait:fly ? {kind:fly.kind,mark:insectMark(run.level,fly.actor)} : player ? 'spidey' : 'rival',
   };
-}
-
-function aimReticle(ctx:CanvasRenderingContext2D,spider:Point,aim:Point) {
-  const pad=7;
-  const edgeX=aim.x>0 ? width-pad-spider.x : spider.x-pad;
-  const edgeY=aim.y>0 ? height-pad-spider.y : spider.y-pad;
-  const reach=Math.max(0,Math.min(22,edgeX/Math.abs(aim.x),edgeY/Math.abs(aim.y)));
-  const x=Math.round(spider.x+aim.x*reach),y=Math.round(spider.y+aim.y*reach);
-  const dark='#182021',light='#fff9df';
-  block(ctx,x-5,y-5,11,11,dark);
-  block(ctx,x-4,y-4,9,9,light);
-  block(ctx,x-2,y-2,5,5,dark);
-  block(ctx,x,y,1,1,light);
-  block(ctx,x-2,y-6,5,2,dark);block(ctx,x,y-5,1,2,light);
-  block(ctx,x-2,y+5,5,2,dark);block(ctx,x,y+4,1,2,light);
-  block(ctx,x-6,y-2,2,5,dark);block(ctx,x-5,y,2,1,light);
-  block(ctx,x+5,y-2,2,5,dark);block(ctx,x+4,y,2,1,light);
 }
 
 function bandColor(from:string,to:string,amount:number) {
@@ -380,7 +363,7 @@ export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:nu
   }
   if (run.intro) return speech;
   if (snare) status(ctx,{x:spider.x,y:spider.y-14},`× ${snare.presses}/${arcadeEscapePresses}`,light,snare.presses/arcadeEscapePresses,'#e9f4b9');
-  else aimReticle(ctx,spider,aim);
+  else drawAimMarker(ctx,spider,aim,width,height);
   if (run.phase==='wave' || run.phase==='boss') {
     const rivalLine=boss && (boss.phase==='trapped' || boss.phase==='recover') && boss.turn%3===1;
     const spideyLine=arcadeIdleSpeech(run);

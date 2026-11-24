@@ -97,6 +97,7 @@ test('natural and skipped introductions start gameplay at the exact staged posit
       }
       assert.equal(run.clock,0);
       assert.deepEqual(poses(run),start);
+      assert.ok(start.flies.every(p=>p.x-start.hero.x>=145));
       const {surfaces}=run.movement.hunt;
       assert.ok(start.flies.every(p=>surfaces.every(s=>
         p.x+5<=s.x || p.x-5>=s.x+s.w || p.y+5<=s.y || p.y-5>=s.y+s.h)));
@@ -127,6 +128,7 @@ test('a free insect causes one contact injury, then the same prey must be trappe
 test('silk catches the first gnat, which escapes from the exact caught position when the deadline passes',()=>{
   const run=createArcade();
   start(run);
+  run.flies[0].p={x:102,y:184};
   advanceArcade(run,arenaInput({x:0,y:0},{x:.75,y:-.8},false,true));
   advanceArcade(run,[0,0,0,0,releaseSilkButton]);
   ticks(run,.8);

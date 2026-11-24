@@ -99,9 +99,9 @@ const nodes=[{x:44,y:102},{x:354,y:103},{x:128,y:32},{x:300,y:36},{x:102,y:184},
 const airNodes=[...nodes,...[28,58,89,121,153,181,200].flatMap(y=>
   [32,79,129,177,221,272,321,370].map(x=>({x,y})))];
 function flySpawn(run:ArcadeRun,index:number) {
-  if (run.level===1) return nodes[4];
+  const spawn=arcadeSpawns[arcadeStage(run.level)];
   const surfaces=flightSurfaces(run);
-  const slots=airNodes.filter(p=>p.x>=95 && p.y<185 && clear(p,p,surfaces));
+  const slots=airNodes.filter(p=>p.x>=spawn.x+145 && p.y<185 && clear(p,p,surfaces));
   return slots[(index*11+run.level*7)%slots.length];
 }
 
