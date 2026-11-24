@@ -615,7 +615,6 @@ export function advanceArcade(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeE
     intro.elapsed+=arenaStep;
     const duration=levelIntroDuration(run.level);
     if (intro.elapsed>=duration || intro.elapsed>=.4 && (input[4]&arcadeEscapeButton)!==0) {
-      if (intro.kind==='rival') warnBoss(run,run.boss!);
       run.intro=undefined;
     }
     return;

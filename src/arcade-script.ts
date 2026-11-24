@@ -1,9 +1,9 @@
 export const idleQuips=[
   'I could use eight footrests.',
-  'The view from here is unpaid.',
+  'A fly owes this ledge rent.',
   'I took this job for web access.',
-  'Standing still is my break.',
-  'One of us should blink first.',
+  'I’m waiting for a molt permit.',
+  'Eight shoes. Still no pockets.',
 ] as const;
 
 export const rivalQuips=[

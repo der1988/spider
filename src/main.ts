@@ -1,14 +1,13 @@
-import {arcadeScenes} from './arcade-scenery';
 import './style.css';
 import {createOpenWorld,createWindowHunt,pantryTiers,preyTier,restartOpenWorld,stepWindowHunt,updateHuntZoom,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
 import {renderWindowHunt} from './window-hunt-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
 import {advanceArena,arenaInput,arenaStep,releaseSilkButton,createArena,type ArenaEvent} from './arena-run';
-import {advanceArcade,arcadeDirectHits,arcadeDodgeStyle,arcadeWebLimit,arcadeEscapeButton,arcadeEscapePresses,arcadeHeight,arcadeStage,arcadeWidth,createArcade,species,type ArcadeEvent,type ArcadeRun} from './arcade';
-import {arcadeLevels,dialogueFor,heartsPerRun,insectMark} from './arcade-dialogue';
+import {advanceArcade,arcadeWebLimit,arcadeEscapeButton,arcadeHeight,arcadeWidth,createArcade,type ArcadeEvent,type ArcadeRun} from './arcade';
+import {arcadeLevels,heartsPerRun} from './arcade-dialogue';
 import {ArcadeMusic} from './arcade-music';
-import {arcadeIcon,renderArcade,type ArcadeSpeech} from './arcade-render';
+import {arcadePortrait,renderArcade,type ArcadeSpeech} from './arcade-render';
 import {WEB_KEY} from './threads';
 import {renderHunt} from './hunt-render';
 import {readLeftStick,samplePlayStation} from './pad-controls';
@@ -26,32 +25,20 @@ import {flyCues,flyDoubtAt,flyDuration,flyFinalStart,flyMenuStart,flyRoomEffect}
 
 const get = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const worldCanvas=get<HTMLCanvasElement>('world');
+const arcadeLine=get('arcade-line');
 const arcadeSpeech=get('arcade-speech');
-let arcadeView={w:0,h:0};
-let speechSize={w:0,h:0};
-new ResizeObserver(([entry])=>{
-  arcadeView={w:entry.contentRect.width,h:entry.contentRect.height};
-  speechSize={w:0,h:0};
-}).observe(worldCanvas);
+const arcadeSpeaker=get('arcade-speaker');
+const arcadePortraitBox=get('arcade-portrait');
 
 function showArcadeSpeech(speech?:ArcadeSpeech) {
-  const {w,h}=arcadeView;
-  arcadeSpeech.hidden=!speech || w<40 || h<32;
-  if (arcadeSpeech.hidden || !speech) return;
-  const scale=Math.min(w/arcadeWidth,h/arcadeHeight);
-  const width=arcadeWidth*scale,height=arcadeHeight*scale;
-  if (arcadeSpeech.textContent!==speech.words || !speechSize.w) {
-    arcadeSpeech.textContent=speech.words;
-    arcadeSpeech.style.setProperty('--caption-width',Math.max(0,width-8)+'px');
-    speechSize={w:arcadeSpeech.offsetWidth,h:arcadeSpeech.offsetHeight};
+  const hidden=!speech;
+  if (arcadeLine.hidden!==hidden) arcadeLine.hidden=hidden;
+  if (!speech) return;
+  if (arcadeSpeaker.textContent!==speech.name) {
+    arcadeSpeaker.textContent=speech.name;
+    arcadePortraitBox.innerHTML=arcadePortrait(speech.portrait);
   }
-  const inset=4;
-  const anchorX=speech.p.x*scale,anchorY=speech.p.y*scale;
-  const x=Math.max(inset,Math.min(width-speechSize.w-inset,anchorX-speechSize.w/2));
-  const gap=Math.max(9,speech.clearance*scale);
-  const above=anchorY-gap-speechSize.h;
-  const y=above>=inset ? above : Math.min(height-speechSize.h-inset,anchorY+gap);
-  arcadeSpeech.style.translate=`${Math.round((w-width)/2+x)}px ${Math.round((h-height)/2+y)}px`;
+  if (arcadeSpeech.textContent!==speech.words) arcadeSpeech.textContent=speech.words;
 }
 
 const context = worldCanvas.getContext('2d',{alpha:false})!;
@@ -77,7 +64,6 @@ new ResizeObserver(([entry])=>{
   menuRoom=createMenuRoom(w,h);
 }).observe(menuCanvas);
 const defeat = get('loop-defeat');
-const defeatScore = get('defeat-score');
 const startStatus = get('start-status');
 const shell = get('shell');
 const lyric = get('lyric');
@@ -111,7 +97,7 @@ let escape: FlyEscape|undefined;
 let windowHunt: WindowRun|undefined;
 let arcade: ArcadeRun|undefined;
 let arcadeAxesReady=false;
-let shownArcadeLevel=0;
+
 let roomMapOpen=false;
 let storyCheckpoint: {offset:number; arena:typeof arena}|undefined;
 let escapeCheckpoint: FlyEscape|undefined;
@@ -306,10 +292,7 @@ function showMenu() {
   arcade=undefined;
   arcadeMusic.stop();
   delete shell.dataset.arcade;
-  delete shell.dataset.arcadeIntro;
   showArcadeSpeech();
-  get('arcade-left').hidden=true;
-  get('arcade-right').hidden=true;
   gnatMusic.reset();
   roomMapOpen=false;
   storyCheckpoint=undefined;
@@ -343,8 +326,8 @@ function startArcade() {
   launch.inert=true;
   worldCanvas.width=arcadeWidth;
   worldCanvas.height=arcadeHeight;
-  get('arcade-left').hidden=false;
-  get('arcade-right').hidden=false;
+  context.imageSmoothingEnabled=false;
+  showArcadeSpeech();
   defeat.hidden=true;
   paused=false;
   opening=false;
@@ -353,8 +336,7 @@ function startArcade() {
   keyboardButtons=0;
   pendingButtons=0;
   arcadeAxesReady=false;
-  shownArcadeLevel=0;
-  say('Move, aim or press a button to start.');
+  say('');
   syncPause();
 }
 
@@ -387,29 +369,19 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
       remainder-=arenaStep;
       input[4]=pendingButtons;
       pendingButtons=0;
+      const intro=run.intro;
       advanceArcade(run,input,arcadeFeedback);
+      if (intro && !run.intro) {
+        // Present the starting pose before advancing another physics step.
+        remainder=0;
+        break;
+      }
     }
   }
-  const stage=arcadeStage(run.level);
-  const boss=run.boss;
-  shell.toggleAttribute('data-arcade-intro',!!run.intro);
   const finished=run.phase==='won';
   if (run.phase!=='ready') arcadeMusic.sync(contextAudio,run.level,frozen && !finished || document.hidden || paused,!!run.intro);
-  const encounter=dialogueFor(run.level);
-  if (shownArcadeLevel!==run.level) {
-    get('arcade-stage').textContent=arcadeScenes[stage].name;
-    get('arcade-species').innerHTML=encounter.insects.map(([name,kind],index)=>
-      `<li>${arcadeIcon(kind,insectMark(run.level,index))}<div><strong>${name}</strong><span>${species[kind][1]} · ${{zigzag:'Zigzag',lift:'Altitude dodge',feint:'Feint'}[arcadeDodgeStyle(kind)]}${arcadeDirectHits(run.level,index)>1 ? ' · '+arcadeDirectHits(run.level,index)+' direct hits' : ''}</span></div></li>`).join('');
-    get('arcade-level').textContent=`Level ${run.level} / ${arcadeLevels}`;
-    get('arcade-progress').innerHTML=Array.from({length:arcadeLevels},(_,i)=>{
-      const number=i+1;
-      const status=number===run.level ? ' aria-current="step"' : number<run.level ? ' data-status="done"' : '';
-      return `<li aria-label="Level ${number}"${status}></li>`;
-    }).join('');
-    shownArcadeLevel=run.level;
-  }
-  const wave=run.intro ? encounter.name : boss ? `${encounter.name} · ${boss.hp} / ${boss.max}` : `Left to catch · ${run.quota-run.recovered}`;
-  if (get('arcade-wave').textContent!==wave) get('arcade-wave').textContent=wave;
+  const level=get('arcade-level'),label=`Level ${run.level} / ${arcadeLevels}`;
+  if (level.textContent!==label) level.textContent=label;
   const nets=get('arcade-webs');
   const webCount=run.movement.hunt.strands.length;
   const webLabel=`Silk ${'◆'.repeat(webCount)}${'◇'.repeat(Math.max(0,arcadeWebLimit-webCount))}`;
@@ -423,18 +395,13 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
     hearts.setAttribute('aria-label',`${run.lives} of ${heartsPerRun} hearts`);
     hearts.textContent='♥'.repeat(run.lives)+'♡'.repeat(heartsPerRun-run.lives);
   }
-  if (scoreLabel.textContent!==String(run.score)) scoreLabel.textContent=String(run.score);
   const beat=reduced() ? 0 : arcadeMusic.pulse;
   if (finished && defeat.hidden) {
     get('defeat-title').textContent='Arcade cleared';
-    defeatScore.textContent=String(run.score);
     get('endless-status').textContent=`Level ${run.level} / ${arcadeLevels}`;
     defeat.hidden=false;
     defeatChoices.select(0,true);
   }
-  if (run.phase!=='ready') say(finished ? '' : run.restartIn>0 ? 'Out of hearts. Back to level 1…' : run.intro ? 'Press × or Enter to skip.' : boss ?
-    (run.snare ? `Press × or X to break free · ${run.snare.presses}/${arcadeEscapePresses}` :
-      'Set a web, then touch the rival while he’s tangled.') : 'Aim with RS. Use R1 to tag flies or swing. Recover trapped flies before they escape.');
   showArcadeSpeech(renderArcade(context,run,beat,reduced()));
 }
 

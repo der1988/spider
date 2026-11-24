@@ -81,6 +81,29 @@ test('all ten encounters have their own dialogue, insect names and silhouettes, 
   }
 });
 
+test('natural and skipped introductions start gameplay at the exact staged positions',()=>{
+  function poses(run:ReturnType<typeof createArcade>) {
+    const {x,y,support}=run.movement.spider;
+    return {hero:{x,y,support},flies:run.flies.map(fly=>({...fly.p})),rival:run.boss && {...run.boss.p}};
+  }
+  for (let level=1;level<=arcadeLevels;level++) {
+    for (const skipped of [false,true]) {
+      const run=createArcade(level),start=poses(run);
+      advanceArcade(run,right);
+      if (skipped) skip(run);
+      else {
+        const input=arenaInput({x:1,y:0});
+        while (run.intro) advanceArcade(run,input);
+      }
+      assert.equal(run.clock,0);
+      assert.deepEqual(poses(run),start);
+      const {surfaces}=run.movement.hunt;
+      assert.ok(start.flies.every(p=>surfaces.every(s=>
+        p.x+5<=s.x || p.x-5>=s.x+s.w || p.y+5<=s.y || p.y-5>=s.y+s.h)));
+    }
+  }
+});
+
 test('a free insect causes one contact injury, then the same prey must be trapped and retrieved',()=>{
   const run=createArcade();
   advanceArcade(run,arenaInput({x:.3,y:0},{x:0,y:.35}));
@@ -364,6 +387,8 @@ test('each full roster advances exactly one level and the tenth opens directly o
   assert.equal(run.level,10);
   assert.equal(run.phase,'boss');
   assert.equal(run.flies.length,0);
+  assert.equal(run.boss?.phase,'recover');
+  advanceArcade(run,neutral);
   assert.equal(run.boss?.phase,'warn');
 });
 

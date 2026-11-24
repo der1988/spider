@@ -1,8 +1,8 @@
-import {arcadeFrame,arcadeScenes} from './arcade-scenery';
+import {arcadeFrame,arcadeLayouts,arcadeScenes} from './arcade-scenery';
 import {dialogueFor,insectMark,lineAt} from './arcade-dialogue';
 import {rivalQuips} from './arcade-script';
 import {arcadeAttackStyle,arcadeDirectHits,arcadeEscapePresses,arcadeHeight,arcadeIdleSpeech,arcadeStage,arcadeWidth,bossTrapSeconds,flyEscapeGrace,flyTrapSeconds,type ArcadeRun} from './arcade';
-import {block,drawAimMarker,drawSpider} from './hunt-render';
+import {block,drawSpider} from './hunt-render';
 import type {Point} from './spider';
 import type {Strand} from './threads';
 
@@ -32,20 +32,50 @@ function silhouette(mark:number) {
 
 const markings=Array.from({length:8},(_,mark)=>new Path2D(silhouette(mark)));
 
-export function arcadeIcon(kind:number,mark:number) {
-  return `<svg viewBox="0 0 12 11" aria-hidden="true"><path fill="${colors[kind]}" d="${wings[kind]}"/><path fill="#24252d" d="${bodies[kind]+silhouette(mark)}"/><path fill="#fff9d2" d="M5 3h2v1H5z"/></svg>`;
+type Portrait='spidey'|'rival'|{kind:number;mark:number};
+export type ArcadeSpeech={name:string;words:string;portrait:Portrait};
+
+export function arcadePortrait(portrait:Portrait) {
+  const image=(art:string)=>`<svg viewBox="0 0 16 16" aria-hidden="true">${art}</svg>`;
+  if (typeof portrait==='string') {
+    const rival=portrait==='rival';
+    return image(`
+      <path fill="#131f20" d="M1 9h3V7h2V4h6v2h2v2h1v4h-2v2h-3v-2H7v2H5v-2H3v2H1v-2h1v-2H1z"/>
+      <path fill="${rival ? '#977783' : '#79a354'}" d="M2 9h3V7h2V5h4v2h2v2h1v2h-3v1H7v-1H5v1H3v-1H2z"/>
+      <path fill="${rival ? '#bc8f8a' : '#b3cd73'}" d="M3 9h3v1H3zM8 5h3v1H8zM7 8h1v2H7z"/>
+      <path fill="#202f24" d="M8 10h4v1H8zM4 12h1v2H4zM11 12h1v2h-1z"/>
+      <path fill="${rival ? '#ffb476' : '#f4ebbd'}" d="M9 8h1v1H9zM12 8h1v1h-1z"/>
+      ${rival ? '<path fill="#ffe596" d="M6 3h1v1h2V2h1v2h2V3h1v3H6z"/>' : ''}
+    `);
+  }
+  const {kind,mark}=portrait;
+  return image(`
+    <g transform="translate(2 3)">
+      <path fill="#162321" d="${wings[kind]}" stroke="#162321" stroke-width="1"/>
+      <path fill="${colors[kind]}" d="${wings[kind]}"/>
+      <path fill="#fff3c9" d="M3 4h1v1H3zM8 4h1v1H8z"/>
+      <path fill="#222733" d="${bodies[kind]+silhouette(mark)}"/>
+      <path fill="${colors[kind]}" d="M4 4h1v1H4zM5 5h2v1H5zM5 7h2v1H5z"/>
+      <path fill="#fff9dc" d="M5 3h1v1H5zM7 3h1v1H7z"/>
+    </g>
+  `);
 }
 
 function insect(ctx:CanvasRenderingContext2D,p:Point,kind:number,mark:number,time:number,caught=false) {
   ctx.save();
   ctx.translate(Math.round(p.x)-6,Math.round(p.y)-5);
-  ctx.fillStyle=colors[kind];
+  ctx.save();
   if (!caught && Math.floor(time*25)%2===0) ctx.translate(0,-1);
+  ctx.fillStyle='#34433d';
+  ctx.translate(0,1);ctx.fill(icons[kind]);ctx.translate(0,-1);
+  ctx.fillStyle=colors[kind];
   ctx.fill(icons[kind]);
+  ctx.restore();
   ctx.fillStyle='#24252d';
   ctx.fill(bodyIcons[kind]);
   if (mark) ctx.fill(markings[mark]);
   block(ctx,5,3,2,1,'#fff9d2');
+  block(ctx,5,5,2,1,colors[kind]);
   ctx.restore();
 }
 
@@ -83,64 +113,57 @@ function status(ctx:CanvasRenderingContext2D,p:Point,label:string,light:string,r
   ctx.restore();
 }
 
-export type ArcadeSpeech={p:Point;words:string;clearance:number};
-
-function spot(ctx:CanvasRenderingContext2D,p:Point,radius:number,light:string,intensity:number) {
-  const pool=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,radius);
-  pool.addColorStop(0,light);
-  pool.addColorStop(1,light+'00');
-  ctx.save();
-  ctx.globalAlpha=intensity;ctx.fillStyle=pool;
-  ctx.fillRect(p.x-radius,p.y-radius,radius*2,radius*2);
-  ctx.restore();
-}
-
-function introduction(ctx:CanvasRenderingContext2D,run:ArcadeRun,ink:string,light:string,pulse:number,reducedMotion:boolean):ArcadeSpeech|undefined {
-  const {elapsed,kind}=run.intro!;
-  const {insects}=dialogueFor(run.level);
-  const speech=lineAt(run.level,elapsed);
-  const hero=run.movement.spider;
-  const positions=insects.map((_,i)=>354-i*33);
-  const y=[166,147,181,129,103].find(y=>positions.every(x=>
-    !run.movement.hunt.surfaces.some(r=>x+9>r.x && x-9<r.x+r.w && y+14>r.y && y-7<r.y+r.h)))??166;
-  const formation=positions.map(x=>({x,y}));
-  const leader=run.boss?.p??formation[0];
-  const speaking=speech?.speaker;
-  const speaker=speaking==='spidey' ? hero : typeof speaking==='number' ? formation[speaking] : leader;
-  const rival=kind==='rival';
-  const accent=reducedMotion ? 0 : pulse*.04;
-  spot(ctx,hero,34,light,speaking==='spidey' ? .52+accent : .23);
-  if (speaker!==hero) spot(ctx,speaker,rival ? 51 : 32,light,.50+accent);
-  else spot(ctx,leader,rival ? 42 : 28,light,.22);
-
-  drawSpider(ctx,hero,elapsed,{time:elapsed,beat:0});
-  if (rival) {
-    ctx.save();
-    ctx.translate(leader.x,leader.y);ctx.scale(2.35,2.35);
-    drawSpider(ctx,{...hero,x:0,y:0,vx:0,vy:0,support:'floor',rope:undefined,facing:-1},elapsed,{time:elapsed,beat:0},'aim');
-    ctx.restore();
-  } else {
-    run.flies.forEach((fly,index)=>{
-      const p=formation[index];
-      insect(ctx,p,fly.kind,insectMark(run.level,index),elapsed+index*.05,reducedMotion);
-      ctx.save();
-      ctx.textAlign='center';ctx.font='bold 7px monospace';ctx.lineWidth=1.5;
-      ctx.strokeStyle=ink;ctx.fillStyle=light;
-      const name=insects[index][0];
-      ctx.strokeText(name,p.x,p.y+12);
-      ctx.fillText(name,p.x,p.y+12);
-      ctx.restore();
-    });
+function openingSpeech(ctx:CanvasRenderingContext2D,run:ArcadeRun):ArcadeSpeech|undefined {
+  const line=lineAt(run.level,run.intro!.elapsed);
+  if (!line) return;
+  const encounter=dialogueFor(run.level);
+  const player=line.speaker==='spidey',rival=line.speaker==='rival';
+  const fly=typeof line.speaker==='number' ? run.flies[line.speaker] : undefined;
+  const p=fly?.p??(player ? run.movement.spider : run.boss!.p);
+  const clearance=rival ? 24 : 11;
+  for (const side of [-1,1]) {
+    const x=p.x+side*clearance;
+    block(ctx,x-1,p.y-1,3,3,'#1b2420');
+    block(ctx,x,p.y,1,1,'#fcf6c9');
   }
-  if (speech) return {p:speaker,words:speech.words,clearance:rival && speaking==='rival' ? 23 : 12};
+  return {
+    name:fly ? encounter.insects[fly.actor][0] : player ? 'Spidey' : encounter.name,
+    words:line.words,
+    portrait:fly ? {kind:fly.kind,mark:insectMark(run.level,fly.actor)} : player ? 'spidey' : 'rival',
+  };
 }
+
+function aimReticle(ctx:CanvasRenderingContext2D,spider:Point,aim:Point) {
+  const pad=7;
+  const edgeX=aim.x>0 ? width-pad-spider.x : spider.x-pad;
+  const edgeY=aim.y>0 ? height-pad-spider.y : spider.y-pad;
+  const reach=Math.max(0,Math.min(22,edgeX/Math.abs(aim.x),edgeY/Math.abs(aim.y)));
+  const x=Math.round(spider.x+aim.x*reach),y=Math.round(spider.y+aim.y*reach);
+  const dark='#182021',light='#fff9df';
+  block(ctx,x-5,y-5,11,11,dark);
+  block(ctx,x-4,y-4,9,9,light);
+  block(ctx,x-2,y-2,5,5,dark);
+  block(ctx,x,y,1,1,light);
+  block(ctx,x-2,y-6,5,2,dark);block(ctx,x,y-5,1,2,light);
+  block(ctx,x-2,y+5,5,2,dark);block(ctx,x,y+4,1,2,light);
+  block(ctx,x-6,y-2,2,5,dark);block(ctx,x-5,y,2,1,light);
+  block(ctx,x+5,y-2,2,5,dark);block(ctx,x+4,y,2,1,light);
+}
+
+function bandColor(from:string,to:string,amount:number) {
+  const a=parseInt(from.slice(1),16),b=parseInt(to.slice(1),16);
+  const rgb=[16,8,0].map(shift=>{
+    const start=(a>>shift)&255,end=(b>>shift)&255;
+    return Math.round(start+(end-start)*amount);
+  });
+  return `rgb(${rgb.join(',')})`;
+}
+const skyBands=arcadeScenes.map(({light,base,accent})=>Array.from({length:14},(_,i)=>
+  i<8 ? bandColor(light,base,i/8) : bandColor(base,accent,(i-8)/7)));
 
 function landscape(ctx:CanvasRenderingContext2D,stage:number,pulse:number,reducedMotion:boolean) {
-  const {base,ink,light,accent,skyline}=arcadeScenes[stage];
-  block(ctx,0,0,width,height,base);
-  const wash=ctx.createLinearGradient(0,0,0,height);
-  wash.addColorStop(0,light);wash.addColorStop(.59,base);wash.addColorStop(1,accent);
-  ctx.fillStyle=wash;ctx.fillRect(0,0,width,height);
+  const {ink,light,accent,skyline}=arcadeScenes[stage];
+  for (const [index,color] of skyBands[stage].entries()) block(ctx,0,index*16,width,16,color);
   ctx.save();
   ctx.globalAlpha=.75;
   const sun=stage%2===0 ? 308 : 84;
@@ -165,7 +188,13 @@ function landscape(ctx:CanvasRenderingContext2D,stage:number,pulse:number,reduce
         block(ctx,x,y+6,4+row*3,root-y-6,tint);
         block(ctx,x-10,y,25,10,tint);
         block(ctx,x-6,y-4,17,4,tint);
-        if (skyline==='bloom') block(ctx,x-2,y-9,10,8,tint);
+        if (skyline==='bloom') {
+          block(ctx,x-2,y-9,10,8,tint);
+          block(ctx,x-13,y+2,6,5,tint);block(ctx,x+13,y+1,6,5,tint);
+          block(ctx,x+1,y+1,7,3,light);
+        } else {
+          block(ctx,x-4,y+3,3,2,light);block(ctx,x+5,y,4,2,light);
+        }
       } else {
         block(ctx,x,y,3,root-y,tint);
         for (let n=0;n<4;n++) {
@@ -187,7 +216,7 @@ function landscape(ctx:CanvasRenderingContext2D,stage:number,pulse:number,reduce
 
 function drawPerches(ctx:CanvasRenderingContext2D,stage:number,pulse:number) {
   const scene=arcadeScenes[stage],{ink,accent,light,base}=scene;
-  for (const [index,{x,y,w,h,form}] of sceneryArt[stage].entries()) {
+  for (const [index,{x,y,w,h,form}] of arcadeLayouts[stage].entries()) {
     block(ctx,x,y,w,h,ink);
     block(ctx,x+1,y+1,w-2,h-2,accent);
     if (index<arcadeFrame.length) {
@@ -222,31 +251,22 @@ function drawPerches(ctx:CanvasRenderingContext2D,stage:number,pulse:number) {
   }
 }
 
-const sceneryArt=arcadeScenes.map(({landing,perches})=>[...arcadeFrame,landing,...perches]);
-
 function cocoon(ctx:CanvasRenderingContext2D,p:Point,v:Point,ink:string,light:string,accent:string,falling:boolean) {
-  ctx.save();
-  ctx.translate(Math.round(p.x),Math.round(p.y));
-  if (falling) ctx.rotate(Math.max(-.65,Math.min(.65,v.x*.008)));
-  block(ctx,-4,-3,9,6,ink);block(ctx,-2,-5,5,10,ink);
-  block(ctx,-3,-2,7,4,light);block(ctx,-1,-4,3,8,light);
-  block(ctx,-3,0,7,1,accent);block(ctx,-1,-2,4,1,accent);
-  ctx.restore();
+  const tilt=falling && Math.abs(v.x)>36 ? Math.sign(v.x) : 0;
+  for (let row=-5;row<5;row++) {
+    const half=Math.abs(row)>=3 ? 2 : 4;
+    const x=p.x+Math.round(row*tilt/3);
+    block(ctx,x-half,p.y+row,2*half+1,1,ink);
+    if (row>-5 && row<4) block(ctx,x-half+1,p.y+row,2*half-1,1,row===-2 || row===1 ? accent : light);
+  }
 }
 
 export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:number,reducedMotion=false) {
   const {movement:{spider,hunt,aim},clock,boss,snare}=run;
   const stage=arcadeStage(run.level),scene=arcadeScenes[stage],{ink,light}=scene;
   landscape(ctx,stage,pulse,reducedMotion);
-  if (!run.intro) {
-    ctx.save();
-    ctx.globalAlpha=.63;
-    ctx.font='bold 15px monospace';ctx.textAlign='center';ctx.fillStyle=ink;
-    ctx.fillText(scene.name.toUpperCase(),width/2,23,width-36);
-    ctx.restore();
-  }
   drawPerches(ctx,stage,pulse);
-  if (run.intro) return introduction(ctx,run,ink,light,pulse,reducedMotion);
+  const speech=run.intro ? openingSpeech(ctx,run) : undefined;
   for (const net of hunt.strands) web(ctx,net,clock,ink);
   for (const net of run.rivalWebs) web(ctx,net,clock,ink,true);
   for (const shot of run.silkShots) {
@@ -337,29 +357,34 @@ export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:nu
     if (phase==='warn' && boss.shot) web(ctx,boss.shot,clock,ink,true,true);
     ctx.save();
     ctx.translate(Math.round(p.x),Math.round(p.y));
-    ctx.scale(size/7,size/7);
-    drawSpider(ctx,{...spider,x:0,y:0,rope:undefined,support:'floor',facing:target.x<p.x ? -1 : 1,
+    const scale=Math.round(size/7);
+    ctx.scale(scale,scale);
+    drawSpider(ctx,{...spider,x:0,y:0,rope:undefined,support:'floor',facing:target.x<=p.x ? -1 : 1,
       vx:phase==='charge' ? 80 : 0,vy:0,grounded:true},clock,{time:clock,beat:0},phase==='warn' ? 'aim' : phase==='trapped' ? 'yield' : 'take');
     block(ctx,2,-2,3,1,phase==='trapped' ? '#ffdf6b' : '#fc9671');
+    block(ctx,0,-7,5,1,'#f2c77c');
+    block(ctx,0,-8,1,1,'#fff4a9');block(ctx,2,-9,1,2,'#fff4a9');block(ctx,4,-8,1,1,'#fff4a9');
     ctx.restore();
-    for (let i=0;i<max;i++) block(ctx,p.x-max*2+i*4,p.y-size-8,3,3,i<hp ? '#902f37' : ink);
+    const healthY=Math.max(arcadeFrame[0].h+2,p.y-size-18);
+    for (let i=0;i<max;i++) block(ctx,p.x-max*2+i*4,healthY,3,3,i<hp ? '#902f37' : ink);
     if (phase==='trapped') {
       const left=boss.at-clock;
       block(ctx,p.x-11,p.y+9,22,4,ink);
       block(ctx,p.x-10,p.y+10,Math.ceil(Math.max(0,left/bossTrapSeconds)*20),2,left<.75 ? '#ffc184' : light);
     }
   }
-  if (clock>=run.invincible || reducedMotion || Math.floor(clock*12)%2===0) drawSpider(ctx,spider,clock,{time:clock,beat:pulse});
+  if (clock>=run.invincible || reducedMotion || Math.floor(clock*12)%2===0) drawSpider(ctx,spider,clock,{time:clock,beat:pulse},'normal',{accent:'#f1ecb1'});
   if (clock<run.invincible) {
     ctx.strokeStyle='#f6d395';
     ctx.strokeRect(Math.round(spider.x)-9,Math.round(spider.y)-9,18,18);
   }
+  if (run.intro) return speech;
   if (snare) status(ctx,{x:spider.x,y:spider.y-14},`× ${snare.presses}/${arcadeEscapePresses}`,light,snare.presses/arcadeEscapePresses,'#e9f4b9');
-  else drawAimMarker(ctx,spider,aim,width,height);
+  else aimReticle(ctx,spider,aim);
   if (run.phase==='wave' || run.phase==='boss') {
     const rivalLine=boss && (boss.phase==='trapped' || boss.phase==='recover') && boss.turn%3===1;
     const spideyLine=arcadeIdleSpeech(run);
-    if (rivalLine) return {p:boss.p,words:rivalQuips[(run.level/10+boss.turn-2)%rivalQuips.length],clearance:boss.size+12};
-    if (spideyLine) return {p:spider,words:spideyLine,clearance:12};
+    if (rivalLine) return {name:dialogueFor(run.level).name,words:rivalQuips[(run.level/10+boss.turn-2)%rivalQuips.length],portrait:'rival' as const};
+    if (spideyLine) return {name:'Spidey',words:spideyLine,portrait:'spidey' as const};
   }
 }

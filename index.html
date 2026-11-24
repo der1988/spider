@@ -53,27 +53,17 @@
     </div>
     <section id="arcade-summary" aria-label="Endless status">
       <p id="arcade-level"></p>
-      <p id="arcade-wave"></p>
+      <p id="arcade-webs"></p>
       <p id="arcade-lives"></p>
     </section>
     <code id="ending-code" class="ending-code" aria-hidden="true"></code>
   </header>
   <div class="playfield">
-    <aside id="arcade-left" class="arcade-rail" aria-label="Stage progress" hidden>
-      <h2 id="arcade-stage"></h2>
-      <ol id="arcade-progress" aria-label="Levels in this stage"></ol>
-      <p id="arcade-webs" aria-label="Fixed silk"></p>
-    </aside>
     <section class="stage" aria-label="Hunting arena">
     <canvas id="world" width="360" height="204" aria-label="Spider, fly and webs"></canvas>
-    <p id="arcade-speech" hidden></p>
     <section id="loop-defeat" class="defeat" aria-labelledby="defeat-title" hidden>
       <div class="defeat-panel">
         <h2 id="defeat-title">Arcade cleared</h2>
-        <div class="defeat-score">
-          <label for="defeat-score">Total catches</label>
-          <output id="defeat-score">0</output>
-        </div>
         <p id="endless-status" role="status"></p>
         <div class="mode-choices">
           <button id="main-menu" type="button" data-selected="false">Main Menu</button>
@@ -82,12 +72,17 @@
       </div>
     </section>
     </section>
-    <aside id="arcade-right" class="arcade-rail" aria-labelledby="arcade-field-guide" hidden>
-      <h2 id="arcade-field-guide">Field guide</h2>
-      <ul id="arcade-species"></ul>
-    </aside>
   </div>
   <footer>
+    <section id="arcade-dialogue" aria-label="Character dialogue">
+      <div id="arcade-line" aria-live="polite" hidden>
+        <div id="arcade-portrait" aria-hidden="true"></div>
+        <div class="arcade-line-copy">
+          <strong id="arcade-speaker"></strong>
+          <p id="arcade-speech" lang="en"></p>
+        </div>
+      </div>
+    </section>
     <section id="open-goal" class="open-goal" aria-label="Nest supplies" hidden>
       <strong>Stock the nest</strong>
       <span id="nest-common" data-tier="common">Common</span>
