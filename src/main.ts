@@ -5,7 +5,7 @@ import {renderWindowHunt} from './window-hunt-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
 import {advanceArena,arenaInput,arenaStep,releaseSilkButton,createArena,type ArenaEvent} from './arena-run';
-import {advanceArcade,arcadeWebLimit,arcadeEscapeButton,arcadeEscapePresses,arcadeHeight,arcadeStage,arcadeWidth,createArcade,species,type ArcadeEvent,type ArcadeRun} from './arcade';
+import {advanceArcade,arcadeDirectHits,arcadeDodgeStyle,arcadeWebLimit,arcadeEscapeButton,arcadeEscapePresses,arcadeHeight,arcadeStage,arcadeWidth,createArcade,species,type ArcadeEvent,type ArcadeRun} from './arcade';
 import {arcadeLevels,dialogueFor,heartsPerRun,insectMark} from './arcade-dialogue';
 import {ArcadeMusic} from './arcade-music';
 import {arcadeIcon,renderArcade} from './arcade-render';
@@ -337,7 +337,7 @@ const arcadeSounds={
   launch:'launch',jump:'jump',attach:'attach',double:'attach',miss:'miss',release:'release',fix:'fix',evict:'fix',
   catch:'catch',entrance:'discovery',new:'discovery',over:'miss',recover:'discovery',boss:'tension',
   'boss-trap':'attach','boss-free':'release',snared:'tension','escape-step':'fix',escape:'release',
-  hit:'catch',win:'discovery',hurt:'heart',
+  'silk-hit':'attach',hit:'catch',win:'discovery',hurt:'heart',
 } as const;
 
 function arcadeFeedback(event:ArcadeEvent) {
@@ -370,7 +370,7 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
   if (shownArcadeLevel!==run.level) {
     get('arcade-stage').textContent=arcadeScenes[stage].name;
     get('arcade-species').innerHTML=encounter.insects.map(([name,kind],index)=>
-      `<li>${arcadeIcon(kind,insectMark(run.level,index))}<div><strong>${name}</strong><span>${species[kind][1]}</span></div></li>`).join('');
+      `<li>${arcadeIcon(kind,insectMark(run.level,index))}<div><strong>${name}</strong><span>${species[kind][1]} · ${{zigzag:'Zigzag',lift:'Altitude dodge',feint:'Feint'}[arcadeDodgeStyle(kind)]}${arcadeDirectHits(run.level,index)>1 ? ' · '+arcadeDirectHits(run.level,index)+' direct hits' : ''}</span></div></li>`).join('');
     get('arcade-level').textContent=`Level ${run.level} / ${arcadeLevels}`;
     get('arcade-progress').innerHTML=Array.from({length:arcadeLevels},(_,i)=>{
       const number=i+1;
@@ -405,7 +405,7 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
   }
   if (run.phase!=='ready') say(finished ? '' : run.restartIn>0 ? 'Out of hearts. Back to level 1…' : run.intro ? 'Press × or Enter to skip.' : boss ?
     (run.snare ? `Press × or X to break free · ${run.snare.presses}/${arcadeEscapePresses}` :
-      'Set a web, then touch the rival while he’s tangled.') : 'Aim with RS. R1 wraps a fly on impact. Touch it before it unwraps.');
+      'Set a web, then touch the rival while he’s tangled.') : 'Aim with RS. Use R1 to tag flies or swing. Recover trapped flies before they escape.');
   renderArcade(context,run,beat,reduced());
 }
 

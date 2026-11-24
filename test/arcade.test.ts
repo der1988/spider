@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {advanceArcade,arcadeEscapeButton,arcadeEscapePresses,arcadeLayouts,arcadeWebLimit,createArcade} from '../src/arcade.ts';
-import {arcadeGround,arcadeScenes} from '../src/arcade-scenery.ts';
+import {advanceArcade,arcadeDirectHits,arcadeEscapeButton,arcadeEscapePresses,arcadeLayouts,arcadeWebLimit,createArcade} from '../src/arcade.ts';
+import {arcadeHeight,arcadeScenes,arcadeSpawns} from '../src/arcade-scenery.ts';
+import {advanceSilk,launchSilk} from '../src/arcade-silk.ts';
 import {sweptHit} from '../src/threads.ts';
 import {arenaInput,arenaStep,releaseSilkButton} from '../src/arena-run.ts';
 import {arcadeLevels,campaign,insectMark,levelIntroDuration} from '../src/arcade-dialogue.ts';
@@ -33,8 +34,13 @@ function putNextToSpider(run:ReturnType<typeof createArcade>) {
 
 function parkFly(run:ReturnType<typeof createArcade>,x=73,y=26) {
   const fly=run.flies[0];
-  Object.assign(fly,{p:{x,y},target:{x,y},v:{x:0,y:0},phase:'patrol',phaseAt:100,aimAt:100,age:5});
+  Object.assign(fly,{p:{x,y},target:{x,y},v:{x:0,y:0},phase:'patrol',phaseAt:100,aimAt:100,dodgeAfter:100,age:5});
   return fly;
+}
+
+const solid=(x:number,y:number,w:number,h:number)=>({x,y,w,h,grip:true});
+function practicePlatform(run:ReturnType<typeof createArcade>) {
+  run.movement.hunt.surfaces=[solid(25,217,343,7)];
 }
 
 test('all ten encounters have their own dialogue, insect names and silhouettes, and freeze time',()=>{
@@ -101,6 +107,7 @@ test('mirrored direct shots push the cocoon along the incoming silk before it la
   for (const sign of [-1,1]) {
     const run=createArcade();
     start(run);
+    practicePlatform(run);
     const spider=run.movement.spider;
     const x=sign===1 ? 52 : 210,y=183;
     Object.assign(spider,{x,y,vx:0,vy:0,support:undefined,grounded:false});
@@ -116,7 +123,7 @@ test('mirrored direct shots push the cocoon along the incoming silk before it la
     assert.equal(run.score,0);
     ticks(run,.65);
     assert.ok((fly.p.x-contactX)*sign>16);
-    assert.equal(fly.p.y,arcadeGround-5);
+    assert.equal(fly.p.y,212);
     assert.ok(fly.cocoon.landed);
     let landing=fly.p;
     while (fly.caughtUntil) {landing=fly.p;advanceArcade(run,neutral);}
@@ -131,6 +138,7 @@ test('mirrored direct shots push the cocoon along the incoming silk before it la
 test('the nearest free fly stops the shot, and picking up its cocoon counts once',()=>{
   const run=createArcade(4);
   start(run);
+  practicePlatform(run);
   const spider=run.movement.spider;
   Object.assign(spider,{x:159,y:193,vx:0,vy:0,support:undefined,grounded:false});
   const near=parkFly(run,192,194),far=run.flies[1];
@@ -167,9 +175,96 @@ test('scenes have open skies and distinct perches with a stable starting point',
     assert.equal(run.movement.spider.support,'floor');
     assert.equal(run.movement.hunt.surfaces,surfaces);
     assert.ok(surfaces.every(perch=>perch.y>=32));
-    assert.ok(surfaces.some(perch=>perch.w<=55 && perch.y+perch.h<arcadeGround));
-    assert.ok(surfaces.filter(perch=>perch.y<arcadeGround).every(perch=>perch.w<100));
+    assert.ok(surfaces.some(perch=>perch.w<=55 && perch.y+perch.h<arcadeHeight-10));
+    assert.ok(surfaces.every(perch=>perch.w<100));
+    const spawn=arcadeSpawns[i];
+    const reachable=Array.from({length:24},(_,n)=>{
+      const angle=Math.PI*n/12,shot=launchSilk(spawn,{x:Math.cos(angle),y:Math.sin(angle)},{x:0,y:0});
+      while (!shot.hit && advanceSilk(shot,surfaces,[],arenaStep)) { /* fly to the first impact */ }
+      return shot.hit?.grip && Math.hypot(shot.hit.point.x-spawn.x,shot.hit.point.y-spawn.y)>25;
+    });
+    assert.ok(reachable.some(Boolean),`level ${i+1} has a second anchor reachable from spawn`);
   }
+});
+
+test('zigzag and altitude dodges have a readable commit and a recovery window',()=>{
+  for (const [kind,style] of [[0,'zigzag'],[3,'lift']] as const) {
+    const run=createArcade(4);
+    start(run);
+    practicePlatform(run);
+    const spider=run.movement.spider;
+    Object.assign(spider,{x:112,y:124,vx:0,vy:0,support:undefined,grounded:false});
+    const fly=parkFly(run,191,125);
+    run.flies=[fly];
+    Object.assign(fly,{kind,dodgeAfter:0});
+    advanceArcade(run,arenaInput({x:0,y:0},{x:1,y:0},false,true));
+    assert.equal(fly.dodge?.style,style);
+    const from={...fly.p};
+    ticks(run,.18);
+    assert.equal(fly.caughtUntil,0);
+    assert.ok(Math.abs(fly.p.y-from.y)>4);
+    ticks(run,.18);
+    assert.equal(fly.dodge,undefined);
+    assert.equal(fly.phase,'recover');
+    assert.ok(fly.dodgeAfter>run.clock+.4);
+  }
+});
+
+test('armoured flies accumulate silk until the last shot sends the cocoon away',()=>{
+  const run=createArcade(9);
+  start(run);
+  practicePlatform(run);
+  const spider=run.movement.spider;
+  const fly=parkFly(run,208,129);
+  run.flies=[fly];
+  const events:string[]=[];
+  for (let n=1;n<=arcadeDirectHits(run.level,fly.actor);n++) {
+    Object.assign(spider,{x:fly.p.x-45,y:fly.p.y-1,vx:0,vy:0,support:undefined,grounded:false,rope:undefined});
+    fly.target={...fly.p};fly.v={x:0,y:0};fly.phaseAt=100;fly.aimAt=100;
+    advanceArcade(run,arenaInput({x:0,y:0},{x:1,y:0},false,true),event=>events.push(event));
+    for (let t=0;t<20 && fly.silkHits<n;t++) advanceArcade(run,neutral,event=>events.push(event));
+    assert.equal(fly.silkHits,n);
+    assert.equal(!!fly.cocoon,n===3);
+  }
+  assert.deepEqual(events,['launch','silk-hit','launch','silk-hit','launch','catch']);
+  assert.ok(fly.v.x>100);
+});
+
+test('a fly escaping either trap type cannot hurt Spidey for one second',()=>{
+  for (const cocoon of [undefined,{struckAt:0,landed:true}]) {
+    const run=createArcade();
+    start(run);
+    const spider=run.movement.spider;
+    const fly=parkFly(run,spider.x,spider.y-4);
+    fly.caughtUntil=run.clock+arenaStep*.5;
+    fly.cocoon=cocoon;
+    if (!cocoon) {
+      fly.trappedBy={from:{x:48,y:205},to:{x:92,y:144},shakeUntil:0};
+      run.movement.hunt.strands=[fly.trappedBy];
+    }
+    advanceArcade(run,neutral);
+    assert.equal(fly.safeUntil-run.clock,1);
+    while (run.clock+arenaStep<fly.safeUntil-1e-8) {
+      fly.p={x:spider.x,y:spider.y-4};fly.target={...fly.p};fly.aimAt=100;
+      advanceArcade(run,neutral);
+      assert.equal(run.lives,3);
+    }
+    fly.p={x:spider.x,y:spider.y-4};fly.target={...fly.p};fly.v={x:0,y:0};fly.aimAt=100;
+    ticks(run,2*arenaStep);
+    assert.equal(run.lives,2);
+  }
+});
+
+test('a fall costs a heart and returns to the same suspended launch perch',()=>{
+  const run=createArcade(3);
+  start(run);
+  const spider=run.movement.spider;
+  Object.assign(spider,{x:190,y:arcadeHeight+15,vx:0,vy:160,support:undefined,grounded:false});
+  advanceArcade(run,neutral);
+  assert.equal(run.lives,2);
+  assert.equal(run.level,3);
+  assert.equal(run.movement.spider.support,'floor');
+  assert.equal(run.movement.spider.y,arcadeSpawns[2].y);
 });
 
 test('the last heart sends the player straight back to level one with three hearts',()=>{
@@ -322,6 +417,7 @@ test('directional jumps use screen axes at the wall and right-stick aim when mov
 test('silk heads travel and slow on a miss, with a longer connection in midair',()=>{
   const run=createArcade();
   start(run);
+  practicePlatform(run);
   parkFly(run);
   const spider=run.movement.spider;
   const shoot=arenaInput({x:0,y:0},{x:1,y:0},false,true);
@@ -338,6 +434,7 @@ test('silk heads travel and slow on a miss, with a longer connection in midair',
   assert.equal(run.silkShots.length,0);
   assert.equal(run.movement.hunt.strands.length,0);
 
+  run.movement.hunt.surfaces.push(solid(286,147,41,8));
   Object.assign(spider,{x:91,y:143,vx:0,vy:-92,support:undefined,grounded:false});
   advanceArcade(run,shoot);
   for (let i=0;i<130 && !spider.rope;i++) advanceArcade(run,neutral);
@@ -355,7 +452,7 @@ test('horizontal jumps from the floor gain enough lift to clear it',()=>{
     ticks(run,.1);
     const spider=run.movement.spider;
     assert.ok(spider.y<201);
-    assert.ok((spider.x-52)*x>12 && (spider.x-52)*x<17);
+    assert.ok((spider.x-arcadeSpawns[0].x)*x>12 && (spider.x-arcadeSpawns[0].x)*x<17);
   }
 });
 
@@ -441,6 +538,7 @@ test('expiry and FIFO replacement tear down dependent strands and hanging ropes'
 test('the rival takes one hit per trap and four hits clear level ten',()=>{
   const run=createArcade(10);
   start(run);
+  practicePlatform(run);
   const boss=run.boss!;
   for (let hp=boss.max;hp>0;hp--) {
     const spider=run.movement.spider;

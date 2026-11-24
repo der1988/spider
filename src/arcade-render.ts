@@ -1,7 +1,7 @@
-import {arcadeBed,arcadeGround,arcadeScenes,type Perch} from './arcade-scenery';
+import {arcadeScenes,perchParts,type Perch} from './arcade-scenery';
 import {deliverySeconds,dialogueFor,insectMark,levelEntranceSeconds} from './arcade-dialogue';
 import {rivalQuips} from './arcade-script';
-import {arcadeAttackStyle,arcadeEscapePresses,arcadeHeight,arcadeIdleSpeech,arcadeStage,arcadeWidth,bossTrapSeconds,flyTrapSeconds,type ArcadeRun} from './arcade';
+import {arcadeAttackStyle,arcadeDirectHits,arcadeEscapePresses,arcadeHeight,arcadeIdleSpeech,arcadeStage,arcadeWidth,bossTrapSeconds,flyEscapeGrace,flyTrapSeconds,type ArcadeRun} from './arcade';
 import {block,drawAimMarker,drawSpider} from './hunt-render';
 import type {Point} from './spider';
 import type {Strand} from './threads';
@@ -181,7 +181,7 @@ function introduction(ctx:CanvasRenderingContext2D,run:ArcadeRun,ink:string,ligh
 function landscape(ctx:CanvasRenderingContext2D,stage:number,pulse:number,reducedMotion:boolean) {
   const {base,ink,light,accent,skyline}=arcadeScenes[stage];
   block(ctx,0,0,width,height,base);
-  const wash=ctx.createLinearGradient(0,0,0,arcadeGround);
+  const wash=ctx.createLinearGradient(0,0,0,height);
   wash.addColorStop(0,light);wash.addColorStop(.59,base);wash.addColorStop(1,accent);
   ctx.fillStyle=wash;ctx.fillRect(0,0,width,height);
   ctx.save();
@@ -192,12 +192,12 @@ function landscape(ctx:CanvasRenderingContext2D,stage:number,pulse:number,reduce
     block(ctx,sun-radius,59+y,2*radius,3,light);
   }
   ctx.globalAlpha=.15;
-  for (let y=67;y<arcadeGround;y+=5) for (let x=(y%4)*3;x<width;x+=12) block(ctx,x,y,2,1,ink);
+  for (let y=67;y<height;y+=5) for (let x=(y%4)*3;x<width;x+=12) block(ctx,x,y,2,1,ink);
   for (let row=0;row<2;row++) {
     ctx.globalAlpha=row ? .48 : .27;
     const tint=row ? accent : ink;
     for (let x=-20+row*17;x<width;x+=36+row*17) {
-      const root=arcadeGround+row*7;
+      const root=height+row*7;
       const y=root-29-((x+40)*(stage+3)*7)%67;
       if (skyline==='branch' || skyline==='reed') {
         block(ctx,x,y,4+row*3,root-y,tint);
@@ -228,89 +228,37 @@ function landscape(ctx:CanvasRenderingContext2D,stage:number,pulse:number,reduce
   ctx.restore();
 }
 
-function ellipse(ctx:CanvasRenderingContext2D,x:number,y:number,rx:number,ry:number,color:string) {
-  for (let row=-ry;row<=ry;row++) {
-    const span=Math.floor(rx*Math.sqrt(1-row**2/ry**2));
-    block(ctx,x-span,y+row,span*2+1,1,color);
+function drawPerches(ctx:CanvasRenderingContext2D,stage:number,pulse:number) {
+  const scene=arcadeScenes[stage],{ink,accent,light,base}=scene;
+  for (const {form,parts,inclined} of sceneryArt[stage]) {
+    for (const {x,y,w,h} of parts) block(ctx,x,y,w,h,ink);
+    for (const {x,y,w,h} of parts) {
+      if (w<4 || h<3) continue;
+      const rim=inclined ? 0 : 1;
+      block(ctx,x+rim,y+1,w-2*rim,h-2,accent);
+      block(ctx,x+rim,y+1,w-2*rim,1,light);
+      const middle=y+Math.floor(h/2);
+      if (form==='leaf') {
+        block(ctx,x+rim,middle,w-2*rim,1,ink);
+        for (let n=4;n<w-2;n+=7) block(ctx,x+n,middle-1,2,1,base);
+      } else if (form==='bloom' || form==='mushroom') {
+        for (let n=3;n<w-3;n+=7) {
+          const accentY=middle+n%2;
+          block(ctx,x+n,accentY-1,3,Math.min(3,h-3),n%3 || pulse>.45 ? light : base);
+          if (form==='bloom') block(ctx,x+n+2,accentY,2,Math.min(2,h-3),base);
+        }
+      } else if (h>w) {
+        for (let n=4;n<h-3;n+=6) block(ctx,x+2,y+n,Math.min(w-3,3+n%5),1,ink);
+      } else {
+        for (let n=4;n<w-3;n+=8) block(ctx,x+n,middle,Math.min(w-n-1,5),1,base);
+      }
+    }
   }
 }
 
-function foliage(ctx:CanvasRenderingContext2D,{x,y,w,h,form}:Perch,{accent,base,ink,light}:typeof arcadeScenes[number]) {
-  const middle=Math.round(x+w/2);
-  ctx.save();
-  ctx.globalAlpha=.58;
-  if (form==='bloom') {
-    block(ctx,middle-2,y,4,arcadeGround-y,accent);
-    ellipse(ctx,middle-10,y+Math.min(46,arcadeGround-y-9),11,4,accent);
-    const petal=Math.floor(w/6);
-    for (const [dx,dy] of [[-2,0],[-1,-7],[0,-9],[1,-7],[2,0],[1,7],[0,8],[-1,7]]) {
-      ellipse(ctx,middle+dx*petal,y+dy,petal+1,7,dx%2 ? light : accent);
-    }
-    ellipse(ctx,middle,y+1,Math.floor(w/6),5,ink);
-    ellipse(ctx,middle,y,Math.floor(w/8),3,light);
-  } else if (form==='leaf') {
-    const flip=x%2 ? -1 : 1;
-    block(ctx,middle+flip*Math.round(w*.35),y+h-1,7,3,accent);
-    ellipse(ctx,middle,y+6,Math.round(w*.52),Math.max(7,Math.round(w*.17)),accent);
-    for (let n=0;n<4;n++) {
-      block(ctx,middle-12+n*6,y+h+1+n%2,4,1,light);
-      block(ctx,middle-11+n*6,y+h+2+n%2,4,1,base);
-    }
-  } else if (form==='mushroom') {
-    block(ctx,middle-4,y+4,9,arcadeGround-y-4,base);
-    ellipse(ctx,middle,y+4,Math.round(w*.54),13,accent);
-    ellipse(ctx,middle,y+7,Math.round(w*.46),7,ink);
-    for (let n=0;n<7;n++) {
-      const dx=Math.round(w*.36*(n%4-1.5)/1.5);
-      ellipse(ctx,middle+dx,y-3+(n*5)%10,2+n%3,2,light);
-    }
-  } else if (form==='branch' && w>h) {
-    block(ctx,x-5,y+1,w+11,h-3,accent);
-    block(ctx,x+9,y+h,w-13,3,accent);
-    block(ctx,x+13,y+h+3,w-22,2,accent);
-    block(ctx,x+w-10,y-5,4,9,accent);
-  } else if (form==='reed') {
-    ellipse(ctx,middle,y+8,Math.round(w*.64),12,accent);
-    block(ctx,middle-1,y+10,3,h-10,accent);
-  }
-  ctx.restore();
-}
-
-function perch(ctx:CanvasRenderingContext2D,p:Perch,scene:typeof arcadeScenes[number],pulse:number) {
-  const {x,y,w,h,form}=p,{ink,accent,light,base}=scene;
-  const bed=y===arcadeGround;
-  // The dark edge marks the full extent of each collision surface.
-  block(ctx,x,y,w,h,ink);
-  block(ctx,x+1,y+1,w-2,Math.max(1,h-3),accent);
-  block(ctx,x+1,y+1,w-2,1,light);
-  if (bed) {
-    for (let n=0;n<w;n+=7) {
-      const rise=(n*13)%7;
-      block(ctx,x+n,y+2,4,h-2,accent);
-      block(ctx,x+n,y+2-rise,2,rise,accent);
-    }
-  } else if (form==='leaf' || form==='bloom' || form==='mushroom') {
-    if (form==='leaf') {
-      block(ctx,x+2,y+Math.floor(h/2),w-4,1,ink);
-      for (let n=5;n<w-4;n+=8) {
-        block(ctx,x+n,y+2,2,1,base);
-        block(ctx,x+n+2,y+h-3,2,1,ink);
-      }
-    } else {
-      for (let n=4;n<w-3;n+=8) {
-        block(ctx,x+n,y+2,n%3+2,Math.min(3,h-4),n%3 ? light : base);
-        block(ctx,x+n+1,y+h-3,3,2,ink);
-      }
-      if (form==='bloom') block(ctx,x+w/2-3,y+2,7,3,ink);
-    }
-  } else {
-    for (let n=4;n<h-3;n+=7) block(ctx,x+2,y+n,Math.min(w-4,3+(n*3)%8),1,ink);
-    for (let n=9;n<w-3;n+=12) block(ctx,x+n,y+h-4,5,1,ink);
-  }
-  if (!bed && (form==='leaf' || form==='bloom') && pulse>.42) {
-    block(ctx,x+w-5,y-2,2,2,light);
-  }
-}
+const sceneryArt=arcadeScenes.map(({landing,perches})=>[landing,...perches].map((perch:Perch)=>({
+  form:perch.form,parts:perchParts(perch),inclined:!!perch.rise,
+})));
 
 function cocoon(ctx:CanvasRenderingContext2D,p:Point,v:Point,ink:string,light:string,accent:string,falling:boolean) {
   ctx.save();
@@ -333,9 +281,7 @@ export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:nu
     ctx.fillText(scene.name.toUpperCase(),width/2,23,width-36);
     ctx.restore();
   }
-  for (const surface of scene.perches) foliage(ctx,surface,scene);
-  for (const surface of scene.perches) perch(ctx,surface,scene,pulse);
-  perch(ctx,arcadeBed,scene,pulse);
+  drawPerches(ctx,stage,pulse);
   if (run.intro) {
     introduction(ctx,run,ink,light,pulse,reducedMotion);
     return;
@@ -346,7 +292,7 @@ export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:nu
     ctx.save();
     const opacity=shot.fade===undefined ? 1 : shot.fade/.08;
     ctx.globalAlpha=.55*opacity;
-    silk(ctx,shot.origin,shot.p,ink);
+    silk(ctx,spider,shot.p,ink);
     ctx.globalAlpha=opacity;
     block(ctx,shot.p.x-1,shot.p.y-1,3,3,ink);
     block(ctx,shot.p.x,shot.p.y,1,1,light);
@@ -374,6 +320,14 @@ export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:nu
         block(ctx,x,y-3,1,3,ink);block(ctx,x,y+1,1,1,light);
       }
     }
+    if (fly.dodge && !fly.caughtUntil) {
+      const {x,y}=fly.p,style=fly.dodge.style;
+      const v=fly.v,speed=Math.hypot(v.x,v.y)||1;
+      silk(ctx,{x:x-v.x/speed*15,y:y-v.y/speed*15},{x:x-v.x/speed*7,y:y-v.y/speed*7},light);
+      if (style==='lift') block(ctx,x-1,y-11,3,2,light);
+      if (style==='zigzag') {block(ctx,x-7,y-6,2,1,light);block(ctx,x+6,y+5,2,1,light);}
+      if (style==='feint') {block(ctx,x-6,y-5,2,2,light);block(ctx,x+4,y-8,2,2,light);}
+    }
     if (fly.cocoon) {
       const flying=!fly.cocoon.landed;
       if (flying && clock-fly.cocoon.struckAt<.15) {
@@ -381,6 +335,32 @@ export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:nu
       }
       cocoon(ctx,fly.p,fly.v,ink,light,scene.accent,flying);
     } else insect(ctx,fly.p,fly.kind,insectMark(run.level,fly.actor),clock,!!fly.caughtUntil || fly.phase==='windup' || fly.phase==='recover');
+    if (!fly.caughtUntil) {
+      const {x,y}=fly.p,hits=arcadeDirectHits(run.level,fly.actor);
+      if (hits>1) {
+        for (let n=0;n<hits;n++) {
+          const left=x-2*hits+n*4;
+          block(ctx,left,y-9,3,2,ink);
+          if (n<fly.silkHits) block(ctx,left,y-9,3,1,light);
+        }
+        if (fly.silkHits) {
+          block(ctx,x-4,y+2,8,1,light);
+          if (fly.silkHits>1) block(ctx,x-3,y-2,6,1,light);
+        }
+        if (clock<fly.struckUntil) {
+          block(ctx,x-8,y+1,2,1,light);block(ctx,x+7,y,2,1,light);
+        }
+      }
+      const grace=fly.safeUntil-clock;
+      if (grace>0) {
+        const reach=6+Math.ceil(5*grace/flyEscapeGrace);
+        const color=grace<.25 ? '#ffcb80' : '#d4ffef';
+        for (const sign of [-1,1]) {
+          block(ctx,x+sign*reach,y-2,1,5,ink);
+          block(ctx,x+sign*(reach+1),y-1,1,3,color);
+        }
+      }
+    }
     if (fly.caughtUntil) {
       block(ctx,fly.p.x-6,fly.p.y-9,12,3,ink);
       const left=fly.caughtUntil-clock;

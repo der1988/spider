@@ -8,7 +8,6 @@ const gravity=65;
 const flightSeconds=1.08;
 
 export type SilkShot={
-  origin:Point;
   p:Point;
   v:Point;
   age:number;
@@ -18,7 +17,7 @@ export type SilkShot={
 
 export function launchSilk(origin:Point,direction:Point,momentum:Point):SilkShot {
   const start={x:origin.x,y:origin.y};
-  return {origin:start,p:start,age:0,v:{
+  return {p:start,age:0,v:{
     x:direction.x*launchSpeed+momentum.x*.16,
     y:direction.y*launchSpeed+momentum.y*.16,
   }};
