@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {advanceArcade,arcadeDirectHits,arcadeEscapeButton,arcadeEscapePresses,arcadeLayouts,arcadeWebLimit,createArcade} from '../src/arcade.ts';
-import {arcadeHeight,arcadeScenes,arcadeSpawns} from '../src/arcade-scenery.ts';
+import {arcadeFrame,arcadeHeight,arcadeScenes,arcadeSpawns} from '../src/arcade-scenery.ts';
 import {advanceSilk,launchSilk} from '../src/arcade-silk.ts';
 import {sweptHit} from '../src/threads.ts';
 import {arenaInput,arenaStep,releaseSilkButton} from '../src/arena-run.ts';
-import {arcadeLevels,campaign,insectMark,levelIntroDuration} from '../src/arcade-dialogue.ts';
+import {arcadeLevels,campaign,insectMark,levelIntroDuration,lineAt} from '../src/arcade-dialogue.ts';
 
 const neutral=arenaInput({x:0,y:0});
 const right=arenaInput({x:1,y:0});
@@ -39,6 +39,8 @@ function parkFly(run:ReturnType<typeof createArcade>,x=73,y=26) {
 }
 
 const solid=(x:number,y:number,w:number,h:number)=>({x,y,w,h,grip:true});
+const dialogueSpeakers=(level:number)=>campaign[level-1].insects.map((_,index)=>index);
+
 function practicePlatform(run:ReturnType<typeof createArcade>) {
   run.movement.hunt.surfaces=[solid(25,217,343,7)];
 }
@@ -49,10 +51,24 @@ test('all ten encounters have their own dialogue, insect names and silhouettes, 
   assert.equal(new Set(names).size,names.length);
   const shapes=campaign.flatMap((level,index)=>level.insects.map(([,kind],slot)=>kind+':'+insectMark(index+1,slot)));
   assert.equal(new Set(shapes).size,names.length);
-  assert.equal(new Set(campaign.flatMap(({line,reply,closing})=>[line,reply,closing])).size,30);
+  const lines=campaign.flatMap(encounter=>[
+    ...encounter.insects.map(([, ,line])=>line),
+    ...('rivalLine' in encounter ? [encounter.rivalLine] : []),
+    encounter.reply,
+  ]);
+  assert.equal(new Set(lines).size,names.length+arcadeLevels+1);
+  assert.ok(lines.every(line=>line.length<=35));
   assert.equal(new Set(arcadeLayouts.map(layout=>JSON.stringify(layout))).size,10);
   for (let level=1;level<=arcadeLevels;level++) {
     const run=createArcade(level);
+    const seen=new Set();
+    for (let at=0;at<levelIntroDuration(level);at+=.05) {
+      const line=lineAt(level,at);
+      if (line) seen.add(line.speaker);
+    }
+    assert.deepEqual([...seen],[
+      ...(level===arcadeLevels ? ['rival'] : dialogueSpeakers(level)), 'spidey',
+    ]);
     advanceArcade(run,right);
     ticks(run,levelIntroDuration(level)-.1);
     assert.ok(run.intro);
@@ -167,16 +183,18 @@ test('the first solid shields a fly just behind it',()=>{
   assert.equal(run.score,0);
 });
 
-test('scenes have open skies and distinct perches with a stable starting point',()=>{
+test('scenes have a playable frame, four spaced perches and a stable spawn',()=>{
   assert.equal(new Set(arcadeScenes.map(scene=>scene.name)).size,arcadeLevels);
   assert.equal(arcadeLayouts.length,arcadeLevels);
   for (const [i,surfaces] of arcadeLayouts.entries()) {
     const run=createArcade(i+1);
     assert.equal(run.movement.spider.support,'floor');
     assert.equal(run.movement.hunt.surfaces,surfaces);
-    assert.ok(surfaces.every(perch=>perch.y>=32));
-    assert.ok(surfaces.some(perch=>perch.w<=55 && perch.y+perch.h<arcadeHeight-10));
-    assert.ok(surfaces.every(perch=>perch.w<100));
+    assert.deepEqual(surfaces.slice(0,3),arcadeFrame);
+    assert.ok(arcadeFrame.every(surface=>surface.grip));
+    assert.equal(surfaces.length,7);
+    assert.ok(surfaces.slice(3).every(perch=>perch.grip && perch.w<100));
+    assert.ok(surfaces.slice(3).some(perch=>perch.y+perch.h<arcadeHeight-45));
     const spawn=arcadeSpawns[i];
     const reachable=Array.from({length:24},(_,n)=>{
       const angle=Math.PI*n/12,shot=launchSilk(spawn,{x:Math.cos(angle),y:Math.sin(angle)},{x:0,y:0});
@@ -184,6 +202,34 @@ test('scenes have open skies and distinct perches with a stable starting point',
       return shot.hit?.grip && Math.hypot(shot.hit.point.x-spawn.x,shot.hit.point.y-spawn.y)>25;
     });
     assert.ok(reachable.some(Boolean),`level ${i+1} has a second anchor reachable from spawn`);
+  }
+});
+
+test('Spidey can jump from a perch, swing to a wall and climb onto the ceiling',()=>{
+  for (const level of [1,4,8]) {
+    const run=createArcade(level);
+    start(run);
+    for (const fly of run.flies) {fly.p={x:380,y:43};fly.caughtUntil=100;}
+    const {spider}=run.movement;
+    const left=arenaInput({x:-1,y:0}),up=arenaInput({x:0,y:-1});
+    const forSteps=(input:typeof neutral,steps:number)=>{
+      for (let i=0;i<steps;i++) advanceArcade(run,input);
+    };
+    forSteps(left,7);
+    advanceArcade(run,arenaInput({x:0,y:0},undefined,true));
+    forSteps(neutral,10);
+    advanceArcade(run,arenaInput({x:0,y:0},{x:-1,y:0},false,true));
+    forSteps(neutral,22);
+    assert.equal(spider.rope?.x,arcadeFrame[1].w);
+    advanceArcade(run,arenaInput({x:-1,y:0},undefined,true));
+    forSteps(up,45);
+    assert.equal(spider.support,'left');
+    forSteps(up,330);
+    assert.equal(spider.support,'ceiling');
+    const startX=spider.x;
+    forSteps(right,36);
+    assert.ok(spider.x>startX+12);
+    assert.equal(spider.support,'ceiling');
   }
 });
 

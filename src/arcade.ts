@@ -1,6 +1,6 @@
 import {arcadeLevels,dialogueFor,heartsPerRun,levelIntroDuration} from './arcade-dialogue.ts';
 import {advanceSilk,arcadeSilkReach,diagonalWeb,launchSilk,ropeAt,type SilkShot} from './arcade-silk.ts';
-import {arcadeHeight,arcadeLayouts,arcadeSpawns,arcadeWidth} from './arcade-scenery.ts';
+import {arcadeHeight,arcadeLayouts,arcadeRim,arcadeSpawns,arcadeWidth} from './arcade-scenery.ts';
 import {idleQuips} from './arcade-script.ts';
 import {arenaStep,createArena,finishWebs,moveArena,releaseSilkButton,type ArenaInput,type ArenaEvent} from './arena-run.ts';
 import {closeCrawlerRopes,createCrawler,crawlerIsSupported} from './crawler.ts';
@@ -41,7 +41,8 @@ const airBottom=arcadeHeight-12;
 const fallLimit=arcadeHeight+16;
 export const flyEscapeGrace=1;
 const clear=(a:Point,b:Point,surfaces:readonly Rect[])=>!surfaces.some(r=>crossesSolid(a,b,r));
-const flyBounds=(p:Point)=>({x:clamp(p.x,12,arcadeWidth-12),y:clamp(p.y,12,airBottom)});
+const flightEdge=arcadeRim+flyRadius;
+const flyBounds=(p:Point)=>({x:clamp(p.x,flightEdge,arcadeWidth-flightEdge),y:clamp(p.y,flightEdge,airBottom)});
 const flightMargin=(r:Rect)=>({x:r.x-flyRadius,y:r.y-flyRadius,w:r.w+2*flyRadius,h:r.h+2*flyRadius});
 const flightLayouts=new WeakMap<readonly Rect[],Rect[]>();
 function flightSurfaces(run:ArcadeRun) {
@@ -635,11 +636,6 @@ export function advanceArcade(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeE
     moveArena(run.movement,arcadeSilk(run,input,emit),emit,{
       climbSilk:false,adjustRope:true,webLimit:arcadeWebLimit,ropeRange:arcadeSilkReach,directionalJump:true,
     });
-    if (spider.x<SPIDER_HALF_WIDTH || spider.x>arcadeWidth-SPIDER_HALF_WIDTH) {
-      spider.x=clamp(spider.x,SPIDER_HALF_WIDTH,arcadeWidth-SPIDER_HALF_WIDTH);
-      spider.vx=0;
-    }
-    if (spider.y<SPIDER_HALF_HEIGHT) {spider.y=SPIDER_HALF_HEIGHT;spider.vy=Math.max(0,spider.vy);}
     if (!spider.rope) run.ropeWeb=undefined;
     if (spider.y>fallLimit) {
       hurt(run,emit);

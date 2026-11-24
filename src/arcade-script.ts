@@ -1,14 +1,14 @@
 export const idleQuips=[
-  'I could use a chair. Or eight.',
-  'This is my impression of a well-adjusted spider.',
-  'I took this job for the web access.',
-  'If I stand very still, the floor owes me rent.',
-  'Somewhere there’s a bug with a very different career plan.',
+  'I could use eight footrests.',
+  'The view from here is unpaid.',
+  'I took this job for web access.',
+  'Standing still is my break.',
+  'One of us should blink first.',
 ] as const;
 
 export const rivalQuips=[
-  'I shall be with you as soon as my knees agree.',
-  'Allow me a dramatic pause. I bought one wholesale.',
-  'I meant to stop here. Mind the dignity.',
-  'My tailor assures me this is a normal number of knees.',
+  'My knees request an adjournment.',
+  'A pause. Entirely ceremonial.',
+  'Please mind the dignity.',
+  'The tailor charged by the knee.',
 ] as const;

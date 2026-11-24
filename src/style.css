@@ -312,6 +312,14 @@ dialog h2 { margin: 0; font-size: 16px; }
   gap: clamp(3px, 1vw, 10px);
 }
 .shell[data-arcade] #lyric { display: none; }
+#arcade-speech {
+  position: absolute; inset: 0 auto auto 0;
+  margin: 0; pointer-events: none; width: max-content;
+  max-width: min(27ch, var(--caption-width, 100%));
+  overflow-wrap: anywhere; text-wrap: balance; text-align: center;
+  font: 600 clamp(11px, 2.2vw, 13px)/1.2 ui-monospace, monospace;
+  color: #fff7d2; -webkit-text-stroke: 1.45px #191c17; paint-order: stroke fill;
+}
 .arcade-rail {
   padding: clamp(3px, 1vw, 10px); min-height: 0; overflow: auto;
   background: var(--panel); border: 1px solid var(--border);
@@ -331,12 +339,18 @@ dialog h2 { margin: 0; font-size: 16px; }
 #arcade-species strong, #arcade-species span { display: block; }
 #arcade-species span { color: #ccd7ad; font-size: .87em; }
 @media (max-width: 480px) {
+  .shell[data-arcade] .playfield {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .shell[data-arcade] .stage { grid-area: 1 / 1 / 2 / -1; }
+  .shell[data-arcade] .arcade-rail { grid-row: 2; max-height: 84px; }
   #arcade-species li { grid-template-columns: 1fr; gap: 1px; }
   #arcade-species svg { width: 1em; }
 }
 
 @media (max-width: 680px) {
-  .shell[data-arcade][data-arcade-intro] .playfield { grid-template-columns: minmax(0,1fr); }
+  .shell[data-arcade][data-arcade-intro] .playfield { grid-template: minmax(0,1fr) / minmax(0,1fr); }
   .shell[data-arcade][data-arcade-intro] .arcade-rail { display: none; }
 }
 

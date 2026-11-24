@@ -8,7 +8,7 @@ import {advanceArena,arenaInput,arenaStep,releaseSilkButton,createArena,type Are
 import {advanceArcade,arcadeDirectHits,arcadeDodgeStyle,arcadeWebLimit,arcadeEscapeButton,arcadeEscapePresses,arcadeHeight,arcadeStage,arcadeWidth,createArcade,species,type ArcadeEvent,type ArcadeRun} from './arcade';
 import {arcadeLevels,dialogueFor,heartsPerRun,insectMark} from './arcade-dialogue';
 import {ArcadeMusic} from './arcade-music';
-import {arcadeIcon,renderArcade} from './arcade-render';
+import {arcadeIcon,renderArcade,type ArcadeSpeech} from './arcade-render';
 import {WEB_KEY} from './threads';
 import {renderHunt} from './hunt-render';
 import {readLeftStick,samplePlayStation} from './pad-controls';
@@ -26,6 +26,34 @@ import {flyCues,flyDoubtAt,flyDuration,flyFinalStart,flyMenuStart,flyRoomEffect}
 
 const get = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const worldCanvas=get<HTMLCanvasElement>('world');
+const arcadeSpeech=get('arcade-speech');
+let arcadeView={w:0,h:0};
+let speechSize={w:0,h:0};
+new ResizeObserver(([entry])=>{
+  arcadeView={w:entry.contentRect.width,h:entry.contentRect.height};
+  speechSize={w:0,h:0};
+}).observe(worldCanvas);
+
+function showArcadeSpeech(speech?:ArcadeSpeech) {
+  const {w,h}=arcadeView;
+  arcadeSpeech.hidden=!speech || w<40 || h<32;
+  if (arcadeSpeech.hidden || !speech) return;
+  const scale=Math.min(w/arcadeWidth,h/arcadeHeight);
+  const width=arcadeWidth*scale,height=arcadeHeight*scale;
+  if (arcadeSpeech.textContent!==speech.words || !speechSize.w) {
+    arcadeSpeech.textContent=speech.words;
+    arcadeSpeech.style.setProperty('--caption-width',Math.max(0,width-8)+'px');
+    speechSize={w:arcadeSpeech.offsetWidth,h:arcadeSpeech.offsetHeight};
+  }
+  const inset=4;
+  const anchorX=speech.p.x*scale,anchorY=speech.p.y*scale;
+  const x=Math.max(inset,Math.min(width-speechSize.w-inset,anchorX-speechSize.w/2));
+  const gap=Math.max(9,speech.clearance*scale);
+  const above=anchorY-gap-speechSize.h;
+  const y=above>=inset ? above : Math.min(height-speechSize.h-inset,anchorY+gap);
+  arcadeSpeech.style.translate=`${Math.round((w-width)/2+x)}px ${Math.round((h-height)/2+y)}px`;
+}
+
 const context = worldCanvas.getContext('2d',{alpha:false})!;
 const message = get('message');
 const timeLabel = get('time');
@@ -279,6 +307,7 @@ function showMenu() {
   arcadeMusic.stop();
   delete shell.dataset.arcade;
   delete shell.dataset.arcadeIntro;
+  showArcadeSpeech();
   get('arcade-left').hidden=true;
   get('arcade-right').hidden=true;
   gnatMusic.reset();
@@ -379,7 +408,7 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
     }).join('');
     shownArcadeLevel=run.level;
   }
-  const wave=boss ? `${encounter.name} · ${boss.hp} / ${boss.max}` : `Left to catch · ${run.quota-run.recovered}`;
+  const wave=run.intro ? encounter.name : boss ? `${encounter.name} · ${boss.hp} / ${boss.max}` : `Left to catch · ${run.quota-run.recovered}`;
   if (get('arcade-wave').textContent!==wave) get('arcade-wave').textContent=wave;
   const nets=get('arcade-webs');
   const webCount=run.movement.hunt.strands.length;
@@ -406,7 +435,7 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
   if (run.phase!=='ready') say(finished ? '' : run.restartIn>0 ? 'Out of hearts. Back to level 1…' : run.intro ? 'Press × or Enter to skip.' : boss ?
     (run.snare ? `Press × or X to break free · ${run.snare.presses}/${arcadeEscapePresses}` :
       'Set a web, then touch the rival while he’s tangled.') : 'Aim with RS. Use R1 to tag flies or swing. Recover trapped flies before they escape.');
-  renderArcade(context,run,beat,reduced());
+  showArcadeSpeech(renderArcade(context,run,beat,reduced()));
 }
 
 function syncPause() {
