@@ -6,6 +6,7 @@ export interface Strand {
   shakeUntil: number;
   expiresAt?: number;
   bearing?: true;
+  parent?: Strand;
 }
 
 interface LooseEnd {

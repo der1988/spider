@@ -8,7 +8,6 @@ import {aimHit,SPIDER_HALF_HEIGHT,SPIDER_HALF_WIDTH,type Point,type Rect} from '
 
 export const arcadeWidth=400,arcadeHeight=224;
 export const arcadeWebLimit=3;
-export const arcadeRopeHold=.18;
 export const arcadeEscapePresses=5,arcadeEscapeButton=4;
 export const flyTrapSeconds=3,bossTrapSeconds=2.8;
 export const species=[
@@ -60,7 +59,7 @@ export function createArcade(startLevel=1) {
     rivalWebs:[] as Strand[],snare:undefined as {web:Strand;presses:number}|undefined,
     recovered:0,score:0,quota:0,lives:heartsPerRun,invincible:0,restartIn:0,
     intro:undefined as {kind:'level'|'rival';elapsed:number}|undefined,
-    idle:0,idleLine:0,silkGesture:undefined as SilkShot|undefined,silkShots:[] as SilkShot[],ropeWeb:undefined as Strand|undefined,
+    idle:0,idleLine:0,silkHeld:false,silkShots:[] as SilkShot[],ropeWeb:undefined as Strand|undefined,
   };
   prepareLevel(run);
   return run;
@@ -84,7 +83,7 @@ function prepareLevel(run:ArcadeRun) {
   const final=run.level===arcadeLevels;
   run.intro=run.phase==='ready' ? undefined : {kind:final ? 'rival' : 'level',elapsed:0};
   run.idle=0;
-  run.silkGesture=undefined;run.silkShots=[];run.ropeWeb=undefined;
+  run.silkHeld=false;run.silkShots=[];run.ropeWeb=undefined;
   const p={x:350,y:193};
   run.boss=final ? {p,target:p,hp:4,max:4,size:18,phase:'recover',at:0,turn:0,side:0,repeated:0,hit:false} : undefined;
   if (final && run.phase!=='ready') run.phase='boss';
@@ -362,30 +361,43 @@ function tickRivalWebs(run:ArcadeRun,from:Point,emit:(event:ArcadeEvent)=>void) 
   spider.thread=undefined;
   spider.vx=0;spider.vy=0;
   run.snare={web,presses:0};
-  run.silkGesture=undefined;run.silkShots=[];run.ropeWeb=undefined;
+  run.silkHeld=false;run.silkShots=[];run.ropeWeb=undefined;
   web.shakeUntil=run.clock+.35;
   emit('snared');
 }
 function arcadeSilk(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeEvent)=>void):ArenaInput {
   const [, ,ax,ay,buttons]=input;
+  const {spider,aim}=run.movement;
   if (buttons&2) {
-    const {spider,aim}=run.movement;
     const length=Math.hypot(ax,ay);
     const direction=length ? {x:ax/length,y:ay/length} : aim;
-    const shot=launchSilk(spider,direction,{x:spider.vx,y:spider.vy},crawlerIsSupported(spider,run.movement.hunt.surfaces));
-    run.silkGesture=shot;
-    run.silkShots.push(shot);
+    run.silkHeld=true;
+    run.silkShots.push(launchSilk(spider,direction,{x:spider.vx,y:spider.vy}));
     emit('launch');
   }
-  const gesture=run.silkGesture;
   if (buttons&releaseSilkButton) {
-    if (gesture) {
-      gesture.mode='trap';
-      if (!crawlerIsSupported(run.movement.spider,run.movement.hunt.surfaces)) gesture.grounded=false;
+    if (run.silkHeld && spider.rope) {
+      closeCrawlerRopes(spider);
+      emit('release');
     }
-    run.silkGesture=undefined;
+    run.silkHeld=false;
   }
-  return [input[0],input[1],ax,ay,buttons&~2];
+  return [input[0],input[1],ax,ay,buttons&~(2|releaseSilkButton)];
+}
+
+function pruneDependentWebs(run:ArcadeRun) {
+  const {hunt,spider}=run.movement;
+  const retained=new Set(hunt.strands);
+  hunt.strands=hunt.strands.filter(web=>{
+    for (let parent=web.parent;parent;parent=parent.parent) {
+      if (!retained.has(parent)) return false;
+    }
+    return true;
+  });
+  if (run.ropeWeb && !hunt.strands.includes(run.ropeWeb)) {
+    closeCrawlerRopes(spider);
+    run.ropeWeb=undefined;
+  }
 }
 
 function tickSilkShots(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
@@ -395,43 +407,32 @@ function tickSilkShots(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
       shot.fade-=arenaStep;
       return shot.fade>0;
     }
-    shot.grounded &&= crawlerIsSupported(spider,hunt.surfaces);
-    if (!advanceSilk(shot,hunt.surfaces,hunt.strands,arenaStep)) {
-      emit('miss');
-      shot.fade=.08;
-      return true;
+    if (advanceSilk(shot,hunt.surfaces,hunt.strands,arenaStep)) {
+      if (!shot.hit) return true;
+      const {point,web}=shot.hit;
+      if (crawlerIsSupported(spider,hunt.surfaces)) {
+        const before=hunt.strands.length;
+        if (anchorSilk(hunt.strands,point,arcadeSilkReach+SPIDER_HALF_HEIGHT,spider,hunt.surfaces,undefined,to=>diagonalWeb(point,to))) {
+          if (web && hunt.strands.length>before) hunt.strands[before].parent=web;
+          finishWebs(movement,before,emit,arcadeWebLimit);
+          pruneDependentWebs(run);
+          return false;
+        }
+      } else {
+        const rope=ropeAt(point,spider);
+        if (rope && clear(spider,point,hunt.surfaces)) {
+          spider.rope=rope;
+          run.ropeWeb=web;
+          spider.support=undefined;spider.thread=undefined;spider.grounded=false;
+          emit('attach');
+          return false;
+        }
+      }
     }
-    if (shot.mode==='pending' && shot.age>=arcadeRopeHold) shot.mode='rope';
-    if (!shot.hit || shot.mode==='pending') return true;
-    const {point,web}=shot.hit;
-    if (!shot.grounded || web && !hunt.strands.includes(web)) {
-      emit('miss');
-      shot.fade=.08;
-      return true;
-    }
-    if (shot.mode==='rope') {
-      const rope=ropeAt(point,spider);
-      if (rope && clear(spider,point,hunt.surfaces)) {
-        spider.rope=rope;
-        run.ropeWeb=web;
-        spider.support=undefined;spider.thread=undefined;spider.grounded=false;
-        emit('attach');
-      } else emit('miss');
-    } else {
-      const before=hunt.strands.length;
-      if (anchorSilk(hunt.strands,point,arcadeSilkReach+SPIDER_HALF_HEIGHT,spider,hunt.surfaces,undefined,to=>diagonalWeb(point,to))) {
-        finishWebs(movement,before,emit,arcadeWebLimit);
-      } else emit('miss');
-    }
-    return false;
+    emit('miss');
+    shot.fade=.08;
+    return true;
   });
-}
-
-function checkRopeWeb(run:ArcadeRun) {
-  if (run.ropeWeb && !run.movement.hunt.strands.includes(run.ropeWeb)) {
-    closeCrawlerRopes(run.movement.spider);
-    run.ropeWeb=undefined;
-  }
 }
 
 export function advanceArcade(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeEvent)=>void=()=>{}) {
@@ -465,7 +466,7 @@ export function advanceArcade(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeE
   run.clock+=arenaStep;
   run.movement.hunt.clock=run.clock;
   run.movement.hunt.strands=run.movement.hunt.strands.filter(wire=>(wire.expiresAt??Infinity)>run.clock);
-  checkRopeWeb(run);
+  pruneDependentWebs(run);
   const {spider}=run.movement,from={x:spider.x,y:spider.y};
   if (run.snare) {
     if ((input[4]&arcadeEscapeButton)!==0) {
@@ -475,11 +476,8 @@ export function advanceArcade(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeE
       else emit('escape-step');
     }
   } else {
-    moveArena(run.movement,arcadeSilk(run,input,emit),event=>{
-      if (event==='jump') for (const shot of run.silkShots) shot.grounded=false;
-      emit(event);
-    },{
-      climbSilk:false,adjustRope:true,webLimit:arcadeWebLimit,ropeRange:arcadeSilkReach,directionalJump:true,acceptWebEnd:diagonalWeb,
+    moveArena(run.movement,arcadeSilk(run,input,emit),emit,{
+      climbSilk:false,adjustRope:true,webLimit:arcadeWebLimit,ropeRange:arcadeSilkReach,directionalJump:true,
     });
     if (!spider.rope) run.ropeWeb=undefined;
     tickSilkShots(run,emit);
@@ -502,5 +500,5 @@ export function advanceArcade(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeE
     prepareLevel(run);
     emit(run.boss ? 'boss' : 'entrance');
   }
-  checkRopeWeb(run);
+  pruneDependentWebs(run);
 }

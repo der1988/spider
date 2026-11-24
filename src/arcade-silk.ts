@@ -12,15 +12,13 @@ export type SilkShot={
   p:Point;
   v:Point;
   age:number;
-  mode:'pending'|'trap'|'rope';
   hit?:{point:Point;grip:boolean;web?:Strand};
-  grounded:boolean;
   fade?:number;
 };
 
-export function launchSilk(origin:Point,direction:Point,momentum:Point,grounded:boolean):SilkShot {
+export function launchSilk(origin:Point,direction:Point,momentum:Point):SilkShot {
   const start={x:origin.x,y:origin.y};
-  return {origin:start,p:start,age:0,grounded,mode:'pending',v:{
+  return {origin:start,p:start,age:0,v:{
     x:direction.x*launchSpeed+momentum.x*.16,
     y:direction.y*launchSpeed+momentum.y*.16,
   }};

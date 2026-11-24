@@ -31,7 +31,7 @@ export function finishWebs(run:ArenaRun,before:number,emit?: (event:ArenaEvent)=
   emit?.(evicted ? 'evict' : 'fix');
 }
 
-export function moveArena(run:ArenaRun,input:ArenaInput,emit?: (event:ArenaEvent)=>void,{climbSilk=true,adjustRope=false,webLimit,ropeRange=DEFAULT_TUNING.range,directionalJump=false,acceptWebEnd}: {climbSilk?:boolean;adjustRope?:boolean;webLimit?:number;ropeRange?:number;directionalJump?:boolean;acceptWebEnd?:(from:Point,to:Point)=>boolean}={}) {
+export function moveArena(run:ArenaRun,input:ArenaInput,emit?: (event:ArenaEvent)=>void,{climbSilk=true,adjustRope=false,webLimit,ropeRange=DEFAULT_TUNING.range,directionalJump=false}: {climbSilk?:boolean;adjustRope?:boolean;webLimit?:number;ropeRange?:number;directionalJump?:boolean}={}) {
   const {hunt,spider}=run;
   const {surfaces}=hunt;
   const [x,y,ax,ay,buttons]=input;
@@ -42,7 +42,7 @@ export function moveArena(run:ArenaRun,input:ArenaInput,emit?: (event:ArenaEvent
   if (buttons&1) {
     const stick=Math.hypot(x,y)>32 ? {x,y} : {x:ax,y:ay};
     const length=Math.hypot(stick.x,stick.y);
-    const direction=directionalJump && length>28 ? {x:stick.x/length,y:spider.support==='floor' ? Math.min(-.58,stick.y/length) : stick.y/length} : undefined;
+    const direction=directionalJump && length>28 ? {x:.82*stick.x/length,y:spider.support==='floor' ? Math.min(-.58,stick.y/length) : stick.y/length} : undefined;
     const normal=spider.support ? normals[spider.support] : undefined;
     if (jumpCrawler(spider,undefined,direction)) {
       if (direction && normal && Math.abs(normal.x*direction.x+normal.y*direction.y)<.04) {
@@ -59,15 +59,6 @@ export function moveArena(run:ArenaRun,input:ArenaInput,emit?: (event:ArenaEvent
       if (webLimit===undefined && anchorCrawlerRope(spider,surfaces,hunt.strands)) finishWebs(run,before,emit);
       else if (spider.firstAnchor) emit?.('double');
     } else emit?.('miss');
-  }
-  if (webLimit!==undefined && (buttons&releaseSilkButton) && spider.rope) {
-    const before=hunt.strands.length;
-    const anchor=spider.rope;
-    if (!anchorCrawlerRope(spider,surfaces,hunt.strands,ropeRange,to=>!acceptWebEnd || acceptWebEnd(anchor,to))) {
-      closeCrawlerRopes(spider);
-    }
-    finishWebs(run,before,emit,webLimit);
-    emit?.('release');
   }
   const move={x:x/axisRange,y:y/axisRange};
   const motion=silkMotion(move,run.down);

@@ -404,7 +404,7 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
   }
   if (run.phase!=='ready') say(finished ? '' : run.restartIn>0 ? 'Out of hearts. Back to level 1…' : run.intro ? 'Press × or Enter to skip.' : boss ?
     (run.snare ? `Press × or X to break free · ${run.snare.presses}/${arcadeEscapePresses}` :
-      'Set a web, then touch the rival while he’s tangled.') : 'Aim with RS. Tap R1 for a web or hold it to catch the line.');
+      'Set a web, then touch the rival while he’s tangled.') : 'Aim with RS and fire with R1. Webs set from a surface. Swing when airborne.');
   renderArcade(context,run,beat,reduced());
 }
 
@@ -877,7 +877,7 @@ function frame(time: number) {
   if (arcade) {
     const rawAim=keys.aim??(gamepad ? {x:gamepad.axes[2]??0,y:gamepad.axes[3]??0} : neutralStick);
     const held=keyboard.has('KeyX') || !!gamepad?.buttons[5]?.pressed;
-    const release=(arcade.silkGesture || arcade.movement.spider.rope || input?.fire || actions&2) && !held ? releaseSilkButton : 0;
+    const release=(arcade.silkHeld || input?.fire || actions&2) && !held ? releaseSilkButton : 0;
     const buttons=actions|(input?.jump ? 1 : 0)|(input?.fire ? 2 : 0)|release|(!navigation && crossPressed ? arcadeEscapeButton : 0);
     arcadeFrame(arcade,elapsed,move,keys.aim??input?.aim,rawAim,buttons,
       paused || !!navigation || dialogOpen() || document.hidden);

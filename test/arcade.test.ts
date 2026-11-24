@@ -196,24 +196,28 @@ test('R1 tap only fixes silk, keeping the newest three distinct webs',()=>{
   assert.deepEqual(hunt.strands,newest);
 });
 
-test('holding R1 attaches a rope without an automatic rise, and Up reels it in',()=>{
+test('holding R1 on the floor still fixes a web, while a held airborne shot reels and detaches',()=>{
   const run=createArcade();
   start(run);
   const {hunt,spider}=run.movement;
-  advanceArcade(run,arenaInput({x:0,y:0},{x:.75,y:-.8},false,true));
+  advanceArcade(run,towardWeb);
   ticks(run,.39);
-  assert.ok(spider.rope);
-  const length=spider.rope.length,y=spider.y;
-  ticks(run,.25);
-  assert.equal(spider.rope.length,length);
-  assert.equal(spider.y,y);
-  assert.equal(hunt.strands.length,0);
-  const up=arenaInput({x:0,y:-1});
-  for (let i=0;i<18;i++) advanceArcade(run,up);
-  assert.ok(spider.rope.length<length);
-  assert.ok(spider.y<y);
-  advanceArcade(run,[0,0,0,0,releaseSilkButton]);
   assert.equal(spider.rope,undefined);
+  assert.equal(hunt.strands.length,1);
+  advanceArcade(run,silkRelease);
+  const web=existingWeb(run);
+  advanceArcade(run,towardWeb);
+  advanceArcade(run,arenaInput({x:0,y:0},undefined,true));
+  for (let i=0;i<80 && !spider.rope;i++) advanceArcade(run,neutral);
+  assert.equal(run.ropeWeb,web);
+  const length=spider.rope!.length;
+  ticks(run,.12);
+  assert.equal(spider.rope?.length,length);
+  for (let i=0;i<18;i++) advanceArcade(run,arenaInput({x:0,y:-1}));
+  assert.ok(spider.rope!.length<length);
+  advanceArcade(run,silkRelease);
+  assert.equal(spider.rope,undefined);
+  assert.deepEqual(hunt.strands,[web]);
 });
 
 test('directional jumps use screen axes at the wall and right-stick aim when movement is neutral',()=>{
@@ -232,7 +236,7 @@ test('directional jumps use screen axes at the wall and right-stick aim when mov
   }
 });
 
-test('silk heads travel and slow on a miss, with a longer connection from a supported launch',()=>{
+test('silk heads travel and slow on a miss, with a longer connection in midair',()=>{
   const run=createArcade();
   start(run);
   const spider=run.movement.spider;
@@ -250,13 +254,13 @@ test('silk heads travel and slow on a miss, with a longer connection from a supp
   assert.equal(run.silkShots.length,0);
   assert.equal(run.movement.hunt.strands.length,0);
 
-  Object.assign(spider,{x:183,y:209,vx:0,vy:0,support:'floor',grounded:true});
+  Object.assign(spider,{x:183,y:130,vx:0,vy:-30,support:undefined,grounded:false});
   advanceArcade(run,shoot);
   for (let i=0;i<130 && !spider.rope;i++) advanceArcade(run,neutral);
   assert.ok(spider.rope);
   assert.equal(spider.rope.x,393);
   assert.ok(spider.rope.length>155);
-  assert.equal(spider.y,209);
+  assert.ok(spider.y<209);
 });
 
 test('horizontal jumps from the floor gain enough lift to clear it',()=>{
@@ -267,7 +271,7 @@ test('horizontal jumps from the floor gain enough lift to clear it',()=>{
     ticks(run,.1);
     const spider=run.movement.spider;
     assert.ok(spider.y<201);
-    assert.ok((spider.x-52)*x>12);
+    assert.ok((spider.x-52)*x>12 && (spider.x-52)*x<17);
   }
 });
 
@@ -280,7 +284,7 @@ function existingWeb(run:ReturnType<typeof createArcade>) {
   return web;
 }
 
-test('a solid stance allows a diagonal web join or a swinging anchor on the same strand',()=>{
+test('the same shot joins a web from a surface and becomes a rope after takeoff',()=>{
   const run=createArcade();
   start(run);
   const {hunt,spider}=run.movement,web=existingWeb(run);
@@ -288,29 +292,27 @@ test('a solid stance allows a diagonal web join or a swinging anchor on the same
   advanceArcade(run,silkRelease);
   ticks(run,.45);
   assert.equal(hunt.strands.length,2);
-  const {from,to}=hunt.strands[1];
+  const {from,to,parent}=hunt.strands[1];
+  assert.equal(parent,web);
   assert.ok(Math.abs((from.y-web.from.y)*(web.to.x-web.from.x)-(from.x-web.from.x)*(web.to.y-web.from.y))<1e-5);
   assert.ok(from.x>web.from.x && from.x<web.to.x);
   assert.ok(Math.abs(to.x-from.x)>2 && Math.abs(to.y-from.y)>2);
   hunt.strands=[web];
   advanceArcade(run,towardWeb);
-  for (let i=0;i<100 && !spider.rope;i++) advanceArcade(run,neutral);
+  advanceArcade(run,arenaInput({x:0,y:0},undefined,true));
+  advanceArcade(run,silkRelease);
+  for (let i=0;i<70 && !spider.rope;i++) advanceArcade(run,neutral);
   assert.equal(run.ropeWeb,web);
   assert.ok(spider.rope);
-  const {length}=spider.rope!;
-  ticks(run,.15);
-  assert.equal(spider.rope?.length,length);
-  const up=arenaInput({x:0,y:-1});
-  for (let i=0;i<26;i++) advanceArcade(run,up);
-  assert.ok(spider.y<205);
-  advanceArcade(run,silkRelease);
-  assert.equal(spider.rope,undefined);
-  ticks(run,.55);
+  ticks(run,.12);
+  assert.ok(spider.rope);
   assert.deepEqual(hunt.strands,[web]);
+  advanceArcade(run,arenaInput({x:0,y:0},undefined,true));
+  assert.equal(spider.rope,undefined);
   assert.equal(hunt.loose.length,0);
 });
 
-test('vertical and near-horizontal strands are rejected, as are shots after takeoff',()=>{
+test('vertical and near-horizontal fixed strands are rejected',()=>{
   for (const aim of [{x:0,y:-1},{x:1,y:0}]) {
     const run=createArcade();
     start(run);
@@ -324,17 +326,31 @@ test('vertical and near-horizontal strands are rejected, as are shots after take
     ticks(run,1);
     assert.deepEqual(run.movement.hunt.strands,initial);
   }
-  for (const release of [true,false]) {
-    const run=createArcade();
-    start(run);
-    const web=existingWeb(run);
-    advanceArcade(run,towardWeb);
-    advanceArcade(run,arenaInput({x:0,y:0},undefined,true));
-    if (release) advanceArcade(run,silkRelease);
-    ticks(run,.75);
-    assert.equal(run.movement.spider.rope,undefined);
-    assert.deepEqual(run.movement.hunt.strands,[web]);
-  }
+});
+
+test('expiry and FIFO replacement tear down dependent strands and hanging ropes',()=>{
+  const run=createArcade();
+  start(run);
+  const {hunt,spider}=run.movement,web=existingWeb(run);
+  const first={from:{x:110,y:144},to:{x:92,y:209},shakeUntil:0,parent:web};
+  const next={from:{x:102,y:173},to:{x:32,y:217},shakeUntil:0,parent:first};
+  hunt.strands=[web,first,next];
+  run.ropeWeb=next;
+  spider.rope={x:80,y:188,length:44};
+  web.expiresAt=run.clock;
+  advanceArcade(run,neutral);
+  assert.equal(hunt.strands.length,0);
+  assert.equal(spider.rope,undefined);
+
+  const old={from:{x:260,y:108},to:{x:280,y:124},shakeUntil:0};
+  const attached={from:{x:270,y:116},to:{x:300,y:168},shakeUntil:0,parent:old};
+  const other={from:{x:264,y:159},to:{x:343,y:217},shakeUntil:0};
+  hunt.strands=[old,attached,other];
+  advanceArcade(run,towardWeb);
+  ticks(run,.45);
+  assert.equal(hunt.strands.length,2);
+  assert.equal(hunt.strands[0],other);
+  assert.ok(!hunt.strands.includes(attached));
 });
 
 test('the rival takes one hit per trap and four hits clear level ten',()=>{

@@ -73,11 +73,11 @@ export function closeCrawlerRopes(spider: Crawler) {
   return old;
 }
 
-export function anchorCrawlerRope(spider: Crawler,surfaces: readonly Rect[],strands: Strand[],range=DEFAULT_TUNING.range,accept?: (point:Point)=>boolean) {
+export function anchorCrawlerRope(spider: Crawler,surfaces: readonly Rect[],strands: Strand[],range=DEFAULT_TUNING.range) {
   const rope=spider.rope;
   if (!rope) return false;
   const face=supports(spider,surfaces)[0];
-  if (!face || !anchorSilk(strands,rope,range+SPIDER_HALF_HEIGHT,spider,surfaces,undefined,accept)) return false;
+  if (!face || !anchorSilk(strands,rope,range+SPIDER_HALF_HEIGHT,spider,surfaces)) return false;
   closeCrawlerRopes(spider);
   grip(spider,face);
   return true;
