@@ -1,12 +1,13 @@
 import {arcadeLevels,dialogueFor,heartsPerRun,levelIntroDuration} from './arcade-dialogue.ts';
 import {advanceSilk,arcadeSilkReach,diagonalWeb,launchSilk,ropeAt,type SilkShot} from './arcade-silk.ts';
+import {arcadeGround,arcadeHeight,arcadeLayouts,arcadeWidth} from './arcade-scenery.ts';
 import {idleQuips} from './arcade-script.ts';
 import {arenaStep,createArena,finishWebs,moveArena,releaseSilkButton,type ArenaInput,type ArenaEvent} from './arena-run.ts';
 import {closeCrawlerRopes,createCrawler,crawlerIsSupported} from './crawler.ts';
 import {anchorSilk,crossesSolid,sweptHit,type Strand} from './threads.ts';
-import {aimHit,SPIDER_HALF_HEIGHT,SPIDER_HALF_WIDTH,type Point,type Rect} from './spider.ts';
+import {aimHit,moveAxis,SPIDER_HALF_HEIGHT,SPIDER_HALF_WIDTH,type Point,type Rect} from './spider.ts';
 
-export const arcadeWidth=400,arcadeHeight=224;
+export {arcadeHeight,arcadeLayouts,arcadeWidth} from './arcade-scenery.ts';
 export const arcadeWebLimit=3;
 export const arcadeEscapePresses=5,arcadeEscapeButton=4;
 export const flyTrapSeconds=3,bossTrapSeconds=2.8;
@@ -24,30 +25,22 @@ export const species=[
 ] as const satisfies readonly (readonly [string,string,Flight])[];
 type Flight={speed:number;steer:number;think:number;fear:number;silk:number;burst?:number;vertical?:number;
   straight?:number;curve?:number;sink?:number;hold?:number;buffer?:number};
-export const stages=[
-  ['Greenhouse','#9eb584','#283d2c','#d8e7a7'],['Wireworks','#9aaeb0','#324354','#e0e9ba'],
-  ['Amber Hall','#c2ad75','#553c2d','#f5e0a6'],['Fern Vault','#82a889','#234d43','#c8ead4'],
-  ['Cinder Loft','#b99079','#512f38','#ffdaaa'],['Rain Tank','#7c9eaa','#253b5d','#c3e8e1'],
-  ['Spore Mill','#aba1ac','#433751','#f2d2db'],['Dusk Circuit','#9294ad','#332d55','#e8ddf6'],
-  ['Copper Nest','#b18370','#4d3431','#ffd1a0'],['Moon Core','#9babbd','#263550','#eff7c8'],
-] as const;
-const wall=(x:number,y:number,w:number,h:number):Rect=>({x,y,w,h,grip:true});
-const floor=217,spawn={x:52,y:209};
-const border=[wall(0,floor,arcadeWidth,7),wall(0,0,arcadeWidth,7),wall(0,7,7,210),wall(arcadeWidth-7,7,7,210)];
-export const arcadeLayouts=stages.map((_,stage)=>[
-  ...border,wall(68+stage*5,56+stage%3*7,53+stage%4*6,7),
-  wall(256-stage*3,49+stage%4*9,62,7),wall(161+(stage%3-1)*26,102+stage%4*6,80-stage%4*9,8),
-  ...(stage ? [wall(62+stage*2,146+stage%2*10,54,7),wall(272-stage*3,158-stage%3*7,58,7)] : []),
-]);
+const spawn={x:52,y:arcadeGround-SPIDER_HALF_HEIGHT};
 type FlightPhase='patrol'|'windup'|'strike'|'recover';
-type Fly={phase:FlightPhase;phaseAt:number;feinted?:boolean;p:Point;v:Point;target:Point;kind:number;actor:number;age:number;aimAt:number;caughtUntil:number;trappedBy?:Strand;touching:boolean};
+type Fly={cocoon?:{struckAt:number;landed:boolean};phase:FlightPhase;phaseAt:number;feinted?:boolean;p:Point;v:Point;target:Point;kind:number;actor:number;age:number;aimAt:number;caughtUntil:number;trappedBy?:Strand;touching:boolean};
 type Boss={p:Point;target:Point;hp:number;max:number;size:number;phase:'warn'|'charge'|'recover'|'trapped';at:number;turn:number;side:number;repeated:number;shot?:Strand;net?:Strand;hit:boolean};
 export type ArcadeEvent=ArenaEvent|'launch'|'entrance'|'recover'|'boss'|'boss-trap'|'boss-free'|'snared'|'escape-step'|'escape'|'hit'|'win'|'hurt';
 const len=(p:Point)=>Math.hypot(p.x,p.y);
 const sub=(a:Point,b:Point)=>({x:a.x-b.x,y:a.y-b.y});
 const dist=(a:Point,b:Point)=>len(sub(a,b));
 const clamp=(x:number,min:number,max:number)=>Math.min(max,Math.max(min,x));
+const flyRadius=5;
+const airBottom=arcadeGround-flyRadius;
 const clear=(a:Point,b:Point,surfaces:readonly Rect[])=>!surfaces.some(r=>crossesSolid(a,b,r));
+const flyBounds=(p:Point)=>({x:clamp(p.x,12,arcadeWidth-12),y:clamp(p.y,12,airBottom)});
+const flightMargin=(r:Rect)=>({x:r.x-flyRadius,y:r.y-flyRadius,w:r.w+2*flyRadius,h:r.h+2*flyRadius});
+const flightLayouts=arcadeLayouts.map(layout=>layout.map(flightMargin));
+const flightSurfaces=(run:ArcadeRun)=>flightLayouts[arcadeStage(run.level)];
 export const arcadeStage=(level:number)=>level-1;
 export const intentionalArcadeInput=([x,y,ax,ay,buttons]:ArenaInput)=>!!buttons || Math.max(Math.hypot(x,y),Math.hypot(ax,ay))>=64;
 
@@ -77,7 +70,7 @@ function prepareLevel(run:ArcadeRun) {
   const encounter=dialogueFor(run.level);
   run.quota=encounter.insects.length;
   run.flies=encounter.insects.map(([,kind],index)=>{
-    const entrance=flySpawn(run.level,index);
+    const entrance=flySpawn(run,index);
     return {p:{...entrance},v:{x:0,y:0},target:{...entrance},kind,actor:index,age:0,aimAt:0,caughtUntil:0,touching:false,phase:'patrol' as const,phaseAt:run.clock+.85+index*.48};
   });
   const final=run.level===arcadeLevels;
@@ -91,8 +84,13 @@ function prepareLevel(run:ArcadeRun) {
 }
 
 const nodes=[{x:44,y:102},{x:354,y:103},{x:128,y:32},{x:300,y:36},{x:102,y:184},{x:304,y:183},{x:187,y:75},{x:211,y:138}];
-function flySpawn(level:number,index:number) {
-  return level===1 ? nodes[4] : nodes[(index*3+level-1)%nodes.length];
+const airNodes=[...nodes,...[28,58,89,121,153,181,200].flatMap(y=>
+  [32,79,129,177,221,272,321,370].map(x=>({x,y})))];
+function flySpawn(run:ArcadeRun,index:number) {
+  if (run.level===1) return nodes[4];
+  const surfaces=flightSurfaces(run);
+  const slots=airNodes.filter(p=>p.x>=95 && p.y<185 && clear(p,p,surfaces));
+  return slots[(index*11+run.level*7)%slots.length];
 }
 
 export function arcadeIdleSpeech(run:ArcadeRun) {
@@ -111,12 +109,12 @@ export function arcadeAttackStyle(kind:number) {
 }
 
 function attackFlight(run:ArcadeRun,fly:Fly,profile:Flight,reading:number) {
-  const {spider,hunt:{surfaces,strands}}=run.movement;
+  const {spider,hunt:{strands}}=run.movement;
   const now=run.clock;
   const style=arcadeAttackStyle(fly.kind);
   const steep=style==='dive',sideways=style==='dash';
   const player={x:clamp(spider.x+spider.vx*reading*.22,15,385),y:clamp(spider.y+spider.vy*reading*.22,14,207)};
-  const clearLane=(from:Point,to:Point)=>clear(from,to,surfaces) && !silkAcross(from,to,strands);
+  const clearLane=(from:Point,to:Point)=>clear(from,to,flightSurfaces(run)) && !silkAcross(from,to,strands);
   if (fly.phase==='patrol') {
     if (now<fly.phaseAt || dist(fly.p,player)>190+reading*95) return;
     const away=fly.p.x<player.x ? -1 : 1;
@@ -160,8 +158,62 @@ function attackFlight(run:ArcadeRun,fly:Fly,profile:Flight,reading:number) {
   }
 }
 
+function fallCocoon(fly:Fly,surfaces:readonly Rect[]) {
+  const cocoon=fly.cocoon!;
+  const body={...fly.p,vx:fly.v.x*Math.exp(-(cocoon.landed ? 12 : 1.5)*arenaStep),vy:fly.v.y+470*arenaStep};
+  if (moveAxis(body,surfaces,'x',body.vx*arenaStep,flyRadius,flyRadius)) body.vx=-fly.v.x*.22;
+  const bounded=flyBounds(body);
+  if (bounded.x!==body.x) {body.x=bounded.x;body.vx*=-.25;}
+  const descending=body.vy>0;
+  const impactSpeed=body.vy;
+  const stopped=moveAxis(body,surfaces,'y',body.vy*arenaStep,flyRadius,flyRadius);
+  if (body.y<12) {body.y=12;body.vy=Math.max(0,body.vy);}
+  cocoon.landed=stopped && descending;
+  if (cocoon.landed) {
+    if (impactSpeed>145) body.vy=-impactSpeed*.16;
+    if (Math.abs(body.vx)<1) body.vx=0;
+  }
+  fly.p={x:body.x,y:body.y};
+  fly.v={x:body.vx,y:body.vy};
+}
+
+function tagFly(run:ArcadeRun,shot:SilkShot,from:Point,emit:(event:ArcadeEvent)=>void) {
+  const travel=sub(shot.p,from),distance=len(travel);
+  if (distance<.001) return false;
+  const direction={x:travel.x/distance,y:travel.y/distance};
+  let first=distance+1e-5;
+  let prey:Fly|undefined;
+  for (const fly of run.flies) {
+    if (fly.caughtUntil) continue;
+    const offset=sub(fly.p,from);
+    const along=offset.x*direction.x+offset.y*direction.y;
+    const lateral=offset.x*direction.y-offset.y*direction.x;
+    const radius=flyRadius+1;
+    if (Math.abs(lateral)>radius) continue;
+    const depth=Math.sqrt(radius**2-lateral**2);
+    if (along+depth<0) continue;
+    const entry=Math.max(0,along-depth);
+    const contact={x:from.x+entry*direction.x,y:from.y+entry*direction.y};
+    if (entry<first && clear(contact,fly.p,run.movement.hunt.surfaces)) {
+      first=entry;
+      prey=fly;
+    }
+  }
+  if (!prey) return false;
+  const profile:Flight=species[prey.kind][2];
+  prey.caughtUntil=run.clock+(profile.hold??flyTrapSeconds);
+  prey.cocoon={struckAt:run.clock,landed:false};
+  prey.trappedBy=undefined;prey.touching=false;
+  prey.v={x:shot.v.x*.34+prey.v.x*.25,y:shot.v.y*.34+prey.v.y*.25};
+  shot.p={x:from.x+first*direction.x,y:from.y+first*direction.y};
+  shot.fade=.08;
+  emit('catch');
+  return true;
+}
+
 function tickFlies(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
   const {spider,hunt}=run.movement;
+  const bounds=flightSurfaces(run);
   const lineup=dialogueFor(run.level).insects;
   const average=lineup.reduce((sum,[,kind])=>sum+species[kind][2].speed,0)/lineup.length;
   const reading=(run.level-1)/8;
@@ -176,7 +228,14 @@ function tickFlies(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
   run.flies=run.flies.filter(fly=>{
     if (!run.lives) return true;
     if (fly.caughtUntil) {
-      if (run.clock<fly.caughtUntil && (!fly.trappedBy || hunt.strands.includes(fly.trappedBy))) return !capture(fly.p);
+      if (run.clock<fly.caughtUntil && (!fly.trappedBy || hunt.strands.includes(fly.trappedBy))) {
+        if (fly.cocoon) {
+          if (capture(fly.p)) return false;
+          fallCocoon(fly,hunt.surfaces);
+        }
+        return !capture(fly.p);
+      }
+      if (fly.cocoon) {fly.v={x:0,y:0};fly.cocoon=undefined;}
       fly.caughtUntil=0;
       fly.aimAt=0;fly.phase='recover';fly.phaseAt=run.clock+.8;
       return true;
@@ -193,7 +252,7 @@ function tickFlies(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
     if ((fly.phase==='patrol' || fly.phase==='recover') && (run.clock>=fly.aimAt || dist(fly.p,fly.target)<12)) {
       const playerNear=dist(fly.p,spider)<75+reading*54 && clear(fly.p,spider,hunt.surfaces);
       const from=fly.p;
-      const choices=nodes.filter(node=>dist(from,node)>45 && clear(from,node,hunt.surfaces));
+      const choices=airNodes.filter(node=>dist(from,node)>40 && clear(from,node,bounds));
       let best=-Infinity;
       for (const [i,node] of choices.entries()) {
         const silkAhead=silkAcross(from,node,hunt.strands);
@@ -221,21 +280,25 @@ function tickFlies(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
     const mix=arenaStep*(fly.phase==='strike' ? style==='dash' ? 7 : 15 : fly.phase==='windup' && style==='dive' ? 12 : profile.steer);
     fly.v.x+=(x-fly.v.x)*mix;
     fly.v.y+=(y+(fly.phase==='patrol' ? profile.sink??0 : 0)-fly.v.y)*mix;
-    const next={x:clamp(fly.p.x+fly.v.x*arenaStep,14,386),y:clamp(fly.p.y+fly.v.y*arenaStep,14,207)};
+    const intended=flyBounds({x:fly.p.x+fly.v.x*arenaStep,y:fly.p.y+fly.v.y*arenaStep});
+    const body={...fly.p,vx:fly.v.x,vy:fly.v.y};
+    const blockedX=moveAxis(body,hunt.surfaces,'x',intended.x-body.x,flyRadius,flyRadius);
+    const blockedY=moveAxis(body,hunt.surfaces,'y',intended.y-body.y,flyRadius,flyRadius);
+    const next={x:body.x,y:body.y};
     for (const wire of hunt.strands) {
       if (wire===fly.trappedBy) continue;
       const hit=sweptHit(fly.p,next,wire);
-      if (!hit) continue;
+      if (!hit || !clear(fly.p,hit.point,bounds)) continue;
       fly.p=hit.point;fly.trappedBy=wire;fly.touching=false;fly.caughtUntil=run.clock+(profile.hold??flyTrapSeconds);
       wire.expiresAt=Math.max(wire.expiresAt??0,fly.caughtUntil);
       wire.shakeUntil=run.clock+.42;
       if (capture(fly.p)) return false;
       emit('catch');return true;
     }
-    if (clear(fly.p,next,hunt.surfaces)) fly.p=next;
-    else {
-      if (!clear(fly.p,{x:next.x,y:fly.p.y},hunt.surfaces)) fly.v.x*=-.22;
-      if (!clear(fly.p,{x:fly.p.x,y:next.y},hunt.surfaces)) fly.v.y*=-.22;
+    fly.p=next;
+    if (blockedX || blockedY) {
+      if (blockedX) fly.v.x*=-.22;
+      if (blockedY) fly.v.y*=-.22;
       fly.aimAt=0;
       if (fly.phase==='strike') {fly.phase='recover';fly.phaseAt=run.clock+.8;}
     }
@@ -266,7 +329,7 @@ function hurt(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
 }
 
 function aimRivalWeb(target:Point,surfaces:readonly Rect[]) {
-  for (const tilt of [.3,-.3]) {
+  for (const tilt of [.3,-.3,.61,-.61,1,-1]) {
     const from=aimHit(target,surfaces,{x:target.x-tilt,y:target.y-1},{range:arcadeHeight});
     const to=aimHit(target,surfaces,{x:target.x+tilt,y:target.y+1},{range:arcadeHeight});
     if (from && to && to.y-from.y>=30 && diagonalWeb(from,to)) return {from,to,shakeUntil:0};
@@ -287,7 +350,7 @@ function warnBoss(run:ArcadeRun,boss:Boss) {
     y:hop ? 88+(boss.turn%2)*40 : clamp(spider.y+spider.vy*predicted,42,200)};
   let target=goal;
   if (!clear(boss.p,goal,hunt.surfaces)) {
-    target=nodes.filter(node=>dist(node,boss.p)>24 && clear(boss.p,node,hunt.surfaces))
+    target=airNodes.filter(node=>dist(node,boss.p)>24 && clear(boss.p,node,hunt.surfaces))
       .sort((a,b)=>dist(a,goal)-dist(b,goal))[0]??boss.p;
   }
   boss.target=target;
@@ -407,7 +470,10 @@ function tickSilkShots(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
       shot.fade-=arenaStep;
       return shot.fade>0;
     }
-    if (advanceSilk(shot,hunt.surfaces,hunt.strands,arenaStep)) {
+    const from=shot.p;
+    const travelled=advanceSilk(shot,hunt.surfaces,hunt.strands,arenaStep);
+    if (tagFly(run,shot,from,emit)) return true;
+    if (travelled) {
       if (!shot.hit) return true;
       const {point,web}=shot.hit;
       if (crawlerIsSupported(spider,hunt.surfaces)) {
@@ -479,6 +545,11 @@ export function advanceArcade(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeE
     moveArena(run.movement,arcadeSilk(run,input,emit),emit,{
       climbSilk:false,adjustRope:true,webLimit:arcadeWebLimit,ropeRange:arcadeSilkReach,directionalJump:true,
     });
+    if (spider.x<SPIDER_HALF_WIDTH || spider.x>arcadeWidth-SPIDER_HALF_WIDTH) {
+      spider.x=clamp(spider.x,SPIDER_HALF_WIDTH,arcadeWidth-SPIDER_HALF_WIDTH);
+      spider.vx=0;
+    }
+    if (spider.y<SPIDER_HALF_HEIGHT) {spider.y=SPIDER_HALF_HEIGHT;spider.vy=Math.max(0,spider.vy);}
     if (!spider.rope) run.ropeWeb=undefined;
     tickSilkShots(run,emit);
   }

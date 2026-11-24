@@ -1,6 +1,7 @@
+import {arcadeBed,arcadeGround,arcadeScenes,type Perch} from './arcade-scenery';
 import {deliverySeconds,dialogueFor,insectMark,levelEntranceSeconds} from './arcade-dialogue';
 import {rivalQuips} from './arcade-script';
-import {arcadeAttackStyle,arcadeEscapePresses,arcadeHeight,arcadeIdleSpeech,arcadeStage,arcadeWidth,bossTrapSeconds,flyTrapSeconds,stages,type ArcadeRun} from './arcade';
+import {arcadeAttackStyle,arcadeEscapePresses,arcadeHeight,arcadeIdleSpeech,arcadeStage,arcadeWidth,bossTrapSeconds,flyTrapSeconds,type ArcadeRun} from './arcade';
 import {block,drawAimMarker,drawSpider} from './hunt-render';
 import type {Point} from './spider';
 import type {Strand} from './threads';
@@ -177,32 +178,164 @@ function introduction(ctx:CanvasRenderingContext2D,run:ArcadeRun,ink:string,ligh
   }
 }
 
-export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:number,reducedMotion=false) {
-  const {movement:{spider,hunt,aim},clock,boss,snare}=run;
-  const stage=arcadeStage(run.level),[name,base,ink,light]=stages[stage];
+function landscape(ctx:CanvasRenderingContext2D,stage:number,pulse:number,reducedMotion:boolean) {
+  const {base,ink,light,accent,skyline}=arcadeScenes[stage];
   block(ctx,0,0,width,height,base);
+  const wash=ctx.createLinearGradient(0,0,0,arcadeGround);
+  wash.addColorStop(0,light);wash.addColorStop(.59,base);wash.addColorStop(1,accent);
+  ctx.fillStyle=wash;ctx.fillRect(0,0,width,height);
   ctx.save();
-  ctx.globalAlpha=.16;
-  for (let x=24+stage;x<width;x+=32+stage%4*4) {
-    const y=24+x%54;
-    block(ctx,x,y,3,height-y,ink);
-    block(ctx,x-4,y+15,11,2,ink);
-    block(ctx,x-2,y+26,8,1,ink);
-    block(ctx,x,y-5-Math.round(pulse*4),4,4,light);
+  ctx.globalAlpha=.75;
+  const sun=stage%2===0 ? 308 : 84;
+  for (let y=-23;y<=23;y+=3) {
+    const radius=Math.floor(Math.sqrt(24**2-y**2));
+    block(ctx,sun-radius,59+y,2*radius,3,light);
   }
-  if (!run.intro) {
-    ctx.globalAlpha=.39+pulse*.12;
-    ctx.font='bold 25px monospace';
-    ctx.textAlign='center';
-    ctx.fillStyle=ink;
-    ctx.fillText(name.toUpperCase(),width/2,34,width-36);
+  ctx.globalAlpha=.15;
+  for (let y=67;y<arcadeGround;y+=5) for (let x=(y%4)*3;x<width;x+=12) block(ctx,x,y,2,1,ink);
+  for (let row=0;row<2;row++) {
+    ctx.globalAlpha=row ? .48 : .27;
+    const tint=row ? accent : ink;
+    for (let x=-20+row*17;x<width;x+=36+row*17) {
+      const root=arcadeGround+row*7;
+      const y=root-29-((x+40)*(stage+3)*7)%67;
+      if (skyline==='branch' || skyline==='reed') {
+        block(ctx,x,y,4+row*3,root-y,tint);
+        block(ctx,x-14,y+18,17,3,tint);
+        block(ctx,x+3,y+29,15,3,tint);
+        if (skyline==='reed') block(ctx,x-2,y-9,8,13,tint);
+      } else if (skyline==='bloom' || skyline==='mushroom') {
+        block(ctx,x,y+6,4+row*3,root-y-6,tint);
+        block(ctx,x-10,y,25,10,tint);
+        block(ctx,x-6,y-4,17,4,tint);
+        if (skyline==='bloom') block(ctx,x-2,y-9,10,8,tint);
+      } else {
+        block(ctx,x,y,3,root-y,tint);
+        for (let n=0;n<4;n++) {
+          block(ctx,x-13,y+9+n*11,14,4,tint);
+          block(ctx,x+2,y+14+n*11,18,4,tint);
+        }
+      }
+    }
+  }
+  ctx.globalAlpha=.66+pulse*.18;
+  const beat=reducedMotion ? 0 : Math.round(pulse*5);
+  for (let i=0;i<23;i++) {
+    const x=(i*61+stage*29)%width;
+    const y=42+(i*31+stage*17)%152-beat;
+    block(ctx,x,y,2+i%2,1+i%2,light);
   }
   ctx.restore();
-  for (const r of hunt.surfaces) {
-    block(ctx,r.x,r.y,r.w,r.h,ink);
-    if (r.w>22) for (let x=4;x<r.w-3;x+=11) block(ctx,r.x+x,r.y+2,4,1,pulse>.48 ? light : base);
-    else for (let y=6;y<r.h-3;y+=11) block(ctx,r.x+2,r.y+y,1,4,base);
+}
+
+function ellipse(ctx:CanvasRenderingContext2D,x:number,y:number,rx:number,ry:number,color:string) {
+  for (let row=-ry;row<=ry;row++) {
+    const span=Math.floor(rx*Math.sqrt(1-row**2/ry**2));
+    block(ctx,x-span,y+row,span*2+1,1,color);
   }
+}
+
+function foliage(ctx:CanvasRenderingContext2D,{x,y,w,h,form}:Perch,{accent,base,ink,light}:typeof arcadeScenes[number]) {
+  const middle=Math.round(x+w/2);
+  ctx.save();
+  ctx.globalAlpha=.58;
+  if (form==='bloom') {
+    block(ctx,middle-2,y,4,arcadeGround-y,accent);
+    ellipse(ctx,middle-10,y+Math.min(46,arcadeGround-y-9),11,4,accent);
+    const petal=Math.floor(w/6);
+    for (const [dx,dy] of [[-2,0],[-1,-7],[0,-9],[1,-7],[2,0],[1,7],[0,8],[-1,7]]) {
+      ellipse(ctx,middle+dx*petal,y+dy,petal+1,7,dx%2 ? light : accent);
+    }
+    ellipse(ctx,middle,y+1,Math.floor(w/6),5,ink);
+    ellipse(ctx,middle,y,Math.floor(w/8),3,light);
+  } else if (form==='leaf') {
+    const flip=x%2 ? -1 : 1;
+    block(ctx,middle+flip*Math.round(w*.35),y+h-1,7,3,accent);
+    ellipse(ctx,middle,y+6,Math.round(w*.52),Math.max(7,Math.round(w*.17)),accent);
+    for (let n=0;n<4;n++) {
+      block(ctx,middle-12+n*6,y+h+1+n%2,4,1,light);
+      block(ctx,middle-11+n*6,y+h+2+n%2,4,1,base);
+    }
+  } else if (form==='mushroom') {
+    block(ctx,middle-4,y+4,9,arcadeGround-y-4,base);
+    ellipse(ctx,middle,y+4,Math.round(w*.54),13,accent);
+    ellipse(ctx,middle,y+7,Math.round(w*.46),7,ink);
+    for (let n=0;n<7;n++) {
+      const dx=Math.round(w*.36*(n%4-1.5)/1.5);
+      ellipse(ctx,middle+dx,y-3+(n*5)%10,2+n%3,2,light);
+    }
+  } else if (form==='branch' && w>h) {
+    block(ctx,x-5,y+1,w+11,h-3,accent);
+    block(ctx,x+9,y+h,w-13,3,accent);
+    block(ctx,x+13,y+h+3,w-22,2,accent);
+    block(ctx,x+w-10,y-5,4,9,accent);
+  } else if (form==='reed') {
+    ellipse(ctx,middle,y+8,Math.round(w*.64),12,accent);
+    block(ctx,middle-1,y+10,3,h-10,accent);
+  }
+  ctx.restore();
+}
+
+function perch(ctx:CanvasRenderingContext2D,p:Perch,scene:typeof arcadeScenes[number],pulse:number) {
+  const {x,y,w,h,form}=p,{ink,accent,light,base}=scene;
+  const bed=y===arcadeGround;
+  // The dark edge marks the full extent of each collision surface.
+  block(ctx,x,y,w,h,ink);
+  block(ctx,x+1,y+1,w-2,Math.max(1,h-3),accent);
+  block(ctx,x+1,y+1,w-2,1,light);
+  if (bed) {
+    for (let n=0;n<w;n+=7) {
+      const rise=(n*13)%7;
+      block(ctx,x+n,y+2,4,h-2,accent);
+      block(ctx,x+n,y+2-rise,2,rise,accent);
+    }
+  } else if (form==='leaf' || form==='bloom' || form==='mushroom') {
+    if (form==='leaf') {
+      block(ctx,x+2,y+Math.floor(h/2),w-4,1,ink);
+      for (let n=5;n<w-4;n+=8) {
+        block(ctx,x+n,y+2,2,1,base);
+        block(ctx,x+n+2,y+h-3,2,1,ink);
+      }
+    } else {
+      for (let n=4;n<w-3;n+=8) {
+        block(ctx,x+n,y+2,n%3+2,Math.min(3,h-4),n%3 ? light : base);
+        block(ctx,x+n+1,y+h-3,3,2,ink);
+      }
+      if (form==='bloom') block(ctx,x+w/2-3,y+2,7,3,ink);
+    }
+  } else {
+    for (let n=4;n<h-3;n+=7) block(ctx,x+2,y+n,Math.min(w-4,3+(n*3)%8),1,ink);
+    for (let n=9;n<w-3;n+=12) block(ctx,x+n,y+h-4,5,1,ink);
+  }
+  if (!bed && (form==='leaf' || form==='bloom') && pulse>.42) {
+    block(ctx,x+w-5,y-2,2,2,light);
+  }
+}
+
+function cocoon(ctx:CanvasRenderingContext2D,p:Point,v:Point,ink:string,light:string,accent:string,falling:boolean) {
+  ctx.save();
+  ctx.translate(Math.round(p.x),Math.round(p.y));
+  if (falling) ctx.rotate(Math.max(-.65,Math.min(.65,v.x*.008)));
+  block(ctx,-4,-3,9,6,ink);block(ctx,-2,-5,5,10,ink);
+  block(ctx,-3,-2,7,4,light);block(ctx,-1,-4,3,8,light);
+  block(ctx,-3,0,7,1,accent);block(ctx,-1,-2,4,1,accent);
+  ctx.restore();
+}
+
+export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:number,reducedMotion=false) {
+  const {movement:{spider,hunt,aim},clock,boss,snare}=run;
+  const stage=arcadeStage(run.level),scene=arcadeScenes[stage],{ink,light}=scene;
+  landscape(ctx,stage,pulse,reducedMotion);
+  if (!run.intro) {
+    ctx.save();
+    ctx.globalAlpha=.63;
+    ctx.font='bold 15px monospace';ctx.textAlign='center';ctx.fillStyle=ink;
+    ctx.fillText(scene.name.toUpperCase(),width/2,23,width-36);
+    ctx.restore();
+  }
+  for (const surface of scene.perches) foliage(ctx,surface,scene);
+  for (const surface of scene.perches) perch(ctx,surface,scene,pulse);
+  perch(ctx,arcadeBed,scene,pulse);
   if (run.intro) {
     introduction(ctx,run,ink,light,pulse,reducedMotion);
     return;
@@ -241,11 +374,17 @@ export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:nu
         block(ctx,x,y-3,1,3,ink);block(ctx,x,y+1,1,1,light);
       }
     }
-    insect(ctx,fly.p,fly.kind,insectMark(run.level,fly.actor),clock,!!fly.caughtUntil || fly.phase==='windup' || fly.phase==='recover');
+    if (fly.cocoon) {
+      const flying=!fly.cocoon.landed;
+      if (flying && clock-fly.cocoon.struckAt<.15) {
+        silk(ctx,{x:fly.p.x-fly.v.x*.045,y:fly.p.y-fly.v.y*.045},fly.p,light);
+      }
+      cocoon(ctx,fly.p,fly.v,ink,light,scene.accent,flying);
+    } else insect(ctx,fly.p,fly.kind,insectMark(run.level,fly.actor),clock,!!fly.caughtUntil || fly.phase==='windup' || fly.phase==='recover');
     if (fly.caughtUntil) {
       block(ctx,fly.p.x-6,fly.p.y-9,12,3,ink);
       const left=fly.caughtUntil-clock;
-      block(ctx,fly.p.x-5,fly.p.y-8,Math.ceil(left/flyTrapSeconds*10),1,left<.8 ? '#ffc184' : light);
+      block(ctx,fly.p.x-5,fly.p.y-8,Math.ceil(Math.max(0,left/flyTrapSeconds)*10),1,left<.8 ? '#ffc184' : light);
       if (left<.8) {
         block(ctx,fly.p.x-1,fly.p.y+5,3,1,'#ffc184');
         block(ctx,fly.p.x-5,fly.p.y+3,2,1,'#ffc184');

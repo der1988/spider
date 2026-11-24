@@ -144,12 +144,13 @@ function approach(value: number, target: number, maxDelta: number) {
 }
 
 /** Sweep the body along one axis, clipping motion to the nearest solid face. */
-export function moveAxis(spider: Spider, surfaces: readonly Rect[], axis: 'x' | 'y', delta: number) {
+export function moveAxis(spider: Pick<Spider,'x'|'y'|'vx'|'vy'>, surfaces: readonly Rect[], axis: 'x' | 'y', delta: number,
+  halfWidth=SPIDER_HALF_WIDTH,halfHeight=SPIDER_HALF_HEIGHT) {
   if (Math.abs(delta) < EPSILON) return false
   const horizontal = axis === 'x'
   const across = horizontal ? 'y' : 'x'
-  const half = horizontal ? SPIDER_HALF_WIDTH : SPIDER_HALF_HEIGHT
-  const acrossHalf = horizontal ? SPIDER_HALF_HEIGHT : SPIDER_HALF_WIDTH
+  const half = horizontal ? halfWidth : halfHeight
+  const acrossHalf = horizontal ? halfHeight : halfWidth
   const bodyMin = spider[across] - acrossHalf
   const bodyMax = spider[across] + acrossHalf
   const forward = delta > 0

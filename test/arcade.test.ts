@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {advanceArcade,arcadeEscapeButton,arcadeEscapePresses,arcadeLayouts,arcadeWebLimit,createArcade} from '../src/arcade.ts';
+import {arcadeGround,arcadeScenes} from '../src/arcade-scenery.ts';
 import {sweptHit} from '../src/threads.ts';
 import {arenaInput,arenaStep,releaseSilkButton} from '../src/arena-run.ts';
 import {arcadeLevels,campaign,insectMark,levelIntroDuration} from '../src/arcade-dialogue.ts';
@@ -27,6 +28,12 @@ function putNextToSpider(run:ReturnType<typeof createArcade>) {
   const {spider}=run.movement;
   const fly=run.flies[0];
   fly.p={x:spider.x+4,y:spider.y-4};
+  return fly;
+}
+
+function parkFly(run:ReturnType<typeof createArcade>,x=73,y=26) {
+  const fly=run.flies[0];
+  Object.assign(fly,{p:{x,y},target:{x,y},v:{x:0,y:0},phase:'patrol',phaseAt:100,aimAt:100,age:5});
   return fly;
 }
 
@@ -88,6 +95,81 @@ test('silk catches the first gnat, which escapes from the exact caught position 
   advanceArcade(run,neutral);
   assert.notDeepEqual(fly.p,point);
   assert.equal(fly.caughtUntil,0);
+});
+
+test('mirrored direct shots push the cocoon along the incoming silk before it lands and escapes',()=>{
+  for (const sign of [-1,1]) {
+    const run=createArcade();
+    start(run);
+    const spider=run.movement.spider;
+    const x=sign===1 ? 52 : 210,y=183;
+    Object.assign(spider,{x,y,vx:0,vy:0,support:undefined,grounded:false});
+    const fly=parkFly(run,x+sign*58,y+1);
+    const contactX=fly.p.x,events:string[]=[];
+    advanceArcade(run,arenaInput({x:0,y:0},{x:sign,y:0},false,true),event=>events.push(event));
+    for (let i=0;i<30 && !fly.cocoon;i++) advanceArcade(run,neutral,event=>events.push(event));
+    assert.ok(fly.cocoon);
+    assert.ok(fly.v.x*sign>100);
+    assert.equal(run.movement.hunt.strands.length,0);
+    assert.equal(spider.rope,undefined);
+    assert.deepEqual(events,['launch','catch']);
+    assert.equal(run.score,0);
+    ticks(run,.65);
+    assert.ok((fly.p.x-contactX)*sign>16);
+    assert.equal(fly.p.y,arcadeGround-5);
+    assert.ok(fly.cocoon.landed);
+    let landing=fly.p;
+    while (fly.caughtUntil) {landing=fly.p;advanceArcade(run,neutral);}
+    assert.equal(run.flies[0],fly);
+    assert.deepEqual(fly.p,landing);
+    assert.equal(run.score,0);
+    ticks(run,.15);
+    assert.ok(fly.p.y<landing.y);
+  }
+});
+
+test('the nearest free fly stops the shot, and picking up its cocoon counts once',()=>{
+  const run=createArcade(4);
+  start(run);
+  const spider=run.movement.spider;
+  Object.assign(spider,{x:159,y:193,vx:0,vy:0,support:undefined,grounded:false});
+  const near=parkFly(run,192,194),far=run.flies[1];
+  Object.assign(far,{...near,p:{x:216,y:195},target:{x:216,y:195},v:{x:0,y:0},actor:1});
+  run.flies=[far,near];
+  advanceArcade(run,arenaInput({x:0,y:0},{x:1,y:0},false,true));
+  ticks(run,.6);
+  assert.ok(near.cocoon?.landed);
+  assert.equal(far.cocoon,undefined);
+  assert.equal(run.score,0);
+  Object.assign(spider,{x:near.p.x,y:209,vx:0,vy:0,support:'floor',grounded:true});
+  advanceArcade(run,neutral);
+  assert.equal(run.score,1);
+  assert.deepEqual(run.flies,[far]);
+});
+
+test('the first solid shields a fly just behind it',()=>{
+  const run=createArcade(6);
+  start(run);
+  const spider=run.movement.spider;
+  Object.assign(spider,{x:52,y:192,vx:0,vy:0,support:undefined,grounded:false});
+  const fly=parkFly(run,110,193);
+  advanceArcade(run,arenaInput({x:0,y:0},{x:1,y:0},false,true));
+  ticks(run,.4);
+  assert.equal(fly.cocoon,undefined);
+  assert.equal(run.score,0);
+});
+
+test('scenes have open skies and distinct perches with a stable starting point',()=>{
+  assert.equal(new Set(arcadeScenes.map(scene=>scene.name)).size,arcadeLevels);
+  assert.equal(arcadeLayouts.length,arcadeLevels);
+  for (const [i,surfaces] of arcadeLayouts.entries()) {
+    const run=createArcade(i+1);
+    assert.equal(run.movement.spider.support,'floor');
+    assert.equal(run.movement.hunt.surfaces,surfaces);
+    assert.ok(surfaces.every(perch=>perch.y>=32));
+    assert.ok(surfaces.some(perch=>perch.w<=55 && perch.y+perch.h<arcadeGround));
+    assert.ok(surfaces.filter(perch=>perch.y<arcadeGround).every(perch=>perch.w<100));
+  }
 });
 
 test('the last heart sends the player straight back to level one with three hearts',()=>{
@@ -199,6 +281,7 @@ test('R1 tap only fixes silk, keeping the newest three distinct webs',()=>{
 test('holding R1 on the floor still fixes a web, while a held airborne shot reels and detaches',()=>{
   const run=createArcade();
   start(run);
+  parkFly(run);
   const {hunt,spider}=run.movement;
   advanceArcade(run,towardWeb);
   ticks(run,.39);
@@ -239,6 +322,7 @@ test('directional jumps use screen axes at the wall and right-stick aim when mov
 test('silk heads travel and slow on a miss, with a longer connection in midair',()=>{
   const run=createArcade();
   start(run);
+  parkFly(run);
   const spider=run.movement.spider;
   const shoot=arenaInput({x:0,y:0},{x:1,y:0},false,true);
   const release:[number,number,number,number,number]=[0,0,0,0,releaseSilkButton];
@@ -254,11 +338,11 @@ test('silk heads travel and slow on a miss, with a longer connection in midair',
   assert.equal(run.silkShots.length,0);
   assert.equal(run.movement.hunt.strands.length,0);
 
-  Object.assign(spider,{x:183,y:130,vx:0,vy:-30,support:undefined,grounded:false});
+  Object.assign(spider,{x:91,y:143,vx:0,vy:-92,support:undefined,grounded:false});
   advanceArcade(run,shoot);
   for (let i=0;i<130 && !spider.rope;i++) advanceArcade(run,neutral);
   assert.ok(spider.rope);
-  assert.equal(spider.rope.x,393);
+  assert.ok(spider.rope.x>=286 && spider.rope.x<=327);
   assert.ok(spider.rope.length>155);
   assert.ok(spider.y<209);
 });
@@ -287,6 +371,7 @@ function existingWeb(run:ReturnType<typeof createArcade>) {
 test('the same shot joins a web from a surface and becomes a rope after takeoff',()=>{
   const run=createArcade();
   start(run);
+  parkFly(run);
   const {hunt,spider}=run.movement,web=existingWeb(run);
   advanceArcade(run,towardWeb);
   advanceArcade(run,silkRelease);

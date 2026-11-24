@@ -1,10 +1,11 @@
+import {arcadeScenes} from './arcade-scenery';
 import './style.css';
 import {createOpenWorld,createWindowHunt,pantryTiers,preyTier,restartOpenWorld,stepWindowHunt,updateHuntZoom,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
 import {renderWindowHunt} from './window-hunt-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
 import {advanceArena,arenaInput,arenaStep,releaseSilkButton,createArena,type ArenaEvent} from './arena-run';
-import {advanceArcade,arcadeWebLimit,arcadeEscapeButton,arcadeEscapePresses,arcadeHeight,arcadeStage,arcadeWidth,createArcade,species,stages,type ArcadeEvent,type ArcadeRun} from './arcade';
+import {advanceArcade,arcadeWebLimit,arcadeEscapeButton,arcadeEscapePresses,arcadeHeight,arcadeStage,arcadeWidth,createArcade,species,type ArcadeEvent,type ArcadeRun} from './arcade';
 import {arcadeLevels,dialogueFor,heartsPerRun,insectMark} from './arcade-dialogue';
 import {ArcadeMusic} from './arcade-music';
 import {arcadeIcon,renderArcade} from './arcade-render';
@@ -367,7 +368,7 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
   if (run.phase!=='ready') arcadeMusic.sync(contextAudio,run.level,frozen && !finished || document.hidden || paused,!!run.intro);
   const encounter=dialogueFor(run.level);
   if (shownArcadeLevel!==run.level) {
-    get('arcade-stage').textContent=stages[stage][0];
+    get('arcade-stage').textContent=arcadeScenes[stage].name;
     get('arcade-species').innerHTML=encounter.insects.map(([name,kind],index)=>
       `<li>${arcadeIcon(kind,insectMark(run.level,index))}<div><strong>${name}</strong><span>${species[kind][1]}</span></div></li>`).join('');
     get('arcade-level').textContent=`Level ${run.level} / ${arcadeLevels}`;
@@ -404,7 +405,7 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
   }
   if (run.phase!=='ready') say(finished ? '' : run.restartIn>0 ? 'Out of hearts. Back to level 1…' : run.intro ? 'Press × or Enter to skip.' : boss ?
     (run.snare ? `Press × or X to break free · ${run.snare.presses}/${arcadeEscapePresses}` :
-      'Set a web, then touch the rival while he’s tangled.') : 'Aim with RS and fire with R1. Webs set from a surface. Swing when airborne.');
+      'Set a web, then touch the rival while he’s tangled.') : 'Aim with RS. R1 wraps a fly on impact. Touch it before it unwraps.');
   renderArcade(context,run,beat,reduced());
 }
 
