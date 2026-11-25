@@ -3,7 +3,7 @@ import {frankLine,frankSpeakerIndex,type FrankStory} from './frank-story';
 import {arcadeFrame,arcadeLayouts,arcadeScenes} from './arcade-scenery';
 import {insectMark,lineAt} from './arcade-dialogue';
 import {rivalQuips} from './arcade-script';
-import {arcadeAttackStyle,arcadeDirectHits,arcadeEscapePresses,arcadeHeight,arcadeIdleSpeech,arcadeStage,arcadeWidth,bossTrapSeconds,flyEscapeGrace,flyTrapSeconds,type ArcadeRun} from './arcade';
+import {arcadeAttackStyle,arcadeDirectHits,arcadeEscapePresses,arcadeHeight,arcadeIdleSpeech,arcadeStage,arcadeWidth,bossTrapSeconds,species,flyEscapeGrace,flyTrapSeconds,type ArcadeRun} from './arcade';
 import {block,drawAimMarker,drawSpider} from './hunt-render';
 import type {Point} from './spider';
 import {crossesSolid,type Strand} from './threads';
@@ -56,29 +56,37 @@ function pixelWords(words:string,color:string) {
   const pixels=pen.getImageData(0,0,sprite.width,sprite.height);
   for (let i=3;i<pixels.data.length;i+=4) pixels.data[i]=pixels.data[i]>=128 ? 255 : 0;
   pen.putImageData(pixels,0,0);
+  if (speechGlyphs.size>=192) speechGlyphs.delete(speechGlyphs.keys().next().value!);
   speechGlyphs.set(key,sprite);
   return sprite;
 }
 
-function drawSpeech(ctx:CanvasRenderingContext2D,speech:Speech,time:number) {
+function drawSpeech(ctx:CanvasRenderingContext2D,speech:Speech,time:number,reveal=speech.words.length) {
+  if (reveal<1) return;
   const {p,words,color,clearance}=speech;
   ctx.save();
   ctx.font='bold 11px monospace';
   const rows=[''];
+  const wrapWidth=words.length>85 ? 190 : 150;
   for (const word of words.toUpperCase().split(' ')) {
     const row=rows.length-1;
-    if (rows[row] && ctx.measureText(rows[row]+' '+word).width>150) rows.push(word);
+    if (rows[row] && ctx.measureText(rows[row]+' '+word).width>wrapWidth) rows.push(word);
     else rows[row]+=(rows[row] ? ' ' : '')+word;
   }
   const half=Math.max(...rows.map(row=>ctx.measureText(row).width))/2+5;
   const x=Math.round(Math.min(width-half,Math.max(half,p.x)));
   const above=p.y-clearance-(rows.length-1)*13;
-  const y=above>=23 ? above : p.y+clearance+12;
+  const below=p.y+clearance+12;
+  const y=above>=23 ? above : Math.min(below,height-9-(rows.length-1)*13);
+  let offset=0;
   rows.forEach((row,i)=>{
     const bob=Math.round(Math.sin(time*7+i*.7)*2);
     const baseline=Math.round(y+i*13)+bob;
-    const sprite=pixelWords(row,color);
-    ctx.drawImage(sprite,Math.round(x-sprite.width/2),baseline-11);
+    const visible=row.slice(0,Math.max(0,reveal-offset));
+    offset+=row.length+1;
+    if (!visible.trim()) return;
+    const sprite=pixelWords(visible,color);
+    ctx.drawImage(sprite,Math.round(x-ctx.measureText(row).width/2)-3,baseline-11);
   });
   ctx.restore();
 }
@@ -268,6 +276,12 @@ function cocoon(ctx:CanvasRenderingContext2D,p:Point,v:Point,ink:string,light:st
 function renderFrankScene(ctx:CanvasRenderingContext2D,run:ArcadeRun,story:FrankStory,reducedMotion:boolean) {
   const chapter=frankChapters[story.chapter],line=frankLine(story);
   const who=line?.speaker;
+  const active=who ? frankSpeakerIndex(story.chapter,who) : -1;
+  function speak(p:Point,color:string,clearance:number) {
+    if (line && !line.narration) {
+      drawSpeech(ctx,{p,color,clearance,words:line.text},reducedMotion ? 0 : story.elapsed,Math.floor(story.reveal));
+    }
+  }
   const shake=(speaker:string)=>!reducedMotion && who===speaker && story.reveal<(line?.text.length??0)
     ? Math.round(Math.sin(story.elapsed*76)) : 0;
   const hero=run.movement.spider;
@@ -285,11 +299,14 @@ function renderFrankScene(ctx:CanvasRenderingContext2D,run:ArcadeRun,story:Frank
   drawSpider(ctx,{...hero,x:x+shake('FRANK'),y,vx:0,vy:0,rope:undefined,support:staged?'floor':hero.support},0,{time:0,beat:0});
   if (story.chapter===0) {
     const leaving=story.lineIndex===chapter.before.length-1;
+    let guestX:number|undefined;
     if (story.lineIndex>=3 && (!leaving || story.reveal<37)) {
-      const guestX=leaving ? 108+story.reveal*3 : story.lineIndex===3 ? Math.max(108,145-story.reveal*2) : 108;
+      guestX=leaving ? 108+story.reveal*3 : story.lineIndex===3 ? Math.max(108,145-story.reveal*2) : 108;
       drawSpider(ctx,{...hero,x:guestX+shake('STRANGER'),y:hero.y,rope:undefined,facing:leaving?1:-1},0,{time:0,beat:0});
     }
     if (story.lineIndex>=10) block(ctx,79,hero.y+3,6,4,'#e2cb90');
+    if (who==='STRANGER' && guestX!==undefined) speak({x:guestX,y:hero.y},'#ffd19a',15);
+    else if (who==='FRANK') speak({x,y},'#82f7d1',15);
     return;
   }
   if (story.chapter===11) {
@@ -304,10 +321,14 @@ function renderFrankScene(ctx:CanvasRenderingContext2D,run:ArcadeRun,story:Frank
   }
   if (!staged) {
     for (const fly of run.flies) {
-      const jitter=who && frankSpeakerIndex(story.chapter,who)===fly.actor ? shake(who) : 0;
+      const jitter=who && active===fly.actor ? shake(who) : 0;
       insect(ctx,{x:fly.p.x+jitter,y:fly.p.y},fly.kind,insectMark(run.level,fly.actor),0,true);
     }
     if (run.boss) drawFrankRival(ctx,hero,run.boss.p,shake('DUKE'));
+    const speaker=run.flies.find(fly=>fly.actor===active);
+    if (who==='FRANK') speak({x,y},'#82f7d1',15);
+    else if (who==='DUKE' && run.boss) speak(run.boss.p,'#ff88b8',35);
+    else if (speaker) speak(speaker.p,colors[speaker.kind],14);
     return;
   }
   const scene=arcadeScenes[run.level-1];
@@ -322,8 +343,14 @@ function renderFrankScene(ctx:CanvasRenderingContext2D,run:ArcadeRun,story:Frank
     const target=prisonerPoint(wire,i);
     if (story.phase==='setup' && t===0) continue;
     const px=x+(target.x-x)*t,py=y+(target.y-y)*t-Math.sin(t*Math.PI)*36;
-    const jitter=who && (frankSpeakerIndex(story.chapter,who)===i || run.boss && who==='DUKE') ? shake(who) : 0;
+    const jitter=who && (active===i || run.boss && who==='DUKE') ? shake(who) : 0;
     cocoon(ctx,{x:px+jitter,y:py},{x:0,y:0},scene.ink,scene.light,scene.accent,false);
+  }
+  if (who==='FRANK') speak({x,y},'#82f7d1',15);
+  else if (who==='DUKE' && run.boss) speak(prisonerPoint(wire,0),'#ff88b8',15);
+  else if (active>=0) {
+    const kind=species.findIndex(([name])=>name===chapter.enemies[active].species);
+    speak(prisonerPoint(wire,active),colors[kind]??scene.light,15);
   }
 }
 

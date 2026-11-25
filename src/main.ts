@@ -354,13 +354,16 @@ function arcadeFeedback(event:ArcadeEvent) {
   else audio.play(arcadeSounds[event]);
 }
 
-const frankTitle=get('frank-title'),frankDialogue=get('frank-dialogue'),frankNarration=get('frank-narration');
+const frankTitle=get('frank-title'),frankNarration=get('frank-narration');
 const frankTouch=get('frank-touch');
 const coarsePointer=matchMedia('(pointer: coarse)');
 function hideFrankPanels() {
-  frankTitle.hidden=frankDialogue.hidden=frankNarration.hidden=frankTouch.hidden=true;
+  frankTitle.hidden=frankNarration.hidden=frankTouch.hidden=true;
 }
-for (const panel of [frankDialogue,frankNarration]) panel.addEventListener('click',()=>{frankTouchPress=true;});
+frankNarration.addEventListener('click',()=>{frankTouchPress=true;});
+worldCanvas.addEventListener('click',()=>{
+  if (frank && frankLine(frank)?.narration===false) frankTouchPress=true;
+});
 for (const control of frankTouch.querySelectorAll<HTMLButtonElement>('button')) {
   control.addEventListener('pointerdown',event=>{
     control.setPointerCapture(event.pointerId);
@@ -401,10 +404,9 @@ function showFrankPanels(story:FrankStory,frozen:boolean) {
       Math.max(0,Math.min(1,story.elapsed/.3,(3-story.elapsed)/.3)));
   }
   frankTouch.hidden=story.phase!=='combat' || !coarsePointer.matches || frozen;
-  frankDialogue.hidden=!line || line.narration;
   frankNarration.hidden=!line || !line.narration;
-  if (!line) return;
-  const panel=line.narration ? frankNarration : frankDialogue;
+  if (!line?.narration) return;
+  const panel=frankNarration;
   const name=line.speaker==='FRANK' ? 'Frank Webbin' : line.speaker==='STRANGER' ? 'Stranger' :
     chapter.enemies.find(enemy=>enemy.name.toUpperCase().split(' ').includes(line.speaker))?.name??'Duke Wobbleknees';
   const text=line.text.slice(0,Math.floor(story.reveal));
