@@ -176,6 +176,29 @@ test('mirrored direct shots push the cocoon along the incoming silk before it la
   }
 });
 
+test('a falling cocoon hangs from the first fixed web and falls again if it breaks',()=>{
+  const run=createArcade();
+  start(run);
+  const fly=run.flies[0];
+  fly.p={x:240,y:130};fly.v={x:0,y:200};
+  fly.cocoon={struckAt:run.clock,landed:false};
+  const deadline=run.clock+2;
+  fly.caughtUntil=deadline;
+  const near={from:{x:220,y:145},to:{x:260,y:155},shakeUntil:0};
+  const far={from:{x:220,y:146},to:{x:260,y:156},shakeUntil:0};
+  run.movement.hunt.strands=[far,near];
+  for (let i=0;i<20 && !fly.trappedBy;i++) advanceArcade(run,neutral);
+  assert.equal(fly.trappedBy,near);
+  ticks(run,.3);
+  assert.equal(fly.p.y,150);
+  assert.equal(fly.caughtUntil,deadline);
+  assert.equal(run.score,0);
+  run.movement.hunt.strands=[];
+  ticks(run,.15);
+  assert.ok(fly.p.y>150);
+  assert.equal(fly.caughtUntil,deadline);
+});
+
 test('the nearest free fly stops the shot, and picking up its cocoon counts once',()=>{
   const run=createArcade(4);
   start(run);

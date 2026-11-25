@@ -308,10 +308,26 @@ function tickFlies(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
   run.flies=run.flies.filter(fly=>{
     if (!run.lives) return true;
     if (fly.caughtUntil) {
+      if (fly.cocoon && fly.trappedBy && !hunt.strands.includes(fly.trappedBy)) fly.trappedBy=undefined;
       if (run.clock<fly.caughtUntil && (!fly.trappedBy || hunt.strands.includes(fly.trappedBy))) {
-        if (fly.cocoon) {
+        if (fly.cocoon && !fly.trappedBy) {
           if (capture(fly.p)) return false;
+          const from=fly.p;
           fallCocoon(fly,hunt.surfaces);
+          if (fly.p.y>from.y) {
+            let nearest: {t:number;point:Point;wire:Strand}|undefined;
+            for (const wire of hunt.strands) {
+              const hit=sweptHit(from,fly.p,wire);
+              if (hit && (!nearest || hit.t<nearest.t)) nearest={...hit,wire};
+            }
+            if (nearest) {
+              fly.p=nearest.point;
+              fly.v={x:0,y:0};
+              fly.trappedBy=nearest.wire;
+              nearest.wire.shakeUntil=run.clock+.42;
+              emit('catch');
+            }
+          }
           if (fly.p.y>fallLimit) {
             fly.p={...flySpawn(run,fly.actor)};
             escape(fly);
