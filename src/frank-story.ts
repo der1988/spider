@@ -15,14 +15,23 @@ export function frankPhase(story:FrankStory,phase:FrankPhase) {
   Object.assign(story,{phase,elapsed:0,lineIndex:0,lineElapsed:0,reveal:0});
 }
 
-export function tickFrank(story:FrankStory,dt:number,press:boolean) {
+function finishFrankScene(story:FrankStory) {
+  const opening=story.phase==='title' || story.phase==='before';
+  frankPhase(story,opening && story.chapter>0 && story.chapter<11 ? 'combat' : 'fade');
+}
+
+export function tickFrank(story:FrankStory,dt:number,press:boolean,skip=false) {
+  if (skip && ['title','before','setup','after'].includes(story.phase)) {
+    finishFrankScene(story);
+    return;
+  }
   story.elapsed+=dt;
   if (story.phase==='title' && story.elapsed>=3) frankPhase(story,'before');
   else if (story.phase==='setup' && story.elapsed>=1.1) frankPhase(story,'after');
   else if (story.phase==='before' || story.phase==='after') {
     const line=frankLine(story);
     if (!line) {
-      frankPhase(story,story.phase==='before' && story.chapter>0 && story.chapter<11 ? 'combat' : 'fade');
+      finishFrankScene(story);
     } else {
       story.lineElapsed+=dt;
       const complete=story.reveal>=line.text.length;
@@ -30,7 +39,7 @@ export function tickFrank(story:FrankStory,dt:number,press:boolean) {
         story.lineIndex++;
         story.lineElapsed=0;
         story.reveal=0;
-        if (!frankLine(story)) frankPhase(story,story.phase==='before' && story.chapter>0 && story.chapter<11 ? 'combat' : 'fade');
+        if (!frankLine(story)) finishFrankScene(story);
       } else if (press) story.reveal=line.text.length;
       else story.reveal=Math.min(line.text.length,story.reveal+dt*35);
     }

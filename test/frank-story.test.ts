@@ -116,3 +116,23 @@ test('the campaign holds the chapter until recovery and preserves progress on tr
   assert.equal(run.invincible,0);
   assert.equal(run.score,1);
 });
+
+test('skipping a scene leaves the next encounter or scene intact',()=>{
+  for (const phase of ['title','before','setup','after'] as const) {
+    const story=createFrankStory(4);
+    frankPhase(story,phase);
+    tickFrank(story,0,false,true);
+    assert.equal(story.phase,phase==='title'||phase==='before' ? 'combat' : 'fade');
+    assert.equal(story.chapter,4);
+    if (story.phase==='fade') {
+      tickFrank(story,.55,false);
+      assert.equal(story.chapter,5);
+      assert.equal(story.phase,'title');
+    }
+  }
+  const prologue=createFrankStory();
+  tickFrank(prologue,0,false,true);
+  tickFrank(prologue,.55,false);
+  assert.equal(prologue.chapter,1);
+  assert.equal(prologue.phase,'title');
+});

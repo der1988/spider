@@ -84,7 +84,7 @@ let escape: FlyEscape|undefined;
 let windowHunt: WindowRun|undefined;
 let arcade: ArcadeRun|undefined;
 let frank:FrankStory|undefined;
-let frankTouchPress=false;
+let frankTouchPress=false,frankSkipPress=false;
 let frankVoiceAt=0;
 let frankTouchMove:Point={x:0,y:0};
 let frankTouchAim:Point|undefined;
@@ -315,7 +315,7 @@ function startArcade() {
   arcade=createArcade();
   frank=createFrankStory();
   frankVoiceAt=0;
-  frankTouchPress=false;
+  frankTouchPress=frankSkipPress=false;
   frankTouchMove={x:0,y:0};
   frankTouchAim=undefined;
   frankTouchButtons=0;
@@ -515,7 +515,7 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
     remainder=0;
     const chapter=story.chapter,phase=story.phase,old=story.reveal,line=frankLine(story);
     const press=frankTouchPress || !!(buttons&arcadeEscapeButton);
-    tickFrank(story,elapsed,press);
+    tickFrank(story,elapsed,press,frankSkipPress);
     if (line && line===frankLine(story) && !press && Math.floor(old/2)<Math.floor(story.reveal/2) && story.reveal<line.text.length && performance.now()>=frankVoiceAt) {
       const char=line.text.charAt(Math.floor(story.reveal)-1);
       if (/\w/.test(char)) frankVoice(contextAudio,line.speaker,Number(effectsVolume.value)/100);
@@ -531,7 +531,7 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
       try {localStorage.setItem(frankCompletionKey,'true');} catch { /* Storage may be unavailable. */ }
     }
   }
-  frankTouchPress=false;
+  frankTouchPress=frankSkipPress=false;
   showFrankPanels(story,frozen);
   if (!frankHud.hidden) showFrankTargets(story.chapter,run);
   const finished=story.phase==='complete';
@@ -590,7 +590,8 @@ window.addEventListener('keydown',event => {
   }
   if (!pausePanel.open && shell.dataset.screen==='game' && !dialogOpen() && !windowDefeat.open && defeat.hidden) {
     if (arcade && frank?.phase!=='combat' && (event.code==='Enter' || event.code==='Space') && !event.repeat) {
-      keyboardButtons|=arcadeEscapeButton;
+      if (event.code==='Space') frankSkipPress=true;
+      else keyboardButtons|=arcadeEscapeButton;
       event.preventDefault();
       return;
     }
