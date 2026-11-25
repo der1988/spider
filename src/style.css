@@ -337,9 +337,23 @@ dialog h2 { margin: 0; font-size: 16px; }
   text-align: left;
 }
 .frank-chapter-info { display: grid; gap: 3px; overflow-wrap: anywhere; }
-#arcade-chapter { color: #f2f4d6; font-size: clamp(20px, 5cqw, 38px); font-weight: 800; line-height: 1.05; }
+#arcade-chapter { color: #f2f4d6; font-size: clamp(18px, 4.5cqw, 32px); font-weight: 800; line-height: 1.05; }
 #arcade-location { color: #bacfa6; font-size: clamp(14px, 3.3cqw, 24px); line-height: 1.2; }
+.frank-combat-info { display: grid; justify-items: end; gap: clamp(3px, .5cqw, 6px); }
 #arcade-lives { color: #ffc1a8; font-size: clamp(28px, 7cqw, 52px); letter-spacing: .06em; line-height: 1; white-space: nowrap; }
+#arcade-targets {
+  --frank-target-size: clamp(20px, 4.1cqw, 52px);
+  display: grid; grid-auto-flow: column; grid-auto-columns: var(--frank-target-size); gap: clamp(3px, .45cqw, 6px);
+}
+.frank-target { position: relative; aspect-ratio: 1; }
+.frank-target[aria-hidden] { background: #1c2b22; border: 1px solid #3a4e40; }
+.frank-captured-mark { display: none; }
+.frank-target[data-captured]::before { opacity: .46; }
+.frank-target[data-captured] .frank-captured-mark {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  color: #ffc1a8; font-size: var(--frank-target-size); font-weight: 900; line-height: 1;
+  -webkit-text-stroke: 1px #17251e;
+}
 #frank-scene { text-align: left; color: #c5b38a; font: 10px/1.2 monospace; }
 #frank-speaker:not([hidden]) {
   display: flex; align-items: center; gap: 12px; min-width: 0;
@@ -360,10 +374,10 @@ dialog h2 { margin: 0; font-size: 16px; }
   image-rendering: pixelated;
 }
 .frank-portrait::after { visibility: hidden; }
-#frank-panel:not([data-still]) .frank-portrait::before {
+#frank-panel:not([data-still]) .frank-portrait:not(.frank-target)::before {
   animation: frank-portrait-bob 2.1s steps(1) infinite;
 }
-#frank-panel:not([data-still]) .frank-portrait::after {
+#frank-panel:not([data-still]) .frank-portrait:not(.frank-target)::after {
   visibility: visible;
   animation: frank-portrait-bob 2.1s steps(1) infinite, frank-distortion 2.1s steps(1) infinite;
 }
@@ -377,7 +391,7 @@ dialog h2 { margin: 0; font-size: 16px; }
   13%, 58%, 68% { clip-path: inset(58% 0 28%); transform: translateX(-3px); }
 }
 @media (prefers-reduced-motion: reduce) {
-  #frank-panel:not([data-still]) .frank-portrait::before { animation: none; }
+  #frank-panel:not([data-still]) .frank-portrait:not(.frank-target)::before { animation: none; }
   .frank-portrait::after { display: none; }
 }
 .frank-title:not([hidden]) {

@@ -359,7 +359,8 @@ const frankTitle=get('frank-title'),frankNarration=get('frank-narration');
 const frankTouch=get('frank-touch'),frankPanel=get('frank-panel');
 const frankScene=get('frank-scene'),frankHud=get('arcade-summary');
 const frankChapterName=get('arcade-chapter'),frankLocation=get('arcade-location'),frankLives=get('arcade-lives');
-const frankCast=get('frank-cast');
+const frankCast=get('frank-cast'),frankTargets=get('arcade-targets');
+const frankTargetSlots=5;
 const frankSpeaker=get('frank-speaker'),frankSpeakerName=get('frank-speaker-name'),frankPortraitBox=get('frank-portrait');
 const coarsePointer=matchMedia('(pointer: coarse)');
 function hideFrankPanels() {
@@ -399,19 +400,51 @@ worldCanvas.addEventListener('pointerdown',event=>{
 });
 worldCanvas.addEventListener('pointermove',aimFrankTouch);
 
+function createFrankPortrait(name:string) {
+  const portrait=document.createElement('span');
+  portrait.className='frank-portrait';
+  portrait.role='img';
+  portrait.setAttribute('aria-label',name);
+  portrait.title=name;
+  portrait.style.setProperty('--frank-portrait-position',frankPortraitPosition(name)??'0% 0%');
+  return portrait;
+}
+
 function showFrankCast(chapter:number) {
   const key=String(chapter);
   if (frankCast.dataset.chapter===key) return;
   frankCast.dataset.chapter=key;
-  frankCast.replaceChildren(...frankCastNames(chapter).map(name=>{
-    const portrait=document.createElement('span');
-    portrait.className='frank-portrait';
-    portrait.role='img';
-    portrait.setAttribute('aria-label',name);
-    portrait.title=name;
-    portrait.style.setProperty('--frank-portrait-position',frankPortraitPosition(name)??'0% 0%');
-    return portrait;
-  }));
+  frankCast.replaceChildren(...frankCastNames(chapter).map(createFrankPortrait));
+}
+
+function showFrankTargets(chapter:number,run:ArcadeRun) {
+  const key=String(chapter);
+  if (frankTargets.dataset.chapter!==key) {
+    frankTargets.dataset.chapter=key;
+    const names=frankCastNames(chapter);
+    frankTargets.replaceChildren(...Array.from({length:frankTargetSlots},(_,actor)=>{
+      const name=names[actor];
+      const tile=name ? createFrankPortrait(name) : document.createElement('span');
+      tile.classList.add('frank-target');
+      if (!name) tile.setAttribute('aria-hidden','true');
+      else {
+        const mark=document.createElement('span');
+        mark.className='frank-captured-mark';
+        mark.setAttribute('aria-hidden','true');
+        mark.textContent='×';
+        tile.append(mark);
+      }
+      return tile;
+    }));
+  }
+  for (const [actor,tile] of Array.from(frankTargets.children).entries()) {
+    const name=(tile as HTMLElement).title;
+    if (!name) continue;
+    const captured=run.boss ? run.boss.hp===0 : !run.flies.some(fly=>fly.actor===actor);
+    if (tile.hasAttribute('data-captured')===captured) continue;
+    tile.toggleAttribute('data-captured',captured);
+    tile.setAttribute('aria-label',captured ? `${name} · Captured` : name);
+  }
 }
 
 function showFrankPanels(story:FrankStory,frozen:boolean) {
@@ -424,14 +457,15 @@ function showFrankPanels(story:FrankStory,frozen:boolean) {
       Math.max(0,Math.min(1,story.elapsed/.3,(3-story.elapsed)/.3)));
   }
   const combat=story.phase==='combat';
+  const showHud=combat || story.phase==='setup' && story.elapsed<.65;
   frankPanel.hidden=false;
   frankPanel.toggleAttribute('data-still',reduced() || frozen);
-  frankHud.hidden=!combat;
-  if (combat) {
+  frankHud.hidden=!showHud;
+  if (showHud) {
     if (frankChapterName.textContent!==chapter.title) frankChapterName.textContent=chapter.title;
     if (frankLocation.textContent!==chapter.location) frankLocation.textContent=chapter.location;
   }
-  frankScene.hidden=combat;
+  frankScene.hidden=showHud;
   frankCast.hidden=story.phase!=='title';
   if (!frankCast.hidden) showFrankCast(story.chapter);
   frankTouch.hidden=!combat || !coarsePointer.matches || frozen;
@@ -507,6 +541,7 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
   }
   frankTouchPress=false;
   showFrankPanels(story,frozen);
+  if (!frankHud.hidden) showFrankTargets(story.chapter,run);
   const finished=story.phase==='complete';
   arcadeMusic.sync(contextAudio,run.level,frozen && !finished || document.hidden || paused,story.phase!=='combat');
   if (frankLives.dataset.lives!==String(run.lives)) {
