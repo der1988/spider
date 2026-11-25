@@ -121,14 +121,9 @@ function bindChoices(items: readonly (readonly [string,()=>void])[],vertical=fal
   return {select,move,get selected(){return selected;},confirm:()=>buttons[selected].click()};
 }
 
-const topTenIndex=5;
 const menuChoices=bindChoices([
   ['story',()=>requestMode('story')],
   ['loop',()=>requestMode('loop')],
-  ['window-hunt-mode',startWindowHunt],
-  ['practice-mode',()=>startWindowHunt(true)],
-  ['settings-menu',openSettings],
-  ['menu-top',()=>void endlessBoard.view()],
 ],true);
 const pauseChoices=bindChoices([['resume',togglePause],['pause-settings',openSettings],['pause-menu',showMenu]],true);
 const windowDefeat=get<HTMLDialogElement>('window-hunt-defeat');
@@ -209,9 +204,7 @@ let settingsHorizontal=0;
 let cancelHeld=false;
 
 const defeatChoices=bindChoices([['main-menu',leaveArcadeResult],['retry',retryLoop]]);
-get<HTMLDialogElement>('endless-board').addEventListener('close',()=>{
-  if (shell.dataset.screen==='start') menuChoices.select(topTenIndex,true);
-});
+
 
 function activeChoices() {
   if (dialogOpen()) return;
@@ -279,8 +272,6 @@ function startIntro(resume=false) {
 
 function showMenu() {
   const priorMode=mode;
-  const practice=windowHunt?.practice;
-  const wasWindowHunt=!!windowHunt;
   windowHunt=undefined;
   arcade=undefined;
   frank=undefined;
@@ -303,7 +294,7 @@ function showMenu() {
   endlessBoard.clear();
   shell.dataset.screen='start';
   launch.inert=false;
-  menuChoices.select(practice ? 3 : wasWindowHunt ? 2 : priorMode==='loop' ? 1 : 0,true);
+  menuChoices.select(priorMode==='loop' ? 1 : 0,true);
   startStatus.textContent='';
   captions('');
   say('');
@@ -539,7 +530,7 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
   showFrankPanels(story,frozen);
   if (!frankHud.hidden) showFrankTargets(story.chapter,run);
   const finished=story.phase==='complete';
-  arcadeMusic.sync(contextAudio,run.level,frozen && !finished || document.hidden || paused,story.phase!=='combat');
+  if (story.chapter>0) arcadeMusic.sync(contextAudio,run.level,frozen && !finished || document.hidden || paused,story.phase!=='combat');
   if (frankLives.dataset.lives!==String(run.lives)) {
     frankLives.dataset.lives=String(run.lives);
     frankLives.setAttribute('aria-label',`${run.lives} of ${heartsPerRun} hearts`);

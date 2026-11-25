@@ -243,7 +243,6 @@ dialog h2 { margin: 0; font-size: 16px; }
   opacity: calc(.70 + var(--menu-pulse) * .30);
   transform: translateX(calc(var(--menu-pulse) * 3px));
 }
-.shell[data-reforming] #menu-top { visibility: hidden; }
 #start-status { z-index: 1; }
 #endless-status { margin: 0; font-size: 11px; }
 #endless-status:empty { display: none; }
@@ -261,7 +260,6 @@ dialog h2 { margin: 0; font-size: 16px; }
 .board-actions { display: flex; gap: 6px; }
 #name-controls { margin: 0; color: #b8ca94; }
 
-.shell[data-reforming] :is(#window-hunt-mode,#practice-mode,#settings-menu) { display:none; }
 .shell[data-window-hunt=practice] .catch-count { visibility:hidden; }
 .open-goal:not([hidden]) {
   display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
