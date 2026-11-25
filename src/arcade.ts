@@ -96,6 +96,8 @@ function prepareLevel(run:ArcadeRun) {
 }
 
 export function loadArcadeChapter(run:ArcadeRun,level:number) {
+  run.lives=heartsPerRun;
+  run.invincible=0;
   run.level=level;
   run.phase='wave';
   prepareLevel(run);

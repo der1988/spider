@@ -109,8 +109,10 @@ test('the campaign holds the chapter until recovery and preserves progress on tr
   assert.equal(run.level,1);
   assert.equal(run.score,1);
   run.lives=2;
+  run.invincible=run.clock+1.5;
   loadArcadeChapter(run,2);
   assert.equal(run.level,2);
-  assert.equal(run.lives,2);
+  assert.equal(run.lives,3);
+  assert.equal(run.invincible,0);
   assert.equal(run.score,1);
 });
