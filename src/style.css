@@ -345,22 +345,22 @@ dialog h2 { margin: 0; font-size: 16px; }
 }
 #arcade-lives { color: #ffc1a8; font-size: clamp(28px, 7cqw, 52px); letter-spacing: .06em; line-height: 1; white-space: nowrap; }
 #arcade-targets {
-  --frank-target-size: clamp(36px, 5.5cqw, 68px);
+  --frank-target-size: clamp(44px, 7.4cqw, 92px);
   min-width: 0; display: flex; gap: clamp(3px, .7cqw, 10px);
   list-style: none; margin: 0; padding: 0;
 }
 .frank-target {
-  position: relative; flex: 0 1 clamp(82px, 12cqw, 150px); min-width: 0;
-  display: grid; justify-items: center; align-content: start; gap: 5px;
+  position: relative; flex: 0 1 clamp(82px, 15cqw, 190px); min-width: 0;
+  display: grid; justify-items: center; align-content: start; gap: 8px;
   text-align: center; overflow-wrap: anywhere;
 }
-.frank-target .frank-portrait { width: var(--frank-target-size); }
+.frank-target .frank-portrait { width: min(100%, var(--frank-target-size)); }
 .frank-target-name { color: #e1e7c5; font-size: clamp(10px, 1.45cqw, 16px); line-height: 1.16; }
 .frank-captured-mark { display: none; }
 .frank-target[data-captured] .frank-portrait::before { opacity: .46; }
 .frank-target[data-captured] .frank-captured-mark {
   position: absolute; inset-block-start: 0; inset-inline-start: 50%; translate: -50% 0;
-  width: var(--frank-target-size); height: var(--frank-target-size);
+  width: min(100%, var(--frank-target-size)); aspect-ratio: 1;
   display: grid; place-items: center;
   color: #ffc1a8; font-size: var(--frank-target-size); font-weight: 900; line-height: 1;
   -webkit-text-stroke: 1px #17251e;
