@@ -136,3 +136,18 @@ test('skipping a scene leaves the next encounter or scene intact',()=>{
   assert.equal(prologue.chapter,1);
   assert.equal(prologue.phase,'title');
 });
+
+test('a defeated campaign waits at the checkpoint until the chapter is restarted',()=>{
+  const run=createArcade(8),input=arenaInput({x:0,y:0});
+  loadArcadeChapter(run,8);
+  run.lives=1;
+  run.movement.spider.y=300;
+  advanceArcade(run,input,undefined,true);
+  assert.equal(run.lives,0);
+  for (let i=0;i<240;i++) advanceArcade(run,input,undefined,true);
+  assert.equal(run.level,8);
+  assert.equal(run.lives,0);
+  loadArcadeChapter(run,8);
+  assert.equal(run.lives,3);
+  assert.equal(run.restartIn,0);
+});

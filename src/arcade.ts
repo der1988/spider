@@ -96,6 +96,7 @@ function prepareLevel(run:ArcadeRun) {
 }
 
 export function loadArcadeChapter(run:ArcadeRun,level:number) {
+  run.restartIn=0;
   run.lives=heartsPerRun;
   run.invincible=0;
   run.level=level;
@@ -634,6 +635,7 @@ function tickSilkShots(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
 
 export function advanceArcade(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeEvent)=>void=()=>{},holdChapter=false) {
   if (run.restartIn>0) {
+    if (holdChapter) return;
     run.restartIn-=arenaStep;
     if (run.restartIn<=0) {
       Object.assign(run,createArcade());

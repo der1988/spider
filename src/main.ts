@@ -208,7 +208,7 @@ function settingsPad(gamepad:Gamepad,cross:boolean,cancel:boolean,direction:numb
 let settingsHorizontal=0;
 let cancelHeld=false;
 
-const defeatChoices=bindChoices([['main-menu',showMenu],['retry',retryLoop]]);
+const defeatChoices=bindChoices([['main-menu',leaveArcadeResult],['retry',retryLoop]]);
 get<HTMLDialogElement>('endless-board').addEventListener('close',()=>{
   if (shell.dataset.screen==='start') menuChoices.select(topTenIndex,true);
 });
@@ -310,10 +310,12 @@ function showMenu() {
   syncPause();
 }
 
-function startArcade() {
+function startArcade(chapter=0) {
   mode='loop';
   arcade=createArcade();
-  frank=createFrankStory();
+  if (chapter) loadArcadeChapter(arcade,chapter);
+  frank=createFrankStory(chapter);
+  remainder=0;
   frankVoiceAt=0;
   frankTouchPress=frankSkipPress=false;
   frankTouchMove={x:0,y:0};
@@ -339,8 +341,14 @@ function startArcade() {
   syncPause();
 }
 
+function leaveArcadeResult() {
+  if (arcade?.lives===0) startArcade();
+  else showMenu();
+}
+
 function retryLoop() {
-  if (arcade && !defeat.hidden) startArcade();
+  if (!arcade || defeat.hidden) return;
+  startArcade(arcade.lives===0 ? arcade.level : 0);
 }
 
 const arcadeSounds={
@@ -493,11 +501,7 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
       input[4]=pendingButtons;
       pendingButtons=0;
       advanceArcade(run,input,arcadeFeedback,true);
-      if (run.intro) {
-        // The original loss/retry path rebuilt level one.
-        run.intro=undefined;
-        run.phase='ready';
-        Object.assign(story,createFrankStory());
+      if (run.lives===0) {
         remainder=0;
         break;
       }
@@ -542,11 +546,14 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
     frankLives.textContent='♥'.repeat(run.lives)+'♡'.repeat(heartsPerRun-run.lives);
   }
   const beat=reduced() ? 0 : arcadeMusic.pulse;
-  if (finished && defeat.hidden) {
-    get('defeat-title').textContent='The Wanted Spider';
-    get('endless-status').textContent=`Level ${run.level} / ${arcadeLevels}`;
+  const lost=run.lives===0;
+  if ((lost || finished) && defeat.hidden) {
+    get('defeat-title').textContent=lost ? 'Out of hearts' : 'The Wanted Spider';
+    get('endless-status').textContent=lost ? `Chapter ${run.level} · ${frankChapters[story.chapter].title}` : `Level ${run.level} / ${arcadeLevels}`;
+    get('main-menu').textContent=lost ? 'Start Over' : 'Main Menu';
+    get('retry').textContent=lost ? 'Retry Chapter' : 'Retry';
     defeat.hidden=false;
-    defeatChoices.select(0,true);
+    defeatChoices.select(lost ? 1 : 0,true);
   }
   renderArcade(context,run,beat,reduced(),story);
 }
