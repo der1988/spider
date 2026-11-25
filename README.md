@@ -1,6 +1,6 @@
 # Spider vs Fly
 
-Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scorri **Story**, **Endless**, **Open World**, **Practice**, **Settings** e **Top 10** con **↑/↓** sulla croce direzionale o con lo stick sinistro. Premi **×** per confermare. Puoi anche fare clic sul pulsante. In **Story** i comandi e il timer partono appena finisce «Start the clock». In **Endless** lo scenario è subito visibile e il primo movimento intenzionale, una mira decisa o una pressione avviano la presentazione del livello.
+Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scorri **Story**, **Different Story**, **Open World**, **Practice**, **Settings** e **Top 10** con **↑/↓** sulla croce direzionale o con lo stick sinistro. Premi **×** per confermare. Puoi anche fare clic sul pulsante. In **Story** i comandi e il timer partono appena finisce «Start the clock». In **Different Story** la campagna di Frank Webbin si apre con il prologo.
 
 - **Stick sinistro** per correre sul pavimento, sulle pareti e sul soffitto o per dondolare. In **Story**, spingi **giù** per staccarti dal filo attivo e **su** per risalire o aggrapparti a un filo già fissato.
 - **Stick destro** per mirare in ogni direzione. **R1** lancia verso il primo appiglio entro la portata. Pareti, soffitto, pavimento e piattaforme accettano la seta. Se sei su una superficie, il tiro tende subito una ragnatela. Salta prima di sparare per dondolare: il filo si fissa quando tocchi una superficie valida. In aria puoi lanciare un secondo filo per spostare il dondolio sul nuovo appiglio.
@@ -8,7 +8,7 @@ Caccia strategica a schermata fissa. Collega un DualShock 4 o DualSense e scorri
 - Osserva i corridoi ai lati della piattaforma centrale. Avvicinandoti, spingi la mosca a cambiare rotta. Tendi un filo tra due appigli mentre è in manovra. Il filo comincia a lampeggiare prima di sparire, dopo **10 secondi**.
 - Il timer al centro dell’HUD e i dettagli dell’arena pulsano sul battito. In **Story**, dopo ogni cattura la prossima mosca entra con un secondo in meno, da **60 secondi** a un minimo di **10 secondi**. Ogni 5 catture la mosca accelera, ogni 10 reagisce prima alle tele e ogni 20 percepisce il ragno da più lontano.
 
-## Endless arcade
+## Different Story
 
 - **Nove cacce e un duello finale**, con tre cuori condivisi. Ogni livello ha il proprio gruppo di insetti, presentato nelle stesse posizioni da cui comincia il livello. Ogni avversario parla a turno e Spidey chiude lo scambio. Le battute appaiono dentro l’arena, accanto a chi parla, con testo pixelato e colori distinti. Premi **×** o **Invio** per saltare la scena. Per avanzare, recupera ogni insetto mentre è ancora intrappolato.
 - I dieci livelli attraversano scenari sospesi, tra foglie, petali, rami e funghi. Quattro appoggi distanziati lasciano spazio per i salti. Spidey può camminare sulle pareti laterali e sul soffitto e usarli come appigli per la seta. Una caduta nel vuoto costa un cuore e riporta al ripiano di partenza.
@@ -47,7 +47,7 @@ Il menu usa **Web Trap Loop** (`menusong.mp3`), con battiti misurati a circa 110
 
 **The Fly Has A** accompagna l’introduzione e la caccia. A **240,330 s** parte **The Fly Has an Upgrade** dall’inizio. Dopo **119,580 s** parte **The Room Has a Space Bar**. Durante il terzo brano, una nuova pressione di **Space** passa a **The Fly Is You**. Dopo la cutscene, lo stick sinistro controlla il volo della mosca. Il ragno insegue la mosca con salti frequenti e usa pareti e soffitto per avvicinarsi. All’inizio tende poche tele, poi aumenta la frequenza durante la caccia. La traccia tratteggiata anticipa dove tenderà la prossima tela. Cambia rotta prima che la fissi per sfuggire alla trappola. Attraversare una luce riporta il timer a 10 secondi. Le luci compaiono in punti casuali, distribuiti tra le varie zone della stanza. Premi e rilascia **×** otto volte per uscire da una tela. A ogni cambio di brano Story memorizza un checkpoint per il tentativo in corso. Se perdi, riparti dall’ultimo brano raggiunto. Nel quarto brano riprendi appena la mosca diventa giocabile. Negli ultimi 20 secondi il timer resta fermo fino alla fine della dissolvenza. L’arena e l’HUD diventano codice e si ricompongono nel menu delle modalità. Se il terzo brano arriva alla fine, la playlist torna al primo a **15,330 s**. La musica prosegue durante le catture. **Options** sul joypad o **Esc** sulla tastiera mettono in pausa musica e partita.
 
-In **Endless** la colonna sonora strumentale 16 bit ripete la stessa melodia a 112 BPM e sovrappone fino a dieci strumenti sincronizzati. I dettagli dell’arena seguono la posizione della sorgente Web Audio. La traccia continua durante le ondate e i combattimenti. La pausa conserva la posizione. Gli arrangiamenti funzionano offline.
+In **Different Story** la colonna sonora strumentale 16 bit ripete la stessa melodia a 112 BPM e sovrappone fino a dieci strumenti sincronizzati. I dettagli dell’arena seguono la posizione della sorgente Web Audio. La traccia continua durante le ondate e i combattimenti. La pausa conserva la posizione. Gli arrangiamenti funzionano offline.
 
 ## Sviluppo
 
@@ -57,6 +57,6 @@ Con Node.js 24, esegui `npm ci` e `npm run dev`. Per i controlli esegui `npm run
 
 ### Frank Webbin — The Perfect Crime
 
-Scegli **Endless** dal menu. Dopo il titolo di scena, avanza con **Invio**, **Spazio**, **×** sul joypad o un tocco sull’arena durante i dialoghi e sul testo esterno durante i monologhi. Le battute appaiono vicino a chi parla, in caratteri pixelati colorati e animati. La prima pressione completa la scrittura in corso. Una nuova pressione passa alla battuta successiva. Sul touch, durante lo scontro, tocca l’arena per orientare il mirino e usa i pulsanti sotto il campo.
+Scegli **Different Story** dal menu. Il pannello sotto l’arena mostra livello, cuori e seta durante il gioco. Nelle scene dà spazio alla narrazione o al ritratto animato del parlante. Dopo il titolo di scena, avanza con **Invio**, **Spazio**, **×** sul joypad o un tocco sull’arena durante i dialoghi e sul testo esterno durante i monologhi. Le battute appaiono vicino a chi parla, in caratteri pixelati colorati e animati. La prima pressione completa la scrittura in corso. Una nuova pressione passa alla battuta successiva. Sul touch, durante lo scontro, tocca l’arena per orientare il mirino e usa i pulsanti sotto il campo.
 
 La sceneggiatura giocabile è in `src/frank-script.ts`. Ogni voce in `frankChapters` contiene il titolo del capitolo, il cast e le sequenze `before` e `after`. Ogni battuta contiene il parlante, il testo inglese e il flag `narration`, che determina dove viene mostrata. La specifica originale è in [docs/FRANK_WEBBIN_GDD.md](docs/FRANK_WEBBIN_GDD.md).

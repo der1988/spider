@@ -28,7 +28,7 @@
     </div>
     <div class="mode-choices">
       <button id="story" type="button" data-selected="true"><span>STORY</span><code aria-hidden="true">story()</code></button>
-      <button id="loop" type="button" data-selected="false"><span>ENDLESS</span><code aria-hidden="true">loop()</code></button>
+      <button id="loop" type="button" data-selected="false"><span>Different Story</span><code aria-hidden="true">case()</code></button>
       <button id="window-hunt-mode" type="button" data-selected="false">Open World</button>
       <button id="practice-mode" type="button" data-selected="false">Practice</button>
       <button id="settings-menu" type="button" data-selected="false">Settings</button>
@@ -51,11 +51,6 @@
       <span class="clock-rhythm" aria-hidden="true"></span>
       <div class="clock-track" aria-hidden="true"><span id="clock-meter"></span></div>
     </div>
-    <section id="arcade-summary" aria-label="Endless status">
-      <p id="arcade-level"></p>
-      <p id="arcade-webs"></p>
-      <p id="arcade-lives"></p>
-    </section>
     <code id="ending-code" class="ending-code" aria-hidden="true"></code>
   </header>
   <div class="playfield">
@@ -75,12 +70,24 @@
     </section>
   </div>
   <footer>
-    <button id="frank-narration" class="frank-narration" type="button" hidden><strong></strong><span></span></button>
-    <div id="frank-touch" hidden>
-      <button type="button" data-move="-1,0" aria-label="Move left">←</button><button type="button" data-move="1,0" aria-label="Move right">→</button>
-      <button type="button" data-move="0,-1" aria-label="Climb">↑</button><button type="button" data-move="0,1" aria-label="Descend">↓</button>
-      <button type="button" data-action="1">Jump</button><button type="button" data-action="2">Silk</button><button type="button" data-action="4">Break free</button>
-    </div>
+    <section id="frank-panel" aria-label="Different Story panel" hidden>
+      <section id="arcade-summary" aria-label="Different Story game status">
+        <p id="arcade-level"></p>
+        <p id="arcade-webs"></p>
+        <p id="arcade-lives"></p>
+      </section>
+      <div id="frank-touch" hidden>
+        <button type="button" data-move="-1,0" aria-label="Move left">←</button><button type="button" data-move="1,0" aria-label="Move right">→</button>
+        <button type="button" data-move="0,-1" aria-label="Climb">↑</button><button type="button" data-move="0,1" aria-label="Descend">↓</button>
+        <button type="button" data-action="1">Jump</button><button type="button" data-action="2">Silk</button><button type="button" data-action="4">Break free</button>
+      </div>
+      <span id="frank-scene" role="status" hidden>Cutscene · Controls paused</span>
+      <button id="frank-narration" class="frank-narration" type="button" hidden><strong></strong><span></span></button>
+      <button id="frank-speaker" type="button" hidden>
+        <span id="frank-portrait" aria-hidden="true"></span>
+        <strong id="frank-speaker-name"></strong>
+      </button>
+    </section>
     <section id="open-goal" class="open-goal" aria-label="Nest supplies" hidden>
       <strong>Stock the nest</strong>
       <span id="nest-common" data-tier="common">Common</span>

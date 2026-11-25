@@ -1,3 +1,4 @@
+import {frankPortrait} from './frank-portrait';
 import {frankChapters} from './frank-script';
 import {createFrankStory,frankCompletionKey,frankLine,frankPhase,frankVoice,tickFrank,type FrankStory} from './frank-story';
 import './style.css';
@@ -355,12 +356,14 @@ function arcadeFeedback(event:ArcadeEvent) {
 }
 
 const frankTitle=get('frank-title'),frankNarration=get('frank-narration');
-const frankTouch=get('frank-touch');
+const frankTouch=get('frank-touch'),frankPanel=get('frank-panel');
+const frankScene=get('frank-scene'),frankHud=get('arcade-summary');
+const frankSpeaker=get('frank-speaker'),frankSpeakerName=get('frank-speaker-name'),frankPortraitBox=get('frank-portrait');
 const coarsePointer=matchMedia('(pointer: coarse)');
 function hideFrankPanels() {
-  frankTitle.hidden=frankNarration.hidden=frankTouch.hidden=true;
+  frankTitle.hidden=frankPanel.hidden=frankTouch.hidden=true;
 }
-frankNarration.addEventListener('click',()=>{frankTouchPress=true;});
+for (const panel of [frankNarration,frankSpeaker]) panel.addEventListener('click',()=>{frankTouchPress=true;});
 worldCanvas.addEventListener('click',()=>{
   if (frank && frankLine(frank)?.narration===false) frankTouchPress=true;
 });
@@ -403,14 +406,28 @@ function showFrankPanels(story:FrankStory,frozen:boolean) {
     frankTitle.style.opacity=String(story.phase==='fade' ? Math.min(1,story.elapsed/.5) :
       Math.max(0,Math.min(1,story.elapsed/.3,(3-story.elapsed)/.3)));
   }
-  frankTouch.hidden=story.phase!=='combat' || !coarsePointer.matches || frozen;
-  frankNarration.hidden=!line || !line.narration;
-  if (!line?.narration) return;
-  const panel=frankNarration;
-  const name=line.speaker==='FRANK' ? 'Frank Webbin' : line.speaker==='STRANGER' ? 'Stranger' :
-    chapter.enemies.find(enemy=>enemy.name.toUpperCase().split(' ').includes(line.speaker))?.name??'Duke Wobbleknees';
+  const combat=story.phase==='combat';
+  frankPanel.hidden=false;
+  frankPanel.toggleAttribute('data-still',reduced() || frozen);
+  frankHud.hidden=!combat;
+  frankScene.hidden=combat;
+  frankTouch.hidden=!combat || !coarsePointer.matches || frozen;
+  frankNarration.hidden=!line?.narration;
+  frankSpeaker.hidden=!line || line.narration;
+  if (!line) return;
+  const enemy=chapter.enemies.find(enemy=>enemy.name.toUpperCase().split(' ').includes(line.speaker));
+  const name=line.speaker==='FRANK' ? 'Frank Webbin' : line.speaker==='STRANGER' ? 'Stranger' : enemy?.name??'Duke Wobbleknees';
+  if (!line.narration) {
+    if (frankSpeakerName.textContent!==name) {
+      frankSpeakerName.textContent=name;
+      frankSpeaker.setAttribute('aria-label',`${name} · Advance dialogue`);
+      const portrait=frankPortrait(line.speaker,enemy?.species,name);
+      frankPortraitBox.innerHTML=portrait+portrait.replace('<svg ','<svg class="frank-portrait-echo" ');
+    }
+    return;
+  }
   const text=line.text.slice(0,Math.floor(story.reveal));
-  const speaker=panel.querySelector('strong')!,copy=panel.querySelector('span')!;
+  const speaker=frankNarration.querySelector('strong')!,copy=frankNarration.querySelector('span')!;
   if (speaker.textContent!==name) speaker.textContent=name;
   if (copy.textContent!==text) copy.textContent=text;
 }

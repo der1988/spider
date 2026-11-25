@@ -305,40 +305,60 @@ dialog h2 { margin: 0; font-size: 16px; }
 
 .playfield { display: grid; min-width: 0; min-height: 0; }
 .shell[data-arcade] {
-  --arcade-hud-height: 32px;
+  --frank-rail: clamp(86px, 17dvh, 110px);
   --arcade-padding: clamp(5px, 1vw, 10px);
   --arcade-gap: 5px;
-  --arcade-view-height: max(0px, calc(100dvh - var(--arcade-hud-height) - 2 * (var(--arcade-padding) + var(--arcade-gap))));
+  --arcade-view-height: max(0px, calc(100dvh - var(--frank-rail) - 2 * var(--arcade-padding) - var(--arcade-gap)));
   padding: var(--arcade-padding);
   gap: var(--arcade-gap);
   grid-template-columns: minmax(0, min(100%, calc(var(--arcade-view-height) * 25 / 14)));
-  grid-template-rows: var(--arcade-hud-height) auto;
+  grid-template-rows: auto var(--frank-rail);
   justify-content: center;
   align-content: start;
 }
 .shell[data-arcade] .playfield { aspect-ratio: 400 / 224; }
 .shell[data-arcade] .stage { border: 0; }
 .shell[data-arcade] #world { image-rendering: pixelated; }
-#arcade-summary { display: none; }
-.shell[data-arcade] header { grid-template-columns: minmax(0,1fr); }
-.shell[data-arcade] header > :not(#arcade-summary),
-.shell[data-arcade] footer { display: none; }
-.shell[data-arcade] #arcade-summary { display: flex; align-items: center; gap: clamp(8px, 2.5vw, 24px); }
+.shell[data-arcade] header,
+.shell[data-arcade] footer > :not(#frank-panel) { display: none; }
+.shell[data-arcade] footer { display: block; min-width: 0; }
+#frank-panel:not([hidden]) {
+  display: flex; flex-direction: column; justify-content: center;
+  gap: 3px; min-height: 100%; padding: 4px 8px;
+  border: 1px solid #72856a; background: #17251e;
+}
+#arcade-summary:not([hidden]) { display: flex; align-items: center; gap: clamp(8px, 2.5vw, 24px); }
 #arcade-summary :is(#arcade-level,#arcade-webs,#arcade-lives) { margin: 0; white-space: nowrap; }
 #arcade-level { color: #f2f4d6; font-size: clamp(14px,4vw,20px); font-weight: 800; }
 #arcade-summary #arcade-webs { margin-inline-start: auto; color: #bacfa6; font-size: clamp(10px, 2vw, 13px); }
 #arcade-lives { color: #ffc1a8; font-size: clamp(20px,5vw,30px); letter-spacing: .08em; line-height: 1; }
-@media (max-height: 320px) {
-  .shell[data-arcade] { --arcade-hud-height: 27px; }
+#frank-scene { text-align: left; color: #c5b38a; font: 10px/1.2 monospace; }
+#frank-speaker:not([hidden]) {
+  display: flex; align-items: center; gap: 12px; min-width: 0;
+  min-height: 0; padding: 0; border: 0; background: transparent;
+  text-align: left; color: #f7edd0; font-size: clamp(12px, 2.7vw, 18px);
 }
-
-.shell[data-arcade] {
-  --frank-rail: clamp(76px, 17dvh, 105px);
-  --arcade-view-height: max(0px, calc(100dvh - var(--frank-rail) - var(--arcade-hud-height) - 2 * var(--arcade-padding) - 2 * var(--arcade-gap)));
-  grid-template-rows: var(--arcade-hud-height) auto var(--frank-rail);
+#frank-portrait {
+  display: grid; flex: 0 0 auto; width: clamp(60px, 12dvh, 86px); aspect-ratio: 1;
+  overflow: hidden; background: repeating-linear-gradient(#33483b 0 4px, #2b4034 4px 5px);
+  border: 1px solid #7b9274;
 }
-.shell[data-arcade] footer { display: block; }
-.shell[data-arcade] footer > :not(#frank-narration):not(#frank-touch) { display: none; }
+#frank-portrait svg {
+  grid-area: 1 / 1; width: 100%; height: 100%; min-width: 0; min-height: 0;
+  align-self: end;
+}
+.frank-portrait-echo { visibility: hidden; }
+#frank-panel:not([data-still]) #frank-portrait .frank-portrait-echo {
+  visibility: visible; animation: frank-distortion 2.1s steps(1) infinite;
+}
+@keyframes frank-distortion {
+  0%, 20%, 64%, 100% { clip-path: inset(0 0 100%); }
+  8%, 61% { clip-path: inset(28% 0 58%); transform: translateX(3px); }
+  13%, 58%, 68% { clip-path: inset(58% 0 28%); transform: translateX(-3px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #frank-panel #frank-portrait .frank-portrait-echo { display: none; }
+}
 .frank-title:not([hidden]) {
   position: absolute; inset: 0; display: grid; place-content: center;
   text-align: center; white-space: pre-line; padding: 12px;
@@ -346,12 +366,12 @@ dialog h2 { margin: 0; font-size: 16px; }
   font: bold clamp(11px, 2.7vw, 22px)/1.4 monospace;
 }
 .frank-narration {
-  color: #f7edd0; background: #17251ef7; border: 1px solid #72856a;
+  color: #f7edd0; background: transparent; border: 0;
   text-align: left; font-size: clamp(10px, 2.5vw, 14px); line-height: 1.28;
   padding: 5px 8px; white-space: normal; touch-action: manipulation;
 }
-.frank-narration { width: 100%; min-height: 100%; }
+.frank-narration { width: 100%; }
 .frank-narration strong { display: block; color: #acd6ac; margin-bottom: 2px; }
 #frank-touch:not([hidden]) { display: flex; flex-wrap: wrap; gap: 4px; }
-#frank-touch button { min-width: 35px; min-height: 28px; touch-action: none; }
+#frank-touch button { min-width: 34px; min-height: 26px; touch-action: none; }
 .shell[data-arcade] .stage { touch-action: none; }
