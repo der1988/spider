@@ -446,16 +446,18 @@ test('R1 tap only fixes silk, keeping the newest three distinct webs',()=>{
   assert.deepEqual(hunt.strands,newest);
 });
 
-test('holding R1 on the floor still fixes a web, while a held airborne shot reels and detaches',()=>{
+test('holding R1 keeps a rope until release, which only fixes silk from support',()=>{
   const run=createArcade();
   start(run);
   parkFly(run);
   const {hunt,spider}=run.movement;
   advanceArcade(run,towardWeb);
   ticks(run,.39);
+  assert.ok(spider.rope);
+  assert.equal(hunt.strands.length,0);
+  advanceArcade(run,silkRelease);
   assert.equal(spider.rope,undefined);
   assert.equal(hunt.strands.length,1);
-  advanceArcade(run,silkRelease);
   const web=existingWeb(run);
   advanceArcade(run,towardWeb);
   advanceArcade(run,arenaInput({x:0,y:0},undefined,true));
@@ -602,6 +604,7 @@ test('expiry and FIFO replacement tear down dependent strands and hanging ropes'
   const other={from:{x:264,y:159},to:{x:343,y:217},shakeUntil:0};
   hunt.strands=[old,attached,other];
   advanceArcade(run,towardWeb);
+  advanceArcade(run,silkRelease);
   ticks(run,.45);
   assert.equal(hunt.strands.length,2);
   assert.equal(hunt.strands[0],other);

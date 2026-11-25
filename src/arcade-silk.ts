@@ -13,6 +13,7 @@ export type SilkShot={
   age:number;
   hit?:{point:Point;grip:boolean;web?:Strand};
   fade?:number;
+  releasedOnSurface?:boolean;
 };
 
 export function launchSilk(origin:Point,direction:Point,momentum:Point):SilkShot {

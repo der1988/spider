@@ -530,9 +530,15 @@ function arcadeSilk(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeEvent)=>voi
     emit('launch');
   }
   if (buttons&releaseSilkButton) {
-    if (run.silkHeld && spider.rope) {
-      closeCrawlerRopes(spider);
-      emit('release');
+    if (run.silkHeld) {
+      const supported=crawlerIsSupported(spider,run.movement.hunt.surfaces);
+      for (const shot of run.silkShots) shot.releasedOnSurface??=supported;
+      if (spider.rope) {
+        const parent=run.ropeWeb;
+        const anchor=closeCrawlerRopes(spider)!;
+        run.ropeWeb=undefined;
+        if (!supported || !fixArcadeSilk(run,anchor,parent,emit)) emit('release');
+      }
     }
     run.silkHeld=false;
   }
@@ -554,6 +560,16 @@ function pruneDependentWebs(run:ArcadeRun) {
   }
 }
 
+function fixArcadeSilk(run:ArcadeRun,point:Point,parent:Strand|undefined,emit:(event:ArcadeEvent)=>void) {
+  const {spider,hunt}=run.movement;
+  const before=hunt.strands.length;
+  if (!anchorSilk(hunt.strands,point,arcadeSilkReach+SPIDER_HALF_HEIGHT,spider,hunt.surfaces,undefined,to=>diagonalWeb(point,to))) return false;
+  if (parent && hunt.strands.length>before) hunt.strands[before].parent=parent;
+  finishWebs(run.movement,before,emit,arcadeWebLimit);
+  pruneDependentWebs(run);
+  return true;
+}
+
 function tickSilkShots(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
   const {movement}=run,{spider,hunt}=movement;
   run.silkShots=run.silkShots.filter(shot=>{
@@ -567,15 +583,9 @@ function tickSilkShots(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
     if (travelled) {
       if (!shot.hit) return true;
       const {point,web}=shot.hit;
-      if (crawlerIsSupported(spider,hunt.surfaces)) {
-        const before=hunt.strands.length;
-        if (anchorSilk(hunt.strands,point,arcadeSilkReach+SPIDER_HALF_HEIGHT,spider,hunt.surfaces,undefined,to=>diagonalWeb(point,to))) {
-          if (web && hunt.strands.length>before) hunt.strands[before].parent=web;
-          finishWebs(movement,before,emit,arcadeWebLimit);
-          pruneDependentWebs(run);
-          return false;
-        }
-      } else {
+      if (shot.releasedOnSurface && crawlerIsSupported(spider,hunt.surfaces)) {
+        if (fixArcadeSilk(run,point,web,emit)) return false;
+      } else if (shot.releasedOnSurface===undefined || !crawlerIsSupported(spider,hunt.surfaces)) {
         const rope=ropeAt(point,spider);
         if (rope && clear(spider,point,hunt.surfaces)) {
           spider.rope=rope;
