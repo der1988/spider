@@ -360,7 +360,6 @@ const frankTouch=get('frank-touch'),frankPanel=get('frank-panel');
 const frankScene=get('frank-scene'),frankHud=get('arcade-summary');
 const frankChapterName=get('arcade-chapter'),frankLocation=get('arcade-location'),frankLives=get('arcade-lives');
 const frankCast=get('frank-cast'),frankTargets=get('arcade-targets');
-const frankTargetSlots=5;
 const frankSpeaker=get('frank-speaker'),frankSpeakerName=get('frank-speaker-name'),frankPortraitBox=get('frank-portrait');
 const coarsePointer=matchMedia('(pointer: coarse)');
 function hideFrankPanels() {
@@ -421,29 +420,26 @@ function showFrankTargets(chapter:number,run:ArcadeRun) {
   const key=String(chapter);
   if (frankTargets.dataset.chapter!==key) {
     frankTargets.dataset.chapter=key;
-    const names=frankCastNames(chapter);
-    frankTargets.replaceChildren(...Array.from({length:frankTargetSlots},(_,actor)=>{
-      const name=names[actor];
-      const tile=name ? createFrankPortrait(name) : document.createElement('span');
-      tile.classList.add('frank-target');
-      if (!name) tile.setAttribute('aria-hidden','true');
-      else {
-        const mark=document.createElement('span');
-        mark.className='frank-captured-mark';
-        mark.setAttribute('aria-hidden','true');
-        mark.textContent='×';
-        tile.append(mark);
-      }
+    frankTargets.replaceChildren(...frankCastNames(chapter).map(name=>{
+      const tile=document.createElement('li');
+      tile.className='frank-target';
+      const portrait=createFrankPortrait(name);
+      portrait.setAttribute('aria-hidden','true');
+      const label=document.createElement('span');
+      label.className='frank-target-name';
+      label.textContent=name;
+      const mark=document.createElement('span');
+      mark.className='frank-captured-mark';
+      mark.role='img';
+      mark.setAttribute('aria-label','Captured');
+      mark.textContent='×';
+      tile.append(portrait,label,mark);
       return tile;
     }));
   }
   for (const [actor,tile] of Array.from(frankTargets.children).entries()) {
-    const name=(tile as HTMLElement).title;
-    if (!name) continue;
     const captured=run.boss ? run.boss.hp===0 : !run.flies.some(fly=>fly.actor===actor);
-    if (tile.hasAttribute('data-captured')===captured) continue;
     tile.toggleAttribute('data-captured',captured);
-    tile.setAttribute('aria-label',captured ? `${name} · Captured` : name);
   }
 }
 

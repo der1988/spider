@@ -309,7 +309,8 @@ dialog h2 { margin: 0; font-size: 16px; }
 
 .playfield { display: grid; min-width: 0; min-height: 0; }
 .shell[data-arcade] {
-  --frank-rail: clamp(103.2px, 20.4dvh, 132px);
+  --frank-content-height: clamp(115px, 22dvh, 140px);
+  --frank-rail: var(--frank-content-height);
   --arcade-padding: clamp(5px, 1vw, 10px);
   --arcade-gap: 5px;
   --arcade-view-height: max(0px, calc(100dvh - var(--frank-rail) - 2 * var(--arcade-padding) - var(--arcade-gap)));
@@ -326,6 +327,12 @@ dialog h2 { margin: 0; font-size: 16px; }
 .shell[data-arcade] header,
 .shell[data-arcade] footer > :not(#frank-panel) { display: none; }
 .shell[data-arcade] footer { display: block; min-width: 0; container-type: inline-size; }
+@media (pointer: coarse) {
+  .shell[data-arcade] { --frank-rail: calc(var(--frank-content-height) + 32px); }
+  .shell[data-arcade] footer {
+    width: 100%; min-width: min(300px, calc(100dvw - 2 * var(--arcade-padding))); justify-self: center;
+  }
+}
 #frank-panel:not([hidden]) {
   display: flex; flex-direction: column; justify-content: safe center;
   gap: 3px; height: 100%; overflow-y: auto; padding: 4px 8px;
@@ -333,24 +340,31 @@ dialog h2 { margin: 0; font-size: 16px; }
 }
 #arcade-summary:not([hidden]) {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center;
-  gap: clamp(8px, 2cqw, 24px); padding-inline: clamp(4px, 1.5cqw, 20px);
+  gap: 4px clamp(8px, 2cqw, 24px); padding-inline: clamp(4px, 1.5cqw, 20px);
   text-align: left;
 }
 .frank-chapter-info { display: grid; gap: 3px; overflow-wrap: anywhere; }
 #arcade-chapter { color: #f2f4d6; font-size: clamp(18px, 4.5cqw, 32px); font-weight: 800; line-height: 1.05; }
 #arcade-location { color: #bacfa6; font-size: clamp(14px, 3.3cqw, 24px); line-height: 1.2; }
-.frank-combat-info { display: grid; justify-items: end; gap: clamp(3px, .5cqw, 6px); }
 #arcade-lives { color: #ffc1a8; font-size: clamp(28px, 7cqw, 52px); letter-spacing: .06em; line-height: 1; white-space: nowrap; }
 #arcade-targets {
-  --frank-target-size: clamp(20px, 4.1cqw, 52px);
-  display: grid; grid-auto-flow: column; grid-auto-columns: var(--frank-target-size); gap: clamp(3px, .45cqw, 6px);
+  --frank-target-size: clamp(20px, 3.1cqw, 36px);
+  grid-column: 1 / -1; display: flex; gap: clamp(3px, .7cqw, 10px);
+  list-style: none; margin: 0; padding: 0;
 }
-.frank-target { position: relative; aspect-ratio: 1; }
-.frank-target[aria-hidden] { background: #1c2b22; border: 1px solid #3a4e40; }
+.frank-target {
+  position: relative; flex: 0 1 clamp(82px, 12cqw, 150px); min-width: 0;
+  display: grid; justify-items: center; align-content: start; gap: 2px;
+  text-align: center; overflow-wrap: anywhere;
+}
+.frank-target .frank-portrait { width: var(--frank-target-size); }
+.frank-target-name { color: #e1e7c5; font-size: clamp(9px, 1.2cqw, 12px); line-height: 1.16; }
 .frank-captured-mark { display: none; }
-.frank-target[data-captured]::before { opacity: .46; }
+.frank-target[data-captured] .frank-portrait::before { opacity: .46; }
 .frank-target[data-captured] .frank-captured-mark {
-  position: absolute; inset: 0; display: grid; place-items: center;
+  position: absolute; inset-block-start: 0; inset-inline-start: 50%; translate: -50% 0;
+  width: var(--frank-target-size); height: var(--frank-target-size);
+  display: grid; place-items: center;
   color: #ffc1a8; font-size: var(--frank-target-size); font-weight: 900; line-height: 1;
   -webkit-text-stroke: 1px #17251e;
 }
@@ -374,10 +388,10 @@ dialog h2 { margin: 0; font-size: 16px; }
   image-rendering: pixelated;
 }
 .frank-portrait::after { visibility: hidden; }
-#frank-panel:not([data-still]) .frank-portrait:not(.frank-target)::before {
+#frank-panel:not([data-still]) :is(#frank-portrait, #frank-cast .frank-portrait)::before {
   animation: frank-portrait-bob 2.1s steps(1) infinite;
 }
-#frank-panel:not([data-still]) .frank-portrait:not(.frank-target)::after {
+#frank-panel:not([data-still]) :is(#frank-portrait, #frank-cast .frank-portrait)::after {
   visibility: visible;
   animation: frank-portrait-bob 2.1s steps(1) infinite, frank-distortion 2.1s steps(1) infinite;
 }
@@ -391,7 +405,7 @@ dialog h2 { margin: 0; font-size: 16px; }
   13%, 58%, 68% { clip-path: inset(58% 0 28%); transform: translateX(-3px); }
 }
 @media (prefers-reduced-motion: reduce) {
-  #frank-panel:not([data-still]) .frank-portrait:not(.frank-target)::before { animation: none; }
+  #frank-panel:not([data-still]) :is(#frank-portrait, #frank-cast .frank-portrait)::before { animation: none; }
   .frank-portrait::after { display: none; }
 }
 .frank-title:not([hidden]) {
