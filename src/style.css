@@ -344,11 +344,11 @@ dialog h2 { margin: 0; font-size: 16px; }
   text-align: left;
 }
 .frank-chapter-info { display: grid; gap: 3px; overflow-wrap: anywhere; }
-#arcade-chapter { color: #f2f4d6; font-size: clamp(18px, 4.5cqw, 32px); font-weight: 800; line-height: 1.05; }
-#arcade-location { color: #bacfa6; font-size: clamp(14px, 3.3cqw, 24px); line-height: 1.2; }
+#arcade-chapter { color: #f2f4d6; font-size: clamp(16px, 3.5cqw, 25px); font-weight: 800; line-height: 1.05; }
+#arcade-location { color: #bacfa6; font-size: clamp(12px, 2.6cqw, 18px); line-height: 1.2; }
 #arcade-lives { color: #ffc1a8; font-size: clamp(28px, 7cqw, 52px); letter-spacing: .06em; line-height: 1; white-space: nowrap; }
 #arcade-targets {
-  --frank-target-size: clamp(20px, 3.1cqw, 36px);
+  --frank-target-size: clamp(28px, 4.4cqw, 52px);
   grid-column: 1 / -1; display: flex; gap: clamp(3px, .7cqw, 10px);
   list-style: none; margin: 0; padding: 0;
 }
