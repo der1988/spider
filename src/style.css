@@ -345,13 +345,13 @@ dialog h2 { margin: 0; font-size: 16px; }
 }
 #arcade-lives { color: #ffc1a8; font-size: clamp(28px, 7cqw, 52px); letter-spacing: .06em; line-height: 1; white-space: nowrap; }
 #arcade-targets {
-  --frank-target-size: clamp(28px, 4.4cqw, 52px);
+  --frank-target-size: clamp(36px, 5.5cqw, 68px);
   min-width: 0; display: flex; gap: clamp(3px, .7cqw, 10px);
   list-style: none; margin: 0; padding: 0;
 }
 .frank-target {
   position: relative; flex: 0 1 clamp(82px, 12cqw, 150px); min-width: 0;
-  display: grid; justify-items: center; align-content: start; gap: 2px;
+  display: grid; justify-items: center; align-content: start; gap: 5px;
   text-align: center; overflow-wrap: anywhere;
 }
 .frank-target .frank-portrait { width: var(--frank-target-size); }
