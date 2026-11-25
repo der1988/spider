@@ -1,5 +1,5 @@
 import {arcadeFrame,arcadeLayouts,arcadeScenes} from './arcade-scenery';
-import {dialogueFor,insectMark,lineAt} from './arcade-dialogue';
+import {insectMark,lineAt} from './arcade-dialogue';
 import {rivalQuips} from './arcade-script';
 import {arcadeAttackStyle,arcadeDirectHits,arcadeEscapePresses,arcadeHeight,arcadeIdleSpeech,arcadeStage,arcadeWidth,bossTrapSeconds,flyEscapeGrace,flyTrapSeconds,type ArcadeRun} from './arcade';
 import {block,drawAimMarker,drawSpider} from './hunt-render';
@@ -32,33 +32,53 @@ function silhouette(mark:number) {
 
 const markings=Array.from({length:8},(_,mark)=>new Path2D(silhouette(mark)));
 
-type Portrait='spidey'|'rival'|{kind:number;mark:number};
-export type ArcadeSpeech={name:string;words:string;portrait:Portrait};
+type Speech={p:Point;words:string;color:string;clearance:number};
 
-export function arcadePortrait(portrait:Portrait) {
-  const image=(art:string)=>`<svg viewBox="0 0 16 16" aria-hidden="true">${art}</svg>`;
-  if (typeof portrait==='string') {
-    const rival=portrait==='rival';
-    return image(`
-      <path fill="#131f20" d="M1 9h3V7h2V4h6v2h2v2h1v4h-2v2h-3v-2H7v2H5v-2H3v2H1v-2h1v-2H1z"/>
-      <path fill="${rival ? '#977783' : '#79a354'}" d="M2 9h3V7h2V5h4v2h2v2h1v2h-3v1H7v-1H5v1H3v-1H2z"/>
-      <path fill="${rival ? '#bc8f8a' : '#b3cd73'}" d="M3 9h3v1H3zM8 5h3v1H8zM7 8h1v2H7z"/>
-      <path fill="#202f24" d="M8 10h4v1H8zM4 12h1v2H4zM11 12h1v2h-1z"/>
-      <path fill="${rival ? '#ffb476' : '#f4ebbd'}" d="M9 8h1v1H9zM12 8h1v1h-1z"/>
-      ${rival ? '<path fill="#ffe596" d="M6 3h1v1h2V2h1v2h2V3h1v3H6z"/>' : ''}
-    `);
+const speechGlyphs=new Map<string,HTMLCanvasElement>();
+
+function pixelWords(words:string,color:string) {
+  const key=color+words;
+  const cached=speechGlyphs.get(key);
+  if (cached) return cached;
+  const sprite=document.createElement('canvas');
+  sprite.width=Math.ceil(words.length*6.65)+6;
+  sprite.height=15;
+  const pen=sprite.getContext('2d',{willReadFrequently:true})!;
+  pen.font='bold 11px monospace';
+  pen.lineWidth=2.5;
+  pen.lineJoin='round';
+  pen.strokeStyle='#171323';
+  pen.fillStyle=color;
+  pen.strokeText(words,3,11);
+  pen.fillText(words,3,11);
+  const pixels=pen.getImageData(0,0,sprite.width,sprite.height);
+  for (let i=3;i<pixels.data.length;i+=4) pixels.data[i]=pixels.data[i]>=128 ? 255 : 0;
+  pen.putImageData(pixels,0,0);
+  speechGlyphs.set(key,sprite);
+  return sprite;
+}
+
+function drawSpeech(ctx:CanvasRenderingContext2D,speech:Speech,time:number) {
+  const {p,words,color,clearance}=speech;
+  ctx.save();
+  ctx.font='bold 11px monospace';
+  const rows=[''];
+  for (const word of words.toUpperCase().split(' ')) {
+    const row=rows.length-1;
+    if (rows[row] && ctx.measureText(rows[row]+' '+word).width>150) rows.push(word);
+    else rows[row]+=(rows[row] ? ' ' : '')+word;
   }
-  const {kind,mark}=portrait;
-  return image(`
-    <g transform="translate(2 3)">
-      <path fill="#162321" d="${wings[kind]}" stroke="#162321" stroke-width="1"/>
-      <path fill="${colors[kind]}" d="${wings[kind]}"/>
-      <path fill="#fff3c9" d="M3 4h1v1H3zM8 4h1v1H8z"/>
-      <path fill="#222733" d="${bodies[kind]+silhouette(mark)}"/>
-      <path fill="${colors[kind]}" d="M4 4h1v1H4zM5 5h2v1H5zM5 7h2v1H5z"/>
-      <path fill="#fff9dc" d="M5 3h1v1H5zM7 3h1v1H7z"/>
-    </g>
-  `);
+  const half=Math.max(...rows.map(row=>ctx.measureText(row).width))/2+5;
+  const x=Math.round(Math.min(width-half,Math.max(half,p.x)));
+  const above=p.y-clearance-(rows.length-1)*13;
+  const y=above>=23 ? above : p.y+clearance+12;
+  rows.forEach((row,i)=>{
+    const bob=Math.round(Math.sin(time*7+i*.7)*2);
+    const baseline=Math.round(y+i*13)+bob;
+    const sprite=pixelWords(row,color);
+    ctx.drawImage(sprite,Math.round(x-sprite.width/2),baseline-11);
+  });
+  ctx.restore();
 }
 
 function insect(ctx:CanvasRenderingContext2D,p:Point,kind:number,mark:number,time:number,caught=false) {
@@ -113,10 +133,9 @@ function status(ctx:CanvasRenderingContext2D,p:Point,label:string,light:string,r
   ctx.restore();
 }
 
-function openingSpeech(ctx:CanvasRenderingContext2D,run:ArcadeRun):ArcadeSpeech|undefined {
+function openingSpeech(ctx:CanvasRenderingContext2D,run:ArcadeRun):Speech|undefined {
   const line=lineAt(run.level,run.intro!.elapsed);
   if (!line) return;
-  const encounter=dialogueFor(run.level);
   const player=line.speaker==='spidey',rival=line.speaker==='rival';
   const fly=typeof line.speaker==='number' ? run.flies[line.speaker] : undefined;
   const p=fly?.p??(player ? run.movement.spider : run.boss!.p);
@@ -127,9 +146,9 @@ function openingSpeech(ctx:CanvasRenderingContext2D,run:ArcadeRun):ArcadeSpeech|
     block(ctx,x,p.y,1,1,'#fcf6c9');
   }
   return {
-    name:fly ? encounter.insects[fly.actor][0] : player ? 'Spidey' : encounter.name,
+    p,clearance,
     words:line.words,
-    portrait:fly ? {kind:fly.kind,mark:insectMark(run.level,fly.actor)} : player ? 'spidey' : 'rival',
+    color:fly ? colors[fly.kind] : player ? '#82f7d1' : '#ff88b8',
   };
 }
 
@@ -361,13 +380,16 @@ export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:nu
     ctx.strokeStyle='#f6d395';
     ctx.strokeRect(Math.round(spider.x)-9,Math.round(spider.y)-9,18,18);
   }
-  if (run.intro) return speech;
+  if (run.intro) {
+    if (speech) drawSpeech(ctx,speech,reducedMotion ? 0 : run.intro.elapsed);
+    return;
+  }
   if (snare) status(ctx,{x:spider.x,y:spider.y-14},`× ${snare.presses}/${arcadeEscapePresses}`,light,snare.presses/arcadeEscapePresses,'#e9f4b9');
   else drawAimMarker(ctx,spider,aim,width,height);
   if (run.phase==='wave' || run.phase==='boss') {
     const rivalLine=boss && (boss.phase==='trapped' || boss.phase==='recover') && boss.turn%3===1;
     const spideyLine=arcadeIdleSpeech(run);
-    if (rivalLine) return {name:dialogueFor(run.level).name,words:rivalQuips[(run.level/10+boss.turn-2)%rivalQuips.length],portrait:'rival' as const};
-    if (spideyLine) return {name:'Spidey',words:spideyLine,portrait:'spidey' as const};
+    if (rivalLine) drawSpeech(ctx,{p:boss.p,words:rivalQuips[(run.level/10+boss.turn-2)%rivalQuips.length],color:'#ff88b8',clearance:38},reducedMotion ? 0 : clock);
+    else if (spideyLine) drawSpeech(ctx,{p:spider,words:spideyLine,color:'#82f7d1',clearance:14},reducedMotion ? 0 : clock);
   }
 }

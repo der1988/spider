@@ -306,61 +306,28 @@ dialog h2 { margin: 0; font-size: 16px; }
 .playfield { display: grid; min-width: 0; min-height: 0; }
 .shell[data-arcade] {
   --arcade-hud-height: 32px;
-  --arcade-line-height: 60px;
   --arcade-padding: clamp(5px, 1vw, 10px);
   --arcade-gap: 5px;
-  --arcade-view-height: max(0px, calc(100dvh - var(--arcade-hud-height) - var(--arcade-line-height) - 2 * (var(--arcade-padding) + var(--arcade-gap))));
+  --arcade-view-height: max(0px, calc(100dvh - var(--arcade-hud-height) - 2 * (var(--arcade-padding) + var(--arcade-gap))));
   padding: var(--arcade-padding);
   gap: var(--arcade-gap);
   grid-template-columns: minmax(0, min(100%, calc(var(--arcade-view-height) * 25 / 14)));
-  grid-template-rows: var(--arcade-hud-height) auto var(--arcade-line-height);
+  grid-template-rows: var(--arcade-hud-height) auto;
   justify-content: center;
   align-content: start;
 }
 .shell[data-arcade] .playfield { aspect-ratio: 400 / 224; }
 .shell[data-arcade] .stage { border: 0; }
 .shell[data-arcade] #world { image-rendering: pixelated; }
-#arcade-summary, #arcade-dialogue { display: none; }
+#arcade-summary { display: none; }
 .shell[data-arcade] header { grid-template-columns: minmax(0,1fr); }
 .shell[data-arcade] header > :not(#arcade-summary),
-.shell[data-arcade] footer > :not(#arcade-dialogue) { display: none; }
+.shell[data-arcade] footer { display: none; }
 .shell[data-arcade] #arcade-summary { display: flex; align-items: center; gap: clamp(8px, 2.5vw, 24px); }
 #arcade-summary :is(#arcade-level,#arcade-webs,#arcade-lives) { margin: 0; white-space: nowrap; }
 #arcade-level { color: #f2f4d6; font-size: clamp(14px,4vw,20px); font-weight: 800; }
 #arcade-summary #arcade-webs { margin-inline-start: auto; color: #bacfa6; font-size: clamp(10px, 2vw, 13px); }
 #arcade-lives { color: #ffc1a8; font-size: clamp(20px,5vw,30px); letter-spacing: .08em; line-height: 1; }
-.shell[data-arcade] #arcade-dialogue {
-  display: grid;
-  align-items: center;
-  min-width: 0;
-  block-size: var(--arcade-line-height);
-  padding: 4px clamp(5px,2vw,12px);
-  border: 1px solid #6e845f;
-  background: #18291f;
-  text-align: left;
-}
-#arcade-line:not([hidden]) {
-  display: grid;
-  grid-template-columns: 38px minmax(0,1fr);
-  gap: clamp(6px,1.5vw,13px);
-  align-items: center;
-}
-#arcade-portrait { block-size: 38px; border: 1px solid #647e5d; background: #2a4133; }
-#arcade-portrait svg { display: block; inline-size: 100%; block-size: 100%; shape-rendering: crispEdges; }
-.arcade-line-copy { min-width: 0; }
-#arcade-speaker {
-  display: block;
-  color: #afd59e;
-  font-size: clamp(11px,2.4vw,13px);
-  line-height: 1.2;
-}
-#arcade-speech {
-  margin-block: 2px 0;
-  color: #fff6d7;
-  font-size: clamp(11px,2.5vw,14px);
-  line-height: 1.22;
-  text-wrap: pretty;
-}
 @media (max-height: 320px) {
-  .shell[data-arcade] { --arcade-hud-height: 27px; --arcade-line-height: 52px; }
+  .shell[data-arcade] { --arcade-hud-height: 27px; }
 }

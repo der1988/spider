@@ -7,7 +7,7 @@ import {advanceArena,arenaInput,arenaStep,releaseSilkButton,createArena,type Are
 import {advanceArcade,arcadeWebLimit,arcadeEscapeButton,arcadeHeight,arcadeWidth,createArcade,type ArcadeEvent,type ArcadeRun} from './arcade';
 import {arcadeLevels,heartsPerRun} from './arcade-dialogue';
 import {ArcadeMusic} from './arcade-music';
-import {arcadePortrait,renderArcade,type ArcadeSpeech} from './arcade-render';
+import {renderArcade} from './arcade-render';
 import {WEB_KEY} from './threads';
 import {renderHunt} from './hunt-render';
 import {readLeftStick,samplePlayStation} from './pad-controls';
@@ -25,22 +25,6 @@ import {flyCues,flyDoubtAt,flyDuration,flyFinalStart,flyMenuStart,flyRoomEffect}
 
 const get = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const worldCanvas=get<HTMLCanvasElement>('world');
-const arcadeLine=get('arcade-line');
-const arcadeSpeech=get('arcade-speech');
-const arcadeSpeaker=get('arcade-speaker');
-const arcadePortraitBox=get('arcade-portrait');
-
-function showArcadeSpeech(speech?:ArcadeSpeech) {
-  const hidden=!speech;
-  if (arcadeLine.hidden!==hidden) arcadeLine.hidden=hidden;
-  if (!speech) return;
-  if (arcadeSpeaker.textContent!==speech.name) {
-    arcadeSpeaker.textContent=speech.name;
-    arcadePortraitBox.innerHTML=arcadePortrait(speech.portrait);
-  }
-  if (arcadeSpeech.textContent!==speech.words) arcadeSpeech.textContent=speech.words;
-}
-
 const context = worldCanvas.getContext('2d',{alpha:false})!;
 const message = get('message');
 const timeLabel = get('time');
@@ -292,7 +276,6 @@ function showMenu() {
   arcade=undefined;
   arcadeMusic.stop();
   delete shell.dataset.arcade;
-  showArcadeSpeech();
   gnatMusic.reset();
   roomMapOpen=false;
   storyCheckpoint=undefined;
@@ -327,7 +310,6 @@ function startArcade() {
   worldCanvas.width=arcadeWidth;
   worldCanvas.height=arcadeHeight;
   context.imageSmoothingEnabled=false;
-  showArcadeSpeech();
   defeat.hidden=true;
   paused=false;
   opening=false;
@@ -402,7 +384,7 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
     defeat.hidden=false;
     defeatChoices.select(0,true);
   }
-  showArcadeSpeech(renderArcade(context,run,beat,reduced()));
+  renderArcade(context,run,beat,reduced());
 }
 
 function syncPause() {
