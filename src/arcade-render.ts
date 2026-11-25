@@ -1,5 +1,5 @@
 import {frankChapters} from './frank-script';
-import {frankLine,frankSpeakerIndex,type FrankStory} from './frank-story';
+import {frankNetTiming,frankLine,frankSpeakerIndex,type FrankStory} from './frank-story';
 import {frankDukePose,frankPrologueWalkway,frankStrangerPose} from './frank-staging';
 import {arcadeFrame,arcadeLayouts,arcadeRivalStage,arcadeScenes} from './arcade-scenery';
 import {insectMark,lineAt} from './arcade-dialogue';
@@ -7,7 +7,7 @@ import {rivalQuips} from './arcade-script';
 import {arcadeAttackStyle,arcadeDirectHits,arcadeEscapePresses,arcadeHeight,arcadeIdleSpeech,arcadeStage,arcadeWidth,bossTrapSeconds,species,flyEscapeGrace,flyTrapSeconds,type ArcadeRun} from './arcade';
 import {block,drawAimMarker,drawSpider} from './hunt-render';
 import type {Point} from './spider';
-import {crossesSolid,type Strand} from './threads';
+import {type Strand} from './threads';
 
 const width=arcadeWidth,height=arcadeHeight;
 const wings=[
@@ -288,7 +288,7 @@ function renderFrankScene(ctx:CanvasRenderingContext2D,run:ArcadeRun,story:Frank
     ? Math.round(Math.sin(story.elapsed*76)) : 0;
   const hero=run.movement.spider;
   const staged=story.chapter===11 || story.phase==='setup' || story.phase==='after' || story.phase==='fade' && story.chapter>0;
-  const progress=staged ? Math.min(1,story.phase==='setup' ? story.elapsed/.32 : 1) : 0;
+  const progress=staged ? Math.min(1,story.phase==='setup' ? story.elapsed/(run.boss ? .32 : frankNetTiming.arrive) : 1) : 0;
   if (story.chapter===0) {
     ctx.fillStyle='#10152b86';ctx.fillRect(0,0,width,height);
     for (let i=0;i<52;i++) {
@@ -298,7 +298,11 @@ function renderFrankScene(ctx:CanvasRenderingContext2D,run:ArcadeRun,story:Frank
   }
   const base=arcadeLayouts[run.level-1][3];
   const x=hero.x+(base.x+base.w/2-hero.x)*progress,y=hero.y+(base.y-8-hero.y)*progress;
-  drawSpider(ctx,{...hero,x:x+shake('FRANK'),y,vx:0,vy:0,rope:undefined,support:staged?'floor':hero.support},0,{time:0,beat:0});
+  const walking=story.phase==='setup' && progress<1;
+  const facing=staged && !run.boss ? (walking && x<hero.x ? -1 : 1) : hero.facing;
+  const pose=story.phase==='setup' && !run.boss && story.elapsed>=frankNetTiming.launch && story.elapsed<frankNetTiming.impact ? 'take' : 'normal';
+  drawSpider(ctx,{...hero,x:x+shake('FRANK'),y,vx:walking ? 64*facing : 0,vy:0,grounded:staged || hero.grounded,facing,rope:undefined,support:staged?'floor':hero.support},
+    reducedMotion ? 0 : story.elapsed,{time:story.elapsed,beat:0},pose);
   if (story.chapter===0) {
     const guest=frankStrangerPose(story);
     if (guest) {
@@ -342,29 +346,47 @@ function renderFrankScene(ctx:CanvasRenderingContext2D,run:ArcadeRun,story:Frank
   }
   const scene=arcadeScenes[run.level-1];
   const count=chapter.enemies.length;
-  const strandAt=(y:number):Strand=>({from:{x:259,y},to:{x:392,y:y+30},shakeUntil:0});
-  const wire=[114,132,153,65,28].map(strandAt).find(candidate=>run.movement.hunt.surfaces.every(r=>
-    !crossesSolid(candidate.from,candidate.to,r) &&
-    Array.from({length:count},(_,i)=>prisonerPoint(candidate,i)).every(p=>p.x+5<=r.x || p.x-5>=r.x+r.w || p.y+5<=r.y || p.y-5>=r.y+r.h)))??strandAt(28);
-  silk(ctx,wire.from,wire.to,scene.ink);
+  const center={x:327,y:[125,153,34].find(cy=>run.movement.hunt.surfaces.every(r=>
+    r.x+r.w<=269 || r.x>=392 || r.y+r.h<=cy-22 || r.y>=cy+22))??34};
+  const elapsed=story.phase==='setup' ? story.elapsed : Infinity;
+  const {launch,impact,woven,toss,stagger}=frankNetTiming;
+  const from={x:x+5,y:y-2};
+  if (elapsed>=launch && elapsed<impact) {
+    const t=(elapsed-launch)/(impact-launch);
+    const tip={x:from.x+(center.x-from.x)*t,y:from.y+(center.y-from.y)*t};
+    silk(ctx,from,tip,scene.light);
+    block(ctx,tip.x-1,tip.y-1,3,3,scene.light);
+  }
+  if (elapsed>=impact) {
+    drawFrankNet(ctx,center,Math.min(1,(elapsed-impact)/(woven-impact)),scene.ink,scene.light);
+  }
+  const targetAt=(index:number)=>({x:center.x+(index-(count-1)/2)*22,y:center.y});
   for (let i=0;i<count;i++) {
-    const t=story.phase==='setup' ? Math.max(0,Math.min(1,(story.elapsed-.32-i*.045)/.56)) : 1;
-    const target=prisonerPoint(wire,i);
-    if (story.phase==='setup' && t===0) continue;
-    const px=x+(target.x-x)*t,py=y+(target.y-y)*t-Math.sin(t*Math.PI)*36;
+    const t=Math.min(1,(elapsed-woven-i*stagger)/toss);
+    if (t<=0) continue;
+    const target=targetAt(i);
+    const px=from.x+(target.x-from.x)*t,py=from.y+(target.y-from.y)*t-Math.sin(t*Math.PI)*32;
     const jitter=who && active===i ? shake(who) : 0;
     cocoon(ctx,{x:px+jitter,y:py},{x:0,y:0},scene.ink,scene.light,scene.accent,false);
   }
   if (who==='FRANK') speak({x,y},'#82f7d1',15);
   else if (active>=0) {
     const kind=species.findIndex(([name])=>name===chapter.enemies[active].species);
-    speak(prisonerPoint(wire,active),colors[kind]??scene.light,15);
+    speak(targetAt(active),colors[kind]??scene.light,28);
   }
 }
 
-function prisonerPoint(wire:Strand,index:number) {
-  const x=wire.from.x+13+index*23;
-  return {x,y:wire.from.y+(x-wire.from.x)*(wire.to.y-wire.from.y)/(wire.to.x-wire.from.x)};
+function drawFrankNet(ctx:CanvasRenderingContext2D,center:Point,progress:number,ink:string,light:string) {
+  const ring=(radius:number)=>Array.from({length:8},(_,i)=>{
+    const angle=i*Math.PI/4;
+    return {x:center.x+Math.cos(angle)*58*radius*progress,y:center.y+Math.sin(angle)*22*radius*progress};
+  });
+  for (const p of ring(1)) silk(ctx,center,p,ink);
+  for (const radius of [.28,.52,.76,1]) {
+    const points=ring(radius);
+    for (const [index,p] of points.entries()) silk(ctx,p,points[(index+1)%points.length],radius===1 ? ink : light);
+  }
+  silk(ctx,ring(1)[0],{x:392,y:center.y},ink);
 }
 
 function drawFrankRival(ctx:CanvasRenderingContext2D,hero:ArcadeRun['movement']['spider'],p:ReturnType<typeof frankDukePose>,jitter:number,time:number) {

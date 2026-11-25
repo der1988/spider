@@ -47,7 +47,7 @@ test('manual reveal takes two edges and all chapters advance through the epilogu
     if (i>0 && i<11) {
       assert.equal(story.phase,'combat');
       frankPhase(story,'setup');
-      tickFrank(story,1.1,false);
+      tickFrank(story,2.05,false);
       while (story.phase==='after') {tickFrank(story,0,true);tickFrank(story,0,true);}
     }
     assert.equal(story.phase,'fade');
