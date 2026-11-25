@@ -1,10 +1,12 @@
+import {frankChapters} from './frank-script';
+import {frankLine,frankSpeakerIndex,type FrankStory} from './frank-story';
 import {arcadeFrame,arcadeLayouts,arcadeScenes} from './arcade-scenery';
 import {insectMark,lineAt} from './arcade-dialogue';
 import {rivalQuips} from './arcade-script';
 import {arcadeAttackStyle,arcadeDirectHits,arcadeEscapePresses,arcadeHeight,arcadeIdleSpeech,arcadeStage,arcadeWidth,bossTrapSeconds,flyEscapeGrace,flyTrapSeconds,type ArcadeRun} from './arcade';
 import {block,drawAimMarker,drawSpider} from './hunt-render';
 import type {Point} from './spider';
-import type {Strand} from './threads';
+import {crossesSolid,type Strand} from './threads';
 
 const width=arcadeWidth,height=arcadeHeight;
 const wings=[
@@ -263,11 +265,87 @@ function cocoon(ctx:CanvasRenderingContext2D,p:Point,v:Point,ink:string,light:st
   }
 }
 
-export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:number,reducedMotion=false) {
+function renderFrankScene(ctx:CanvasRenderingContext2D,run:ArcadeRun,story:FrankStory,reducedMotion:boolean) {
+  const chapter=frankChapters[story.chapter],line=frankLine(story);
+  const who=line?.speaker;
+  const shake=(speaker:string)=>!reducedMotion && who===speaker && story.reveal<(line?.text.length??0)
+    ? Math.round(Math.sin(story.elapsed*76)) : 0;
+  const hero=run.movement.spider;
+  const staged=story.chapter===11 || story.phase==='setup' || story.phase==='after' || story.phase==='fade' && story.chapter>0;
+  const progress=staged ? Math.min(1,story.phase==='setup' ? story.elapsed/.32 : 1) : 0;
+  if (story.chapter===0) {
+    ctx.fillStyle='#10152b86';ctx.fillRect(0,0,width,height);
+    for (let i=0;i<52;i++) {
+      const x=(i*41+9)%width,y=(i*53+Math.floor(reducedMotion ? 0 : story.elapsed*155))%height;
+      block(ctx,x,y,1,5,'#879fbe');
+    }
+  }
+  const base=arcadeLayouts[run.level-1][3];
+  const x=hero.x+(base.x+base.w/2-hero.x)*progress,y=hero.y+(base.y-8-hero.y)*progress;
+  drawSpider(ctx,{...hero,x:x+shake('FRANK'),y,vx:0,vy:0,rope:undefined,support:staged?'floor':hero.support},0,{time:0,beat:0});
+  if (story.chapter===0) {
+    const leaving=story.lineIndex===chapter.before.length-1;
+    if (story.lineIndex>=3 && (!leaving || story.reveal<37)) {
+      const guestX=leaving ? 108+story.reveal*3 : story.lineIndex===3 ? Math.max(108,145-story.reveal*2) : 108;
+      drawSpider(ctx,{...hero,x:guestX+shake('STRANGER'),y:hero.y,rope:undefined,facing:leaving?1:-1},0,{time:0,beat:0});
+    }
+    if (story.lineIndex>=10) block(ctx,79,hero.y+3,6,4,'#e2cb90');
+    return;
+  }
+  if (story.chapter===11) {
+    block(ctx,206,134,30,21,'#233022');
+    block(ctx,208,135,26,18,'#fbefc5');
+    block(ctx,210,137,22,3,'#485243');
+    for (let y=143;y<=149;y+=3) {
+      block(ctx,210,y,9,1,'#849175');
+      block(ctx,221,y,11,1,'#849175');
+    }
+    return;
+  }
+  if (!staged) {
+    for (const fly of run.flies) {
+      const jitter=who && frankSpeakerIndex(story.chapter,who)===fly.actor ? shake(who) : 0;
+      insect(ctx,{x:fly.p.x+jitter,y:fly.p.y},fly.kind,insectMark(run.level,fly.actor),0,true);
+    }
+    if (run.boss) drawFrankRival(ctx,hero,run.boss.p,shake('DUKE'));
+    return;
+  }
+  const scene=arcadeScenes[run.level-1];
+  const count=chapter.enemies.length || 1;
+  const strandAt=(y:number):Strand=>({from:{x:259,y},to:{x:392,y:y+30},shakeUntil:0});
+  const wire=[114,132,153,65,28].map(strandAt).find(candidate=>run.movement.hunt.surfaces.every(r=>
+    !crossesSolid(candidate.from,candidate.to,r) &&
+    Array.from({length:count},(_,i)=>prisonerPoint(candidate,i)).every(p=>p.x+5<=r.x || p.x-5>=r.x+r.w || p.y+5<=r.y || p.y-5>=r.y+r.h)))??strandAt(28);
+  silk(ctx,wire.from,wire.to,scene.ink);
+  for (let i=0;i<count;i++) {
+    const t=story.phase==='setup' ? Math.max(0,Math.min(1,(story.elapsed-.32-i*.045)/.56)) : 1;
+    const target=prisonerPoint(wire,i);
+    if (story.phase==='setup' && t===0) continue;
+    const px=x+(target.x-x)*t,py=y+(target.y-y)*t-Math.sin(t*Math.PI)*36;
+    const jitter=who && (frankSpeakerIndex(story.chapter,who)===i || run.boss && who==='DUKE') ? shake(who) : 0;
+    cocoon(ctx,{x:px+jitter,y:py},{x:0,y:0},scene.ink,scene.light,scene.accent,false);
+  }
+}
+
+function prisonerPoint(wire:Strand,index:number) {
+  const x=wire.from.x+13+index*23;
+  return {x,y:wire.from.y+(x-wire.from.x)*(wire.to.y-wire.from.y)/(wire.to.x-wire.from.x)};
+}
+
+function drawFrankRival(ctx:CanvasRenderingContext2D,hero:ArcadeRun['movement']['spider'],p:Point,jitter:number) {
+  ctx.save();ctx.translate(Math.round(p.x)+jitter,Math.round(p.y));ctx.scale(3,3);
+  drawSpider(ctx,{...hero,x:0,y:0,support:'floor',rope:undefined,facing:-1},0,{time:0,beat:0});
+  block(ctx,0,-7,5,1,'#f2c77c');
+  block(ctx,0,-8,1,1,'#fff4a9');block(ctx,2,-9,1,2,'#fff4a9');block(ctx,4,-8,1,1,'#fff4a9');
+  ctx.restore();
+}
+
+export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:number,reducedMotion=false,story?:FrankStory) {
   const {movement:{spider,hunt,aim},clock,boss,snare}=run;
   const stage=arcadeStage(run.level),scene=arcadeScenes[stage],{ink,light}=scene;
   landscape(ctx,stage,pulse,reducedMotion);
   drawPerches(ctx,stage,pulse);
+  if (story && story.phase!=='combat') {renderFrankScene(ctx,run,story,reducedMotion);return;}
   const speech=run.intro ? openingSpeech(ctx,run) : undefined;
   for (const net of hunt.strands) web(ctx,net,clock,ink);
   for (const net of run.rivalWebs) web(ctx,net,clock,ink,true);
@@ -386,7 +464,7 @@ export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:nu
   }
   if (snare) status(ctx,{x:spider.x,y:spider.y-14},`× ${snare.presses}/${arcadeEscapePresses}`,light,snare.presses/arcadeEscapePresses,'#e9f4b9');
   else drawAimMarker(ctx,spider,aim,width,height);
-  if (run.phase==='wave' || run.phase==='boss') {
+  if (!story && (run.phase==='wave' || run.phase==='boss')) {
     const rivalLine=boss && (boss.phase==='trapped' || boss.phase==='recover') && boss.turn%3===1;
     const spideyLine=arcadeIdleSpeech(run);
     if (rivalLine) drawSpeech(ctx,{p:boss.p,words:rivalQuips[(run.level/10+boss.turn-2)%rivalQuips.length],color:'#ff88b8',clearance:38},reducedMotion ? 0 : clock);

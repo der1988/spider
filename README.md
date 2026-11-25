@@ -54,3 +54,9 @@ In **Endless** la colonna sonora strumentale 16 bit ripete la stessa melodia a 1
 Con Node.js 24, esegui `npm ci` e `npm run dev`. Per i controlli esegui `npm run lint`, `npm test` e `npm run build`. La build Vite usa `dist` e conserva il supporto offline dopo il primo caricamento.
 
 [Note su fisica, mosca e timer](docs/architettura.md)
+
+### Frank Webbin — The Perfect Crime
+
+Scegli **Endless** dal menu. Dopo il titolo di scena, avanza con **Invio**, **Spazio**, **×** sul joypad o un tocco sulla battuta. La prima pressione completa la scrittura in corso. Una nuova pressione passa alla battuta successiva. Sul touch, durante lo scontro, tocca l’arena per orientare il mirino e usa i pulsanti sotto il campo.
+
+La sceneggiatura giocabile è in `src/frank-script.ts`. Ogni voce in `frankChapters` contiene il titolo del capitolo, il cast e le sequenze `before` e `after`. Ogni battuta contiene il parlante, il testo inglese e il flag `narration`, che determina dove viene mostrata. La specifica originale è in [docs/FRANK_WEBBIN_GDD.md](docs/FRANK_WEBBIN_GDD.md).

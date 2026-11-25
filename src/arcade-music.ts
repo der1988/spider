@@ -1,3 +1,4 @@
+import {frankMix} from './frank-story';
 import {arcadeLevels} from './arcade-dialogue';
 
 const bpm=112;
@@ -160,11 +161,11 @@ export class ArcadeMusic {
     const now=context.currentTime+.02;
     if (!this.bed) {
       this.bed=context.createGain();
-      this.bed.gain.value=cinematic ? .22 : 1;
+      this.bed.gain.value=cinematic ? frankMix.narrative : frankMix.combat;
       this.bed.connect(this.master(context));
     }
     if (cinematic!==this.cinematic) {
-      this.bed.gain.setTargetAtTime(cinematic ? .22 : 1,now,cinematic ? .045 : .095);
+      this.bed.gain.setTargetAtTime(cinematic ? frankMix.narrative : frankMix.combat,now,cinematic ? .045 : .095);
       if (!cinematic) this.fadeCue(now);
       this.cinematic=cinematic;
     }

@@ -95,6 +95,13 @@ function prepareLevel(run:ArcadeRun) {
   run.rivalWebs=[];run.snare=undefined;
 }
 
+export function loadArcadeChapter(run:ArcadeRun,level:number) {
+  run.level=level;
+  run.phase='wave';
+  prepareLevel(run);
+  run.intro=undefined;
+}
+
 const nodes=[{x:44,y:102},{x:354,y:103},{x:128,y:32},{x:300,y:36},{x:102,y:184},{x:304,y:183},{x:187,y:75},{x:211,y:138}];
 const airNodes=[...nodes,...[28,58,89,121,153,181,200].flatMap(y=>
   [32,79,129,177,221,272,321,370].map(x=>({x,y})))];
@@ -618,7 +625,7 @@ function tickSilkShots(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
   });
 }
 
-export function advanceArcade(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeEvent)=>void=()=>{}) {
+export function advanceArcade(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeEvent)=>void=()=>{},holdChapter=false) {
   if (run.restartIn>0) {
     run.restartIn-=arenaStep;
     if (run.restartIn<=0) {
@@ -684,7 +691,7 @@ export function advanceArcade(run:ArcadeRun,input:ArenaInput,emit:(event:ArcadeE
     tickRivalWebs(run,from,emit);
     tickBoss(run,emit);
     if (!run.boss!.hp) {run.phase='won';emit('win');}
-  } else if (run.flies.length===0) {
+  } else if (run.flies.length===0 && !holdChapter) {
     run.level++;
     prepareLevel(run);
     emit(run.boss ? 'boss' : 'entrance');

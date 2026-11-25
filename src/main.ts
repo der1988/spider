@@ -1,10 +1,12 @@
+import {frankChapters} from './frank-script';
+import {createFrankStory,frankCompletionKey,frankLine,frankPhase,frankVoice,tickFrank,type FrankStory} from './frank-story';
 import './style.css';
 import {createOpenWorld,createWindowHunt,pantryTiers,preyTier,restartOpenWorld,stepWindowHunt,updateHuntZoom,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
 import {renderWindowHunt} from './window-hunt-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
 import {advanceArena,arenaInput,arenaStep,releaseSilkButton,createArena,type ArenaEvent} from './arena-run';
-import {advanceArcade,arcadeWebLimit,arcadeEscapeButton,arcadeHeight,arcadeWidth,createArcade,type ArcadeEvent,type ArcadeRun} from './arcade';
+import {advanceArcade,arcadeWebLimit,arcadeEscapeButton,arcadeHeight,arcadeWidth,createArcade,loadArcadeChapter,type ArcadeEvent,type ArcadeRun} from './arcade';
 import {arcadeLevels,heartsPerRun} from './arcade-dialogue';
 import {ArcadeMusic} from './arcade-music';
 import {renderArcade} from './arcade-render';
@@ -80,7 +82,13 @@ let paused = false;
 let escape: FlyEscape|undefined;
 let windowHunt: WindowRun|undefined;
 let arcade: ArcadeRun|undefined;
-let arcadeAxesReady=false;
+let frank:FrankStory|undefined;
+let frankTouchPress=false;
+let frankVoiceAt=0;
+let frankTouchMove:Point={x:0,y:0};
+let frankTouchAim:Point|undefined;
+let frankTouchButtons=0;
+let frankTouchSilk=false;
 
 let roomMapOpen=false;
 let storyCheckpoint: {offset:number; arena:typeof arena}|undefined;
@@ -274,6 +282,8 @@ function showMenu() {
   const wasWindowHunt=!!windowHunt;
   windowHunt=undefined;
   arcade=undefined;
+  frank=undefined;
+  hideFrankPanels();
   arcadeMusic.stop();
   delete shell.dataset.arcade;
   gnatMusic.reset();
@@ -302,6 +312,13 @@ function showMenu() {
 function startArcade() {
   mode='loop';
   arcade=createArcade();
+  frank=createFrankStory();
+  frankVoiceAt=0;
+  frankTouchPress=false;
+  frankTouchMove={x:0,y:0};
+  frankTouchAim=undefined;
+  frankTouchButtons=0;
+  frankTouchSilk=false;
   song.stop();
   arcadeMusic.stop();
   shell.dataset.arcade='true';
@@ -317,7 +334,6 @@ function startArcade() {
   captions('');
   keyboardButtons=0;
   pendingButtons=0;
-  arcadeAxesReady=false;
   say('');
   syncPause();
 }
@@ -338,30 +354,119 @@ function arcadeFeedback(event:ArcadeEvent) {
   else audio.play(arcadeSounds[event]);
 }
 
-function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined,rawAim:Point,buttons:number,frozen:boolean) {
-  if (!frozen) {
-    const waiting=run.phase==='ready';
-    if (!waiting || Math.max(Math.hypot(move.x,move.y),Math.hypot(rawAim.x,rawAim.y))<.26) arcadeAxesReady=true;
-    const startAxes=arcadeAxesReady && Math.max(Math.hypot(move.x,move.y),Math.hypot(rawAim.x,rawAim.y))>=.51;
-    const axes=waiting && !startAxes && !buttons ? [neutralStick,undefined] as const : [move,aim] as const;
+const frankTitle=get('frank-title'),frankDialogue=get('frank-dialogue'),frankNarration=get('frank-narration');
+const frankTouch=get('frank-touch');
+const coarsePointer=matchMedia('(pointer: coarse)');
+function hideFrankPanels() {
+  frankTitle.hidden=frankDialogue.hidden=frankNarration.hidden=frankTouch.hidden=true;
+}
+for (const panel of [frankDialogue,frankNarration]) panel.addEventListener('click',()=>{frankTouchPress=true;});
+for (const control of frankTouch.querySelectorAll<HTMLButtonElement>('button')) {
+  control.addEventListener('pointerdown',event=>{
+    control.setPointerCapture(event.pointerId);
+    if (control.dataset.move) {
+      const [x,y]=control.dataset.move.split(',').map(Number);
+      frankTouchMove={x,y};
+    }
+    const button=Number(control.dataset.action);
+    if (button) frankTouchButtons|=button;
+    if (button===2) frankTouchSilk=true;
+  });
+  control.addEventListener('lostpointercapture',()=>{
+    if (control.dataset.move) frankTouchMove={x:0,y:0};
+    if (control.dataset.action==='2') frankTouchSilk=false;
+  });
+}
+function aimFrankTouch(event:PointerEvent) {
+  if (event.pointerType!=='touch' || !arcade || frank?.phase!=='combat') return;
+  const rect=worldCanvas.getBoundingClientRect();
+  const x=(event.clientX-rect.left)*arcadeWidth/rect.width-arcade.movement.spider.x;
+  const y=(event.clientY-rect.top)*arcadeHeight/rect.height-arcade.movement.spider.y;
+  const length=Math.hypot(x,y);
+  if (length>2) frankTouchAim={x:x/length,y:y/length};
+}
+worldCanvas.addEventListener('pointerdown',event=>{
+  if (event.pointerType==='touch' && frank?.phase==='combat') worldCanvas.setPointerCapture(event.pointerId);
+  aimFrankTouch(event);
+});
+worldCanvas.addEventListener('pointermove',aimFrankTouch);
+
+function showFrankPanels(story:FrankStory,frozen:boolean) {
+  const chapter=frankChapters[story.chapter],line=frankLine(story);
+  frankTitle.hidden=story.phase!=='title' && story.phase!=='fade';
+  if (!frankTitle.hidden) {
+    frankTitle.textContent=story.phase==='fade' ? '' : story.chapter===0 ? 'FRANK WEBBIN — THE PERFECT CRIME\n'+chapter.title :
+      story.chapter===11 ? 'EPILOGUE\n'+chapter.title : `CHAPTER ${String(story.chapter).padStart(2,'0')}\n${chapter.location.toUpperCase()}\n${chapter.title}`;
+    frankTitle.style.opacity=String(story.phase==='fade' ? Math.min(1,story.elapsed/.5) :
+      Math.max(0,Math.min(1,story.elapsed/.3,(3-story.elapsed)/.3)));
+  }
+  frankTouch.hidden=story.phase!=='combat' || !coarsePointer.matches || frozen;
+  frankDialogue.hidden=!line || line.narration;
+  frankNarration.hidden=!line || !line.narration;
+  if (!line) return;
+  const panel=line.narration ? frankNarration : frankDialogue;
+  const name=line.speaker==='FRANK' ? 'Frank Webbin' : line.speaker==='STRANGER' ? 'Stranger' :
+    chapter.enemies.find(enemy=>enemy.name.toUpperCase().split(' ').includes(line.speaker))?.name??'Duke Wobbleknees';
+  const text=line.text.slice(0,Math.floor(story.reveal));
+  const speaker=panel.querySelector('strong')!,copy=panel.querySelector('span')!;
+  if (speaker.textContent!==name) speaker.textContent=name;
+  if (copy.textContent!==text) copy.textContent=text;
+}
+
+function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined,buttons:number,frozen:boolean) {
+  const story=frank!;
+  const combat=story.phase==='combat';
+  if (!frozen && combat) {
+    const input=arenaInput(frankTouchMove.x || frankTouchMove.y ? frankTouchMove : move,aim??frankTouchAim);
     pendingButtons|=buttons;
-    const input=arenaInput(...axes);
     remainder+=elapsed;
     while (remainder>=arenaStep) {
       remainder-=arenaStep;
       input[4]=pendingButtons;
       pendingButtons=0;
-      const intro=run.intro;
-      advanceArcade(run,input,arcadeFeedback);
-      if (intro && !run.intro) {
-        // Present the starting pose before advancing another physics step.
+      advanceArcade(run,input,arcadeFeedback,true);
+      if (run.intro) {
+        // The original loss/retry path rebuilt level one.
+        run.intro=undefined;
+        run.phase='ready';
+        Object.assign(story,createFrankStory());
+        remainder=0;
+        break;
+      }
+      if (run.phase==='won' || run.lives>0 && run.phase==='wave' && run.flies.length===0) {
+        frankPhase(story,'setup');
+        frankTouchMove={x:0,y:0};
+        frankTouchSilk=false;
+        frankTouchAim=undefined;
         remainder=0;
         break;
       }
     }
+  } else if (!frozen) {
+    pendingButtons=0;
+    remainder=0;
+    const chapter=story.chapter,phase=story.phase,old=story.reveal,line=frankLine(story);
+    const press=frankTouchPress || !!(buttons&arcadeEscapeButton);
+    tickFrank(story,elapsed,press);
+    if (line && line===frankLine(story) && !press && Math.floor(old/2)<Math.floor(story.reveal/2) && story.reveal<line.text.length && performance.now()>=frankVoiceAt) {
+      const char=line.text.charAt(Math.floor(story.reveal)-1);
+      if (/\w/.test(char)) frankVoice(contextAudio,line.speaker,Number(effectsVolume.value)/100);
+      frankVoiceAt=performance.now()+46;
+    }
+    if (chapter!==story.chapter && story.chapter<=arcadeLevels) loadArcadeChapter(run,story.chapter);
+    if (phase!=='combat' && story.phase==='combat') {
+      run.phase=run.boss ? 'boss' : 'wave';
+      run.intro=undefined;
+      pendingButtons=0;
+    }
+    if (phase!=='complete' && story.phase==='complete') {
+      try {localStorage.setItem(frankCompletionKey,'true');} catch { /* Storage may be unavailable. */ }
+    }
   }
-  const finished=run.phase==='won';
-  if (run.phase!=='ready') arcadeMusic.sync(contextAudio,run.level,frozen && !finished || document.hidden || paused,!!run.intro);
+  frankTouchPress=false;
+  showFrankPanels(story,frozen);
+  const finished=story.phase==='complete';
+  arcadeMusic.sync(contextAudio,run.level,frozen && !finished || document.hidden || paused,story.phase!=='combat');
   const level=get('arcade-level'),label=`Level ${run.level} / ${arcadeLevels}`;
   if (level.textContent!==label) level.textContent=label;
   const nets=get('arcade-webs');
@@ -379,12 +484,12 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
   }
   const beat=reduced() ? 0 : arcadeMusic.pulse;
   if (finished && defeat.hidden) {
-    get('defeat-title').textContent='Arcade cleared';
+    get('defeat-title').textContent='The Wanted Spider';
     get('endless-status').textContent=`Level ${run.level} / ${arcadeLevels}`;
     defeat.hidden=false;
     defeatChoices.select(0,true);
   }
-  renderArcade(context,run,beat,reduced());
+  renderArcade(context,run,beat,reduced(),story);
 }
 
 function syncPause() {
@@ -425,9 +530,10 @@ window.addEventListener('keydown',event => {
     event.preventDefault();
   }
   if (!pausePanel.open && shell.dataset.screen==='game' && !dialogOpen() && !windowDefeat.open && defeat.hidden) {
-    if (arcade?.intro && event.code==='Enter' && !event.repeat) {
+    if (arcade && frank?.phase!=='combat' && (event.code==='Enter' || event.code==='Space') && !event.repeat) {
       keyboardButtons|=arcadeEscapeButton;
       event.preventDefault();
+      return;
     }
     if (/^(Key[WASDZXCGVQ]|Arrow(Up|Down|Left|Right))$/.test(event.code)) {
       keyboard.add(event.code);
@@ -854,11 +960,11 @@ function frame(time: number) {
     return;
   }
   if (arcade) {
-    const rawAim=keys.aim??(gamepad ? {x:gamepad.axes[2]??0,y:gamepad.axes[3]??0} : neutralStick);
-    const held=keyboard.has('KeyX') || !!gamepad?.buttons[5]?.pressed;
-    const release=(arcade.silkHeld || input?.fire || actions&2) && !held ? releaseSilkButton : 0;
-    const buttons=actions|(input?.jump ? 1 : 0)|(input?.fire ? 2 : 0)|release|(!navigation && crossPressed ? arcadeEscapeButton : 0);
-    arcadeFrame(arcade,elapsed,move,keys.aim??input?.aim,rawAim,buttons,
+    const held=keyboard.has('KeyX') || !!gamepad?.buttons[5]?.pressed || frankTouchSilk;
+    const release=(arcade.silkHeld || input?.fire || (actions|frankTouchButtons)&2) && !held ? releaseSilkButton : 0;
+    const buttons=actions|frankTouchButtons|(input?.jump ? 1 : 0)|(input?.fire ? 2 : 0)|release|(!navigation && crossPressed ? arcadeEscapeButton : 0);
+    frankTouchButtons=0;
+    arcadeFrame(arcade,elapsed,move,keys.aim??input?.aim,buttons,
       paused || !!navigation || dialogOpen() || document.hidden);
     requestAnimationFrame(frame);
     return;

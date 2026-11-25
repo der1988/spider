@@ -331,3 +331,28 @@ dialog h2 { margin: 0; font-size: 16px; }
 @media (max-height: 320px) {
   .shell[data-arcade] { --arcade-hud-height: 27px; }
 }
+
+.shell[data-arcade] {
+  --frank-rail: clamp(76px, 17dvh, 105px);
+  --arcade-view-height: max(0px, calc(100dvh - var(--frank-rail) - var(--arcade-hud-height) - 2 * var(--arcade-padding) - 2 * var(--arcade-gap)));
+  grid-template-rows: var(--arcade-hud-height) auto var(--frank-rail);
+}
+.shell[data-arcade] footer { display: block; }
+.shell[data-arcade] footer > :not(#frank-narration):not(#frank-touch) { display: none; }
+.frank-title:not([hidden]) {
+  position: absolute; inset: 0; display: grid; place-content: center;
+  text-align: center; white-space: pre-line; padding: 12px;
+  color: #f7edd0; background: #151b18b8; pointer-events: none;
+  font: bold clamp(11px, 2.7vw, 22px)/1.4 monospace;
+}
+.frank-dialogue, .frank-narration {
+  color: #f7edd0; background: #17251ef7; border: 1px solid #72856a;
+  text-align: left; font-size: clamp(10px, 2.5vw, 14px); line-height: 1.28;
+  padding: 5px 8px; white-space: normal; touch-action: manipulation;
+}
+.frank-dialogue { position: absolute; inset: auto 2% 4%; width: 96%; }
+.frank-narration { width: 100%; min-height: 100%; }
+:is(.frank-dialogue,.frank-narration) strong { display: block; color: #acd6ac; margin-bottom: 2px; }
+#frank-touch:not([hidden]) { display: flex; flex-wrap: wrap; gap: 4px; }
+#frank-touch button { min-width: 35px; min-height: 28px; touch-action: none; }
+.shell[data-arcade] .stage { touch-action: none; }

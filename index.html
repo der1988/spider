@@ -61,6 +61,8 @@
   <div class="playfield">
     <section class="stage" aria-label="Hunting arena">
     <canvas id="world" width="360" height="204" aria-label="Spider, fly and webs"></canvas>
+    <div id="frank-title" class="frank-title" hidden></div>
+    <button id="frank-dialogue" class="frank-dialogue" type="button" hidden><strong></strong><span></span></button>
     <section id="loop-defeat" class="defeat" aria-labelledby="defeat-title" hidden>
       <div class="defeat-panel">
         <h2 id="defeat-title">Arcade cleared</h2>
@@ -74,6 +76,12 @@
     </section>
   </div>
   <footer>
+    <button id="frank-narration" class="frank-narration" type="button" hidden><strong></strong><span></span></button>
+    <div id="frank-touch" hidden>
+      <button type="button" data-move="-1,0" aria-label="Move left">←</button><button type="button" data-move="1,0" aria-label="Move right">→</button>
+      <button type="button" data-move="0,-1" aria-label="Climb">↑</button><button type="button" data-move="0,1" aria-label="Descend">↓</button>
+      <button type="button" data-action="1">Jump</button><button type="button" data-action="2">Silk</button><button type="button" data-action="4">Break free</button>
+    </div>
     <section id="open-goal" class="open-goal" aria-label="Nest supplies" hidden>
       <strong>Stock the nest</strong>
       <span id="nest-common" data-tier="common">Common</span>
