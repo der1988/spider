@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {advanceArcade,arcadeDirectHits,arcadeEscapeButton,arcadeEscapePresses,arcadeLayouts,arcadeWebLimit,createArcade} from '../src/arcade.ts';
-import {arcadeFrame,arcadeHeight,arcadeScenes,arcadeSpawns} from '../src/arcade-scenery.ts';
+import {arcadeFrame,arcadeHeight,arcadeRivalStage,arcadeScenes,arcadeSpawns} from '../src/arcade-scenery.ts';
 import {advanceSilk,launchSilk} from '../src/arcade-silk.ts';
-import {sweptHit} from '../src/threads.ts';
+import {crossesSolid,sweptHit} from '../src/threads.ts';
 import {arenaInput,arenaStep,releaseSilkButton} from '../src/arena-run.ts';
 import {arcadeLevels,campaign,insectMark,levelIntroDuration,lineAt} from '../src/arcade-dialogue.ts';
 
@@ -659,6 +659,29 @@ test('the rival takes one hit per trap and four hits clear level ten',()=>{
     }
   }
   assert.equal(run.phase,'won');
+});
+
+test('the smaller rival clears Moonflower perches and casts anchored webs during the fight',()=>{
+  const run=createArcade(10);
+  start(run);
+  run.invincible=20;
+  const boss=run.boss!,{surfaces}=run.movement.hunt;
+  const {halfWidth,head,feet}=arcadeRivalStage;
+  let distance=0,casts=0;
+  for (let frame=0;frame<12/arenaStep;frame++) {
+    const from=boss.p;
+    advanceArcade(run,neutral,event=>{if (event==='fix') casts++;});
+    const {x,y}=boss.p;
+    distance+=Math.hypot(x-from.x,y-from.y);
+    for (const solid of surfaces) {
+      const free=x+halfWidth<=solid.x+.15 || x-halfWidth>=solid.x+solid.w-.15 ||
+        y+feet<=solid.y+.15 || y-head>=solid.y+solid.h-.15;
+      assert.ok(free,`Rival overlaps a perch at ${x}, ${y}`);
+    }
+    for (const web of run.rivalWebs) assert.ok(surfaces.every(solid=>!crossesSolid(web.from,web.to,solid)));
+  }
+  assert.ok(distance>250);
+  assert.ok(casts>=2);
 });
 
 test('rival silk still requires five escape inputs',()=>{

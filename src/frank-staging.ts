@@ -23,9 +23,9 @@ export function frankStrangerPose(story:FrankStory) {
 }
 
 export function frankDukePose(story:FrankStory,battleX:number) {
-  const {perch,start}=arcadeRivalStage;
-  // At triple scale the feet span up to 21 pixels to either side.
-  const left=perch.x+22,right=perch.x+perch.w-22;
+  const {perch,start,halfWidth}=arcadeRivalStage;
+  const margin=halfWidth+1; // A pixel for the speaking animation.
+  const left=perch.x+margin,right=perch.x+perch.w-margin;
   const from=story.phase==='setup' ? Math.max(left,Math.min(right,battleX)) : right;
   const seconds=story.phase==='setup' || story.phase==='before' ? story.elapsed :
     story.phase==='title' ? 0 : Infinity;

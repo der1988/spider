@@ -469,11 +469,11 @@ export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:nu
     }
   }
   if (boss) {
-    const {p,target,phase,size,hp,max}=boss;
+    const {p,target,phase,hp,max}=boss;
+    const {scale,head}=arcadeRivalStage;
     if (phase==='warn' && boss.shot) web(ctx,boss.shot,clock,ink,true,true);
     ctx.save();
     ctx.translate(Math.round(p.x),Math.round(p.y));
-    const scale=Math.round(size/7);
     ctx.scale(scale,scale);
     drawSpider(ctx,{...spider,x:0,y:0,rope:undefined,support:'floor',facing:target.x<=p.x ? -1 : 1,
       vx:phase==='charge' ? 80 : 0,vy:0,grounded:true},clock,{time:clock,beat:0},phase==='warn' ? 'aim' : phase==='trapped' ? 'yield' : 'take');
@@ -481,7 +481,7 @@ export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:nu
     block(ctx,0,-7,5,1,'#f2c77c');
     block(ctx,0,-8,1,1,'#fff4a9');block(ctx,2,-9,1,2,'#fff4a9');block(ctx,4,-8,1,1,'#fff4a9');
     ctx.restore();
-    const healthY=Math.max(arcadeFrame[0].h+2,p.y-size-18);
+    const healthY=Math.max(arcadeFrame[0].h+2,p.y-head-7);
     for (let i=0;i<max;i++) block(ctx,p.x-max*2+i*4,healthY,3,3,i<hp ? '#902f37' : ink);
     if (phase==='trapped') {
       const left=boss.at-clock;

@@ -30,7 +30,7 @@ type DodgeStyle='zigzag'|'lift'|'feint';
 type Dodge={from:Point;to:Point;start:number;end:number;style:DodgeStyle};
 type Fly={dodge?:Dodge;dodgeAfter:number;silkHits:number;struckUntil:number;safeUntil:number;
   cocoon?:{struckAt:number;landed:boolean};phase:FlightPhase;phaseAt:number;feinted?:boolean;p:Point;v:Point;target:Point;kind:number;actor:number;age:number;aimAt:number;caughtUntil:number;trappedBy?:Strand;touching:boolean};
-type Boss={p:Point;target:Point;hp:number;max:number;size:number;phase:'warn'|'charge'|'recover'|'trapped';at:number;turn:number;side:number;repeated:number;shot?:Strand;net?:Strand;hit:boolean};
+type Boss={p:Point;target:Point;hp:number;max:number;phase:'warn'|'charge'|'recover'|'trapped';at:number;turn:number;side:number;repeated:number;shot?:Strand;net?:Strand;hit:boolean};
 export type ArcadeEvent=ArenaEvent|'launch'|'entrance'|'recover'|'boss'|'boss-trap'|'boss-free'|'snared'|'escape-step'|'escape'|'hit'|'silk-hit'|'win'|'hurt';
 const len=(p:Point)=>Math.hypot(p.x,p.y);
 const sub=(a:Point,b:Point)=>({x:a.x-b.x,y:a.y-b.y});
@@ -90,7 +90,7 @@ function prepareLevel(run:ArcadeRun) {
   run.idle=0;
   run.silkHeld=false;run.silkShots=[];run.ropeWeb=undefined;
   const p={...arcadeRivalStage.start};
-  run.boss=final ? {p,target:p,hp:4,max:4,size:18,phase:'recover',at:0,turn:0,side:0,repeated:0,hit:false} : undefined;
+  run.boss=final ? {p,target:p,hp:4,max:4,phase:'recover',at:0,turn:0,side:0,repeated:0,hit:false} : undefined;
   if (final && run.phase!=='ready') run.phase='boss';
   run.rivalWebs=[];run.snare=undefined;
 }
@@ -459,12 +459,17 @@ function warnBoss(run:ArcadeRun,boss:Boss) {
   const predicted=track ? .29 : 0;
   const intercept=spider.vx*predicted;
   const hop=boss.turn%3===0 || boss.repeated>=2;
-  const size=boss.size+7;
-  const goal={x:clamp(spider.x+intercept,size,arcadeWidth-size),
+  const {halfWidth,head,feet}=arcadeRivalStage;
+  const margin=arcadeRim+halfWidth;
+  const goal={x:clamp(spider.x+intercept,margin,arcadeWidth-margin),
     y:hop ? 88+(boss.turn%2)*40 : clamp(spider.y+spider.vy*predicted,42,200)};
+  // Grow the solids by Duke's footprint so a clear route fits his whole sprite.
+  const borders=hunt.surfaces.map(({x,y,w,h})=>({
+    x:x-halfWidth,y:y-feet,w:w+2*halfWidth,h:h+feet+head,
+  }));
   let target=goal;
-  if (!clear(boss.p,goal,hunt.surfaces)) {
-    target=airNodes.filter(node=>dist(node,boss.p)>24 && clear(boss.p,node,hunt.surfaces))
+  if (!clear(boss.p,goal,borders)) {
+    target=airNodes.filter(node=>dist(node,boss.p)>24 && clear(boss.p,node,borders))
       .sort((a,b)=>dist(a,goal)-dist(b,goal))[0]??boss.p;
   }
   boss.target=target;
@@ -476,7 +481,7 @@ function warnBoss(run:ArcadeRun,boss:Boss) {
 function tickBoss(run:ArcadeRun,emit:(event:ArcadeEvent)=>void) {
   const boss=run.boss!;
   const {spider,hunt}=run.movement;
-  const touches=()=>dist(boss.p,spider)<boss.size+SPIDER_HALF_WIDTH && clear(boss.p,spider,hunt.surfaces);
+  const touches=()=>dist(boss.p,spider)<arcadeRivalStage.contactRadius+SPIDER_HALF_WIDTH && clear(boss.p,spider,hunt.surfaces);
   if (boss.phase==='trapped') {
     if (run.clock>=boss.at || boss.net && !hunt.strands.includes(boss.net)) {
       hunt.strands=hunt.strands.filter(web=>web!==boss.net);

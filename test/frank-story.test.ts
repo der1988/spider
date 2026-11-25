@@ -79,7 +79,7 @@ test('the Stranger walks in, talks and walks out along the prologue platform',()
 
 test('Duke stages both conversations on the same perch as the fight entrance',()=>{
   const story=createFrankStory(10),run=createArcade(10);
-  const {perch,scale,start}=arcadeRivalStage;
+  const {perch,feet,halfWidth,start}=arcadeRivalStage;
   assert.ok(run.movement.hunt.surfaces.includes(perch));
   assert.deepEqual(run.boss?.p,start);
   for (const phase of ['title','before','setup','after'] as const) {
@@ -88,8 +88,8 @@ test('Duke stages both conversations on the same perch as the fight entrance',()
       story.elapsed=frame/120;
       for (const battleX of [45,348,380]) {
         const pose=frankDukePose(story,battleX);
-        assert.equal(pose.y+7*scale,perch.y);
-        assert.ok(pose.x-7*scale>=perch.x && pose.x+7*scale<=perch.x+perch.w);
+        assert.equal(pose.y+feet,perch.y);
+        assert.ok(pose.x-halfWidth>=perch.x && pose.x+halfWidth<=perch.x+perch.w);
       }
     }
     if (phase!=='title') assert.equal(frankDukePose(story,348).x,start.x);
