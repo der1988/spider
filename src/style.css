@@ -343,13 +343,10 @@ dialog h2 { margin: 0; font-size: 16px; }
   gap: 4px clamp(8px, 2cqw, 24px); padding-inline: clamp(4px, 1.5cqw, 20px);
   text-align: left;
 }
-.frank-chapter-info { display: grid; gap: 3px; overflow-wrap: anywhere; }
-#arcade-chapter { color: #f2f4d6; font-size: clamp(16px, 3.5cqw, 25px); font-weight: 800; line-height: 1.05; }
-#arcade-location { color: #bacfa6; font-size: clamp(12px, 2.6cqw, 18px); line-height: 1.2; }
 #arcade-lives { color: #ffc1a8; font-size: clamp(28px, 7cqw, 52px); letter-spacing: .06em; line-height: 1; white-space: nowrap; }
 #arcade-targets {
   --frank-target-size: clamp(28px, 4.4cqw, 52px);
-  grid-column: 1 / -1; display: flex; gap: clamp(3px, .7cqw, 10px);
+  min-width: 0; display: flex; gap: clamp(3px, .7cqw, 10px);
   list-style: none; margin: 0; padding: 0;
 }
 .frank-target {
@@ -358,7 +355,7 @@ dialog h2 { margin: 0; font-size: 16px; }
   text-align: center; overflow-wrap: anywhere;
 }
 .frank-target .frank-portrait { width: var(--frank-target-size); }
-.frank-target-name { color: #e1e7c5; font-size: clamp(9px, 1.2cqw, 12px); line-height: 1.16; }
+.frank-target-name { color: #e1e7c5; font-size: clamp(10px, 1.45cqw, 16px); line-height: 1.16; }
 .frank-captured-mark { display: none; }
 .frank-target[data-captured] .frank-portrait::before { opacity: .46; }
 .frank-target[data-captured] .frank-captured-mark {
@@ -424,7 +421,6 @@ dialog h2 { margin: 0; font-size: 16px; }
 #frank-touch:not([hidden]) { display: flex; flex-wrap: wrap; gap: 4px; }
 #frank-touch button { min-width: 34px; min-height: 26px; touch-action: none; }
 @container (max-width: 355px) {
-  .frank-chapter-info { gap: 1px; }
   #frank-touch:not([hidden]) { gap: 3px; }
   #frank-touch button { min-width: 28px; min-height: 30px; padding-inline: 3px; font-size: 11px; }
 }

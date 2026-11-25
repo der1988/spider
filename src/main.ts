@@ -358,7 +358,7 @@ function arcadeFeedback(event:ArcadeEvent) {
 const frankTitle=get('frank-title'),frankNarration=get('frank-narration');
 const frankTouch=get('frank-touch'),frankPanel=get('frank-panel');
 const frankScene=get('frank-scene'),frankHud=get('arcade-summary');
-const frankChapterName=get('arcade-chapter'),frankLocation=get('arcade-location'),frankLives=get('arcade-lives');
+const frankLives=get('arcade-lives');
 const frankCast=get('frank-cast'),frankTargets=get('arcade-targets');
 const frankSpeaker=get('frank-speaker'),frankSpeakerName=get('frank-speaker-name'),frankPortraitBox=get('frank-portrait');
 const coarsePointer=matchMedia('(pointer: coarse)');
@@ -457,10 +457,6 @@ function showFrankPanels(story:FrankStory,frozen:boolean) {
   frankPanel.hidden=false;
   frankPanel.toggleAttribute('data-still',reduced() || frozen);
   frankHud.hidden=!showHud;
-  if (showHud) {
-    if (frankChapterName.textContent!==chapter.title) frankChapterName.textContent=chapter.title;
-    if (frankLocation.textContent!==chapter.location) frankLocation.textContent=chapter.location;
-  }
   frankScene.hidden=showHud;
   frankCast.hidden=story.phase!=='title';
   if (!frankCast.hidden) showFrankCast(story.chapter);
