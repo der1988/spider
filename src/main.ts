@@ -1,6 +1,6 @@
-import {frankPortrait} from './frank-portrait';
+import {frankPortraitPosition} from './frank-portrait';
 import {frankChapters} from './frank-script';
-import {createFrankStory,frankCompletionKey,frankLine,frankPhase,frankVoice,tickFrank,type FrankStory} from './frank-story';
+import {createFrankStory,frankCastNames,frankCompletionKey,frankLine,frankPhase,frankSpeakerIdentity,frankVoice,tickFrank,type FrankStory} from './frank-story';
 import './style.css';
 import {createOpenWorld,createWindowHunt,pantryTiers,preyTier,restartOpenWorld,stepWindowHunt,updateHuntZoom,roomHeight,roomWidth,breakFreePresses,type CornerInput,type WindowRun} from './window-hunt';
 import {renderWindowHunt} from './window-hunt-render';
@@ -358,6 +358,7 @@ function arcadeFeedback(event:ArcadeEvent) {
 const frankTitle=get('frank-title'),frankNarration=get('frank-narration');
 const frankTouch=get('frank-touch'),frankPanel=get('frank-panel');
 const frankScene=get('frank-scene'),frankHud=get('arcade-summary');
+const frankCast=get('frank-cast');
 const frankSpeaker=get('frank-speaker'),frankSpeakerName=get('frank-speaker-name'),frankPortraitBox=get('frank-portrait');
 const coarsePointer=matchMedia('(pointer: coarse)');
 function hideFrankPanels() {
@@ -397,6 +398,21 @@ worldCanvas.addEventListener('pointerdown',event=>{
 });
 worldCanvas.addEventListener('pointermove',aimFrankTouch);
 
+function showFrankCast(chapter:number) {
+  const key=String(chapter);
+  if (frankCast.dataset.chapter===key) return;
+  frankCast.dataset.chapter=key;
+  frankCast.replaceChildren(...frankCastNames(chapter).map(name=>{
+    const portrait=document.createElement('span');
+    portrait.className='frank-portrait';
+    portrait.role='img';
+    portrait.setAttribute('aria-label',name);
+    portrait.title=name;
+    portrait.style.setProperty('--frank-portrait-position',frankPortraitPosition(name)??'0% 0%');
+    return portrait;
+  }));
+}
+
 function showFrankPanels(story:FrankStory,frozen:boolean) {
   const chapter=frankChapters[story.chapter],line=frankLine(story);
   frankTitle.hidden=story.phase!=='title' && story.phase!=='fade';
@@ -411,18 +427,20 @@ function showFrankPanels(story:FrankStory,frozen:boolean) {
   frankPanel.toggleAttribute('data-still',reduced() || frozen);
   frankHud.hidden=!combat;
   frankScene.hidden=combat;
+  frankCast.hidden=story.phase!=='title';
+  if (!frankCast.hidden) showFrankCast(story.chapter);
   frankTouch.hidden=!combat || !coarsePointer.matches || frozen;
   frankNarration.hidden=!line?.narration;
   frankSpeaker.hidden=!line || line.narration;
   if (!line) return;
-  const enemy=chapter.enemies.find(enemy=>enemy.name.toUpperCase().split(' ').includes(line.speaker));
-  const name=line.speaker==='FRANK' ? 'Frank Webbin' : line.speaker==='STRANGER' ? 'Stranger' : enemy?.name??'Duke Wobbleknees';
+  const name=frankSpeakerIdentity(story.chapter,line.speaker);
   if (!line.narration) {
     if (frankSpeakerName.textContent!==name) {
       frankSpeakerName.textContent=name;
       frankSpeaker.setAttribute('aria-label',`${name} · Advance dialogue`);
-      const portrait=frankPortrait(line.speaker,enemy?.species,name);
-      frankPortraitBox.innerHTML=portrait+portrait.replace('<svg ','<svg class="frank-portrait-echo" ');
+      const position=frankPortraitPosition(name);
+      if (position) frankPortraitBox.style.setProperty('--frank-portrait-position',position);
+      frankPortraitBox.hidden=!position;
     }
     return;
   }

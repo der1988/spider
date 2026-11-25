@@ -16,6 +16,7 @@
 <link rel="apple-touch-icon" href="./touch.png">
 <link rel="icon" href="./favicon.ico" sizes="any">
 <link rel="icon" href="./spider-vs-fly-32.png" type="image/png" sizes="32x32">
+<link rel="preload" href="/frank-cast.png" as="image">
 <title>SPIDER vs FLY</title>
 </head>
 <body>
@@ -82,9 +83,10 @@
         <button type="button" data-action="1">Jump</button><button type="button" data-action="2">Silk</button><button type="button" data-action="4">Break free</button>
       </div>
       <span id="frank-scene" role="status" hidden>Cutscene · Controls paused</span>
+      <div id="frank-cast" role="group" aria-label="Chapter cast" hidden></div>
       <button id="frank-narration" class="frank-narration" type="button" hidden><strong></strong><span></span></button>
       <button id="frank-speaker" type="button" hidden>
-        <span id="frank-portrait" aria-hidden="true"></span>
+        <span id="frank-portrait" class="frank-portrait" aria-hidden="true"></span>
         <strong id="frank-speaker-name"></strong>
       </button>
     </section>

@@ -342,18 +342,30 @@ dialog h2 { margin: 0; font-size: 16px; }
   min-height: 0; padding: 0; border: 0; background: transparent;
   text-align: left; color: #f7edd0; font-size: clamp(12px, 2.7vw, 18px);
 }
-#frank-portrait {
-  display: grid; flex: 0 0 auto; width: clamp(60px, 12dvh, 86px); aspect-ratio: 1;
+#frank-cast:not([hidden]) { display: flex; justify-content: center; gap: clamp(4px, 1vw, 10px); }
+.frank-portrait:not([hidden]) {
+  display: grid; aspect-ratio: 1; min-width: 0;
   overflow: hidden; background: repeating-linear-gradient(#33483b 0 4px, #2b4034 4px 5px);
   border: 1px solid #7b9274;
 }
-#frank-portrait svg {
-  grid-area: 1 / 1; width: 100%; height: 100%; min-width: 0; min-height: 0;
-  align-self: end;
+#frank-portrait { flex: 0 0 auto; width: min(86px, calc(var(--frank-rail) - 25px)); }
+#frank-cast .frank-portrait { width: min(66px, calc(var(--frank-rail) - 25px)); }
+.frank-portrait::before, .frank-portrait::after {
+  content: ''; grid-area: 1 / 1;
+  background: url('/frank-cast.png') var(--frank-portrait-position, 0% 0%) / 600% 500% no-repeat;
+  image-rendering: pixelated;
 }
-.frank-portrait-echo { visibility: hidden; }
-#frank-panel:not([data-still]) #frank-portrait .frank-portrait-echo {
-  visibility: visible; animation: frank-distortion 2.1s steps(1) infinite;
+.frank-portrait::after { visibility: hidden; }
+#frank-panel:not([data-still]) .frank-portrait::before {
+  animation: frank-portrait-bob 2.1s steps(1) infinite;
+}
+#frank-panel:not([data-still]) .frank-portrait::after {
+  visibility: visible;
+  animation: frank-portrait-bob 2.1s steps(1) infinite, frank-distortion 2.1s steps(1) infinite;
+}
+@keyframes frank-portrait-bob {
+  0%, 64%, 100% { translate: 0 0; }
+  15%, 48% { translate: 0 -1px; }
 }
 @keyframes frank-distortion {
   0%, 20%, 64%, 100% { clip-path: inset(0 0 100%); }
@@ -361,7 +373,8 @@ dialog h2 { margin: 0; font-size: 16px; }
   13%, 58%, 68% { clip-path: inset(58% 0 28%); transform: translateX(-3px); }
 }
 @media (prefers-reduced-motion: reduce) {
-  #frank-panel #frank-portrait .frank-portrait-echo { display: none; }
+  #frank-panel:not([data-still]) .frank-portrait::before { animation: none; }
+  .frank-portrait::after { display: none; }
 }
 .frank-title:not([hidden]) {
   position: absolute; inset: 0; display: grid; place-content: center;

@@ -43,6 +43,21 @@ export function frankSpeakerIndex(chapter:number,speaker:string) {
   return frankChapters[chapter].enemies.findIndex(enemy=>enemy.name.toUpperCase().split(' ').includes(speaker));
 }
 
+const frankNamedSpeakers:Record<string,string|undefined>={
+  FRANK:'Frank Webbin',STRANGER:'The Stranger',DUKE:'Duke Wobbleknees',
+};
+
+export function frankSpeakerIdentity(chapter:number,speaker:string) {
+  return frankNamedSpeakers[speaker] ?? frankChapters[chapter].enemies[frankSpeakerIndex(chapter,speaker)]?.name ?? speaker;
+}
+
+export function frankCastNames(chapter:number) {
+  if (chapter===0) return ['FRANK','STRANGER'].map(speaker=>frankSpeakerIdentity(chapter,speaker));
+  if (chapter===10) return [frankSpeakerIdentity(chapter,'DUKE')];
+  if (chapter===11) return [frankSpeakerIdentity(chapter,'FRANK')];
+  return frankChapters[chapter].enemies.map(enemy=>enemy.name);
+}
+
 export function frankVoice(context:AudioContext|undefined,speaker:string,volume:number) {
   if (!context || context.state!=='running' || volume<=0) return;
   const seed=[...speaker].reduce((sum,ch)=>Math.imul(sum,31)+ch.charCodeAt(0),0)>>>0;

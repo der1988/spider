@@ -14,7 +14,7 @@ export default defineConfig({
     apply: 'build',
     async writeBundle(options) {
       const dir = options.dir ?? 'dist';
-      const files = ['index.html', 'manifest.webmanifest', 'favicon.ico', 'spider-vs-fly-32.png', 'icon-192.png', 'icon-512.png', 'touch.png', 'the-fly-has-ai.mp3', 'the-fly-has-an-upgrade.mp3', 'the-room-has-a-space-bar.mp3', 'the-fly-is-you.mp3', 'infinite-loop.mp3', 'menusong.mp3'];
+      const files = ['index.html', 'manifest.webmanifest', 'favicon.ico', 'spider-vs-fly-32.png', 'icon-192.png', 'icon-512.png', 'touch.png', 'frank-cast.png', 'the-fly-has-ai.mp3', 'the-fly-has-an-upgrade.mp3', 'the-room-has-a-space-bar.mp3', 'the-fly-is-you.mp3', 'infinite-loop.mp3', 'menusong.mp3'];
       const digest = createHash('sha256');
       for (const file of files) digest.update(await readFile(resolve(dir, file)));
       const worker = resolve(dir, 'sw.js');

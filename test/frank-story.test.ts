@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {frankChapters} from '../src/frank-script.ts';
-import {createFrankStory,frankLine,frankPhase,frankSpeakerIndex,tickFrank} from '../src/frank-story.ts';
+import {frankPortraitPosition} from '../src/frank-portrait.ts';
+import {createFrankStory,frankCastNames,frankLine,frankPhase,frankSpeakerIdentity,frankSpeakerIndex,tickFrank} from '../src/frank-story.ts';
 import {advanceArcade,arcadeDirectHits,createArcade,loadArcadeChapter,species} from '../src/arcade.ts';
 import {arenaInput} from '../src/arena-run.ts';
 
@@ -16,6 +17,17 @@ test('campaign data uses the existing roster, resistance and known speakers',()=
     assert.deepEqual(chapter.enemies.map(f=>f.species),run.flies.map(f=>species[f.kind][0]));
     assert.deepEqual(chapter.enemies.map(f=>f.hits),run.flies.map(f=>arcadeDirectHits(i,f.actor)));
   }
+});
+
+test('every cast member has a distinct portrait in the atlas',()=>{
+  const names=[...new Set(frankChapters.flatMap((_,chapter)=>frankCastNames(chapter)))];
+  assert.equal(names.length,30);
+  const positions=names.map(frankPortraitPosition);
+  assert.ok(positions.every(Boolean));
+  assert.equal(new Set(positions).size,30);
+  frankChapters.forEach(({before,after},chapter)=>{
+    for (const line of [...before,...after]) assert.ok(names.includes(frankSpeakerIdentity(chapter,line.speaker)));
+  });
 });
 
 test('manual reveal takes two edges and all chapters advance through the epilogue',()=>{
