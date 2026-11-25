@@ -144,6 +144,10 @@ dialog h2 { margin: 0; font-size: 16px; }
   padding: 10px 24px; text-align: left; letter-spacing: .18em;
   font-size: clamp(16px,2.8vmin,22px); min-height: 44px;
 }
+.launch > .mode-choices #loop {
+  padding-inline-end: 8px; letter-spacing: .08em;
+  font-size: clamp(11px, 2.6vmin, 17px); white-space: nowrap;
+}
 .launch > .mode-choices button:hover { color: #eff3c8; }
 .launch > .mode-choices button[data-selected=true] {
   background: #263b2d; color: #eff3c8;
