@@ -4,7 +4,7 @@ export const frankCompletionKey='spider-vs-fly:frank-perfect-crime';
 export const frankMix={narrative:.30,combat:1};
 export type FrankPhase='title'|'before'|'combat'|'setup'|'after'|'fade'|'complete';
 export function createFrankStory(chapter=0) {
-  return {chapter,phase:'title' as FrankPhase,elapsed:0,lineIndex:0,reveal:0};
+  return {chapter,phase:'title' as FrankPhase,elapsed:0,lineIndex:0,lineElapsed:0,reveal:0};
 }
 export type FrankStory=ReturnType<typeof createFrankStory>;
 export const frankLine=(story:FrankStory):FrankLine|undefined=>
@@ -12,7 +12,7 @@ export const frankLine=(story:FrankStory):FrankLine|undefined=>
     story.phase==='after' ? frankChapters[story.chapter].after[story.lineIndex] : undefined;
 
 export function frankPhase(story:FrankStory,phase:FrankPhase) {
-  Object.assign(story,{phase,elapsed:0,lineIndex:0,reveal:0});
+  Object.assign(story,{phase,elapsed:0,lineIndex:0,lineElapsed:0,reveal:0});
 }
 
 export function tickFrank(story:FrankStory,dt:number,press:boolean) {
@@ -24,9 +24,11 @@ export function tickFrank(story:FrankStory,dt:number,press:boolean) {
     if (!line) {
       frankPhase(story,story.phase==='before' && story.chapter>0 && story.chapter<11 ? 'combat' : 'fade');
     } else {
+      story.lineElapsed+=dt;
       const complete=story.reveal>=line.text.length;
       if (press && complete) {
         story.lineIndex++;
+        story.lineElapsed=0;
         story.reveal=0;
         if (!frankLine(story)) frankPhase(story,story.phase==='before' && story.chapter>0 && story.chapter<11 ? 'combat' : 'fade');
       } else if (press) story.reveal=line.text.length;

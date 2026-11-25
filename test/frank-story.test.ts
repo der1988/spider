@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {frankChapters} from '../src/frank-script.ts';
 import {frankPortraitPosition} from '../src/frank-portrait.ts';
+import {frankDukePose,frankPrologueWalkway,frankStrangerPose} from '../src/frank-staging.ts';
 import {createFrankStory,frankCastNames,frankLine,frankPhase,frankSpeakerIdentity,frankSpeakerIndex,tickFrank} from '../src/frank-story.ts';
 import {advanceArcade,arcadeDirectHits,createArcade,loadArcadeChapter,species} from '../src/arcade.ts';
+import {arcadeRivalStage} from '../src/arcade-scenery.ts';
 import {arenaInput} from '../src/arena-run.ts';
 
 test('campaign data uses the existing roster, resistance and known speakers',()=>{
@@ -52,6 +54,46 @@ test('manual reveal takes two edges and all chapters advance through the epilogu
     tickFrank(story,.55,false);
   }
   assert.equal(story.phase,'complete');
+});
+
+test('the Stranger walks in, talks and walks out along the prologue platform',()=>{
+  const story=createFrankStory();
+  frankPhase(story,'before');
+  const walkway=frankPrologueWalkway;
+  story.lineIndex=3;
+  const entrance=frankStrangerPose(story)!;
+  tickFrank(story,0,true);
+  assert.deepEqual(frankStrangerPose(story),entrance);
+  for (const index of [3,4,frankChapters[0].before.length-1]) {
+    story.lineIndex=index;
+    for (let step=0;step<120;step++) {
+      story.lineElapsed=step/120;
+      const pose=frankStrangerPose(story)!;
+      assert.ok(pose.x-8>=walkway.x && pose.x+8<=walkway.x+walkway.w);
+      assert.equal(pose.y+7,walkway.y);
+    }
+  }
+  story.lineElapsed=1;
+  assert.equal(frankStrangerPose(story),undefined);
+});
+
+test('Duke stages both conversations on the same perch as the fight entrance',()=>{
+  const story=createFrankStory(10),run=createArcade(10);
+  const {perch,scale,start}=arcadeRivalStage;
+  assert.ok(run.movement.hunt.surfaces.includes(perch));
+  assert.deepEqual(run.boss?.p,start);
+  for (const phase of ['title','before','setup','after'] as const) {
+    frankPhase(story,phase);
+    for (let frame=0;frame<=120;frame++) {
+      story.elapsed=frame/120;
+      for (const battleX of [45,348,380]) {
+        const pose=frankDukePose(story,battleX);
+        assert.equal(pose.y+7*scale,perch.y);
+        assert.ok(pose.x-7*scale>=perch.x && pose.x+7*scale<=perch.x+perch.w);
+      }
+    }
+    if (phase!=='title') assert.equal(frankDukePose(story,348).x,start.x);
+  }
 });
 
 test('the campaign holds the chapter until recovery and preserves progress on transition',()=>{

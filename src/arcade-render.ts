@@ -1,6 +1,7 @@
 import {frankChapters} from './frank-script';
 import {frankLine,frankSpeakerIndex,type FrankStory} from './frank-story';
-import {arcadeFrame,arcadeLayouts,arcadeScenes} from './arcade-scenery';
+import {frankDukePose,frankPrologueWalkway,frankStrangerPose} from './frank-staging';
+import {arcadeFrame,arcadeLayouts,arcadeRivalStage,arcadeScenes} from './arcade-scenery';
 import {insectMark,lineAt} from './arcade-dialogue';
 import {rivalQuips} from './arcade-script';
 import {arcadeAttackStyle,arcadeDirectHits,arcadeEscapePresses,arcadeHeight,arcadeIdleSpeech,arcadeStage,arcadeWidth,bossTrapSeconds,species,flyEscapeGrace,flyTrapSeconds,type ArcadeRun} from './arcade';
@@ -226,9 +227,10 @@ function landscape(ctx:CanvasRenderingContext2D,stage:number,pulse:number,reduce
   ctx.restore();
 }
 
-function drawPerches(ctx:CanvasRenderingContext2D,stage:number,pulse:number) {
+function drawPerches(ctx:CanvasRenderingContext2D,stage:number,pulse:number,prologue:boolean) {
   const scene=arcadeScenes[stage],{ink,accent,light,base}=scene;
-  for (const [index,{x,y,w,h,form}] of arcadeLayouts[stage].entries()) {
+  for (const [index,perch] of arcadeLayouts[stage].entries()) {
+    const {x,y,w,h,form}=prologue && index===arcadeFrame.length ? frankPrologueWalkway : perch;
     block(ctx,x,y,w,h,ink);
     block(ctx,x+1,y+1,w-2,h-2,accent);
     if (index<arcadeFrame.length) {
@@ -298,14 +300,16 @@ function renderFrankScene(ctx:CanvasRenderingContext2D,run:ArcadeRun,story:Frank
   const x=hero.x+(base.x+base.w/2-hero.x)*progress,y=hero.y+(base.y-8-hero.y)*progress;
   drawSpider(ctx,{...hero,x:x+shake('FRANK'),y,vx:0,vy:0,rope:undefined,support:staged?'floor':hero.support},0,{time:0,beat:0});
   if (story.chapter===0) {
-    const leaving=story.lineIndex===chapter.before.length-1;
-    let guestX:number|undefined;
-    if (story.lineIndex>=3 && (!leaving || story.reveal<37)) {
-      guestX=leaving ? 108+story.reveal*3 : story.lineIndex===3 ? Math.max(108,145-story.reveal*2) : 108;
-      drawSpider(ctx,{...hero,x:guestX+shake('STRANGER'),y:hero.y,rope:undefined,facing:leaving?1:-1},0,{time:0,beat:0});
+    const guest=frankStrangerPose(story);
+    if (guest) {
+      const time=reducedMotion ? 0 : story.lineElapsed;
+      ctx.save();
+      ctx.globalAlpha=guest.opacity;
+      drawSpider(ctx,{...hero,...guest,x:guest.x+shake('STRANGER'),vy:0,grounded:true,support:'floor',rope:undefined},time,{time,beat:0});
+      ctx.restore();
     }
     if (story.lineIndex>=10) block(ctx,79,hero.y+3,6,4,'#e2cb90');
-    if (who==='STRANGER' && guestX!==undefined) speak({x:guestX,y:hero.y},'#ffd19a',15);
+    if (who==='STRANGER' && guest) speak(guest,'#ffd19a',15);
     else if (who==='FRANK') speak({x,y},'#82f7d1',15);
     return;
   }
@@ -319,20 +323,25 @@ function renderFrankScene(ctx:CanvasRenderingContext2D,run:ArcadeRun,story:Frank
     }
     return;
   }
+  if (run.boss) {
+    const rival=frankDukePose(story,run.boss.p.x);
+    drawFrankRival(ctx,hero,rival,shake('DUKE'),reducedMotion ? 0 : story.elapsed);
+    if (who==='FRANK') speak({x,y},'#82f7d1',15);
+    else if (who==='DUKE') speak(rival,'#ff88b8',35);
+    return;
+  }
   if (!staged) {
     for (const fly of run.flies) {
       const jitter=who && active===fly.actor ? shake(who) : 0;
       insect(ctx,{x:fly.p.x+jitter,y:fly.p.y},fly.kind,insectMark(run.level,fly.actor),0,true);
     }
-    if (run.boss) drawFrankRival(ctx,hero,run.boss.p,shake('DUKE'));
     const speaker=run.flies.find(fly=>fly.actor===active);
     if (who==='FRANK') speak({x,y},'#82f7d1',15);
-    else if (who==='DUKE' && run.boss) speak(run.boss.p,'#ff88b8',35);
     else if (speaker) speak(speaker.p,colors[speaker.kind],14);
     return;
   }
   const scene=arcadeScenes[run.level-1];
-  const count=chapter.enemies.length || 1;
+  const count=chapter.enemies.length;
   const strandAt=(y:number):Strand=>({from:{x:259,y},to:{x:392,y:y+30},shakeUntil:0});
   const wire=[114,132,153,65,28].map(strandAt).find(candidate=>run.movement.hunt.surfaces.every(r=>
     !crossesSolid(candidate.from,candidate.to,r) &&
@@ -343,11 +352,10 @@ function renderFrankScene(ctx:CanvasRenderingContext2D,run:ArcadeRun,story:Frank
     const target=prisonerPoint(wire,i);
     if (story.phase==='setup' && t===0) continue;
     const px=x+(target.x-x)*t,py=y+(target.y-y)*t-Math.sin(t*Math.PI)*36;
-    const jitter=who && (active===i || run.boss && who==='DUKE') ? shake(who) : 0;
+    const jitter=who && active===i ? shake(who) : 0;
     cocoon(ctx,{x:px+jitter,y:py},{x:0,y:0},scene.ink,scene.light,scene.accent,false);
   }
   if (who==='FRANK') speak({x,y},'#82f7d1',15);
-  else if (who==='DUKE' && run.boss) speak(prisonerPoint(wire,0),'#ff88b8',15);
   else if (active>=0) {
     const kind=species.findIndex(([name])=>name===chapter.enemies[active].species);
     speak(prisonerPoint(wire,active),colors[kind]??scene.light,15);
@@ -359,9 +367,10 @@ function prisonerPoint(wire:Strand,index:number) {
   return {x,y:wire.from.y+(x-wire.from.x)*(wire.to.y-wire.from.y)/(wire.to.x-wire.from.x)};
 }
 
-function drawFrankRival(ctx:CanvasRenderingContext2D,hero:ArcadeRun['movement']['spider'],p:Point,jitter:number) {
-  ctx.save();ctx.translate(Math.round(p.x)+jitter,Math.round(p.y));ctx.scale(3,3);
-  drawSpider(ctx,{...hero,x:0,y:0,support:'floor',rope:undefined,facing:-1},0,{time:0,beat:0});
+function drawFrankRival(ctx:CanvasRenderingContext2D,hero:ArcadeRun['movement']['spider'],p:ReturnType<typeof frankDukePose>,jitter:number,time:number) {
+  const {scale}=arcadeRivalStage;
+  ctx.save();ctx.translate(Math.round(p.x)+jitter,Math.round(p.y));ctx.scale(scale,scale);
+  drawSpider(ctx,{...hero,x:0,y:0,support:'floor',rope:undefined,facing:p.facing,grounded:true,vx:p.vx,vy:0},time,{time,beat:0});
   block(ctx,0,-7,5,1,'#f2c77c');
   block(ctx,0,-8,1,1,'#fff4a9');block(ctx,2,-9,1,2,'#fff4a9');block(ctx,4,-8,1,1,'#fff4a9');
   ctx.restore();
@@ -371,7 +380,7 @@ export function renderArcade(ctx:CanvasRenderingContext2D,run:ArcadeRun,pulse:nu
   const {movement:{spider,hunt,aim},clock,boss,snare}=run;
   const stage=arcadeStage(run.level),scene=arcadeScenes[stage],{ink,light}=scene;
   landscape(ctx,stage,pulse,reducedMotion);
-  drawPerches(ctx,stage,pulse);
+  drawPerches(ctx,stage,pulse,story?.chapter===0);
   if (story && story.phase!=='combat') {renderFrankScene(ctx,run,story,reducedMotion);return;}
   const speech=run.intro ? openingSpeech(ctx,run) : undefined;
   for (const net of hunt.strands) web(ctx,net,clock,ink);

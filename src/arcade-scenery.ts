@@ -8,6 +8,8 @@ type Scene={
   skyline:Form;landing:Perch;perches:Perch[];
 };
 const at=(form:Form,x:number,y:number,w:number,h=8):Perch=>({form,x,y,w,h,grip:true});
+const rivalPerch=at('branch',285,215,87,9);
+const rivalScale=3;
 
 export const arcadeFrame=[
   at('branch',0,0,arcadeWidth,arcadeRim),
@@ -45,9 +47,15 @@ export const arcadeScenes:readonly Scene[]=[
     at('branch',107,119,65,10),at('leaf',215,160,61),at('branch',300,77,54,10),
   ]},
   {name:'Moonflower',base:'#a8aecb',ink:'#303956',light:'#f9f0d1',accent:'#7b7da8',skyline:'bloom',landing:at('branch',39,212,78),perches:[
-    at('bloom',123,112,58,10),at('bloom',237,84,64,10),at('branch',285,215,87,9),
+    at('bloom',123,112,58,10),at('bloom',237,84,64,10),rivalPerch,
   ]},
 ];
+
+export const arcadeRivalStage={
+  perch:rivalPerch,
+  scale:rivalScale,
+  start:{x:rivalPerch.x+Math.floor(rivalPerch.w/2),y:rivalPerch.y-7*rivalScale},
+};
 
 export const arcadeLayouts=arcadeScenes.map(({landing,perches})=>[...arcadeFrame,landing,...perches]);
 export const arcadeSpawns=arcadeScenes.map(({landing})=>({

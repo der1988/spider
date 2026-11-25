@@ -1,6 +1,6 @@
 import {arcadeLevels,dialogueFor,heartsPerRun,levelIntroDuration} from './arcade-dialogue.ts';
 import {advanceSilk,arcadeSilkReach,diagonalWeb,launchSilk,ropeAt,type SilkShot} from './arcade-silk.ts';
-import {arcadeHeight,arcadeLayouts,arcadeRim,arcadeSpawns,arcadeWidth} from './arcade-scenery.ts';
+import {arcadeHeight,arcadeLayouts,arcadeRim,arcadeRivalStage,arcadeSpawns,arcadeWidth} from './arcade-scenery.ts';
 import {idleQuips} from './arcade-script.ts';
 import {arenaStep,createArena,finishWebs,moveArena,releaseSilkButton,type ArenaInput,type ArenaEvent} from './arena-run.ts';
 import {closeCrawlerRopes,createCrawler,crawlerIsSupported} from './crawler.ts';
@@ -89,7 +89,7 @@ function prepareLevel(run:ArcadeRun) {
   run.intro=run.phase==='ready' ? undefined : {kind:final ? 'rival' : 'level',elapsed:0};
   run.idle=0;
   run.silkHeld=false;run.silkShots=[];run.ropeWeb=undefined;
-  const p={x:350,y:193};
+  const p={...arcadeRivalStage.start};
   run.boss=final ? {p,target:p,hp:4,max:4,size:18,phase:'recover',at:0,turn:0,side:0,repeated:0,hit:false} : undefined;
   if (final && run.phase!=='ready') run.phase='boss';
   run.rivalWebs=[];run.snare=undefined;
