@@ -7,7 +7,7 @@ import {renderWindowHunt} from './window-hunt-render';
 import {trackStarts} from './playlist';
 import type {Point} from './spider';
 import {advanceArena,arenaInput,arenaStep,releaseSilkButton,createArena,type ArenaEvent} from './arena-run';
-import {advanceArcade,arcadeWebLimit,arcadeEscapeButton,arcadeHeight,arcadeWidth,createArcade,loadArcadeChapter,type ArcadeEvent,type ArcadeRun} from './arcade';
+import {advanceArcade,arcadeEscapeButton,arcadeHeight,arcadeWidth,createArcade,loadArcadeChapter,type ArcadeEvent,type ArcadeRun} from './arcade';
 import {arcadeLevels,heartsPerRun} from './arcade-dialogue';
 import {ArcadeMusic} from './arcade-music';
 import {renderArcade} from './arcade-render';
@@ -358,6 +358,7 @@ function arcadeFeedback(event:ArcadeEvent) {
 const frankTitle=get('frank-title'),frankNarration=get('frank-narration');
 const frankTouch=get('frank-touch'),frankPanel=get('frank-panel');
 const frankScene=get('frank-scene'),frankHud=get('arcade-summary');
+const frankChapterName=get('arcade-chapter'),frankLocation=get('arcade-location'),frankLives=get('arcade-lives');
 const frankCast=get('frank-cast');
 const frankSpeaker=get('frank-speaker'),frankSpeakerName=get('frank-speaker-name'),frankPortraitBox=get('frank-portrait');
 const coarsePointer=matchMedia('(pointer: coarse)');
@@ -426,6 +427,10 @@ function showFrankPanels(story:FrankStory,frozen:boolean) {
   frankPanel.hidden=false;
   frankPanel.toggleAttribute('data-still',reduced() || frozen);
   frankHud.hidden=!combat;
+  if (combat) {
+    if (frankChapterName.textContent!==chapter.title) frankChapterName.textContent=chapter.title;
+    if (frankLocation.textContent!==chapter.location) frankLocation.textContent=chapter.location;
+  }
   frankScene.hidden=combat;
   frankCast.hidden=story.phase!=='title';
   if (!frankCast.hidden) showFrankCast(story.chapter);
@@ -504,20 +509,10 @@ function arcadeFrame(run:ArcadeRun,elapsed:number,move:Point,aim:Point|undefined
   showFrankPanels(story,frozen);
   const finished=story.phase==='complete';
   arcadeMusic.sync(contextAudio,run.level,frozen && !finished || document.hidden || paused,story.phase!=='combat');
-  const level=get('arcade-level'),label=`Level ${run.level} / ${arcadeLevels}`;
-  if (level.textContent!==label) level.textContent=label;
-  const nets=get('arcade-webs');
-  const webCount=run.movement.hunt.strands.length;
-  const webLabel=`Silk ${'◆'.repeat(webCount)}${'◇'.repeat(Math.max(0,arcadeWebLimit-webCount))}`;
-  if (nets.textContent!==webLabel) {
-    nets.textContent=webLabel;
-    nets.setAttribute('aria-label',`Fixed silk ${webCount} of ${arcadeWebLimit}`);
-  }
-  const hearts=get('arcade-lives');
-  if (hearts.dataset.lives!==String(run.lives)) {
-    hearts.dataset.lives=String(run.lives);
-    hearts.setAttribute('aria-label',`${run.lives} of ${heartsPerRun} hearts`);
-    hearts.textContent='♥'.repeat(run.lives)+'♡'.repeat(heartsPerRun-run.lives);
+  if (frankLives.dataset.lives!==String(run.lives)) {
+    frankLives.dataset.lives=String(run.lives);
+    frankLives.setAttribute('aria-label',`${run.lives} of ${heartsPerRun} hearts`);
+    frankLives.textContent='♥'.repeat(run.lives)+'♡'.repeat(heartsPerRun-run.lives);
   }
   const beat=reduced() ? 0 : arcadeMusic.pulse;
   if (finished && defeat.hidden) {
