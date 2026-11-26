@@ -8,19 +8,8 @@ export type Sound = keyof typeof notes;
 export class Soundscape {
   private context?: AudioContext;
   private master?: GainNode;
-  private buzzing?: GainNode;
-  private flyTone?: OscillatorNode;
   private paused = false;
   private pending: {effect:Sound; delay:number; at:number}[] = [];
-
-  constructor(private enabled: boolean) {}
-
-  setEnabled(enabled: boolean) {
-    this.enabled = enabled;
-    if (!enabled) this.pending.length = 0;
-    this.updateVolume();
-    if (enabled) this.unlock();
-  }
 
   setPaused(paused: boolean) {
     this.paused = paused;
@@ -29,7 +18,7 @@ export class Soundscape {
 
   private updateVolume() {
     if (this.master && this.context) {
-      this.master.gain.setTargetAtTime(this.enabled && !this.paused ? .72 : 0,this.context.currentTime,.025);
+      this.master.gain.setTargetAtTime(!this.paused ? .72 : 0,this.context.currentTime,.025);
     }
   }
 
@@ -44,7 +33,7 @@ export class Soundscape {
     const ctx = this.audioContext();
     if (!ctx || ctx.state === 'running') return;
     void ctx.resume().then(() => {
-      if (!this.enabled || this.paused) return;
+      if (this.paused) return;
       for (const {effect,delay,at} of this.pending.splice(0)) {
         if (performance.now()-at < 400) this.play(effect,delay);
       }
@@ -58,50 +47,15 @@ export class Soundscape {
     const ctx = new Type();
     this.context = ctx;
     const master = ctx.createGain();
-    master.gain.value = this.enabled && !this.paused ? .72 : 0;
+    master.gain.value = !this.paused ? .72 : 0;
     master.connect(ctx.destination);
     this.master = master;
 
-    const buffer = ctx.createBuffer(1,ctx.sampleRate * 3,ctx.sampleRate);
-    const samples = buffer.getChannelData(0);
-    for (let i = 0; i < samples.length; i++) samples[i] = Math.random() * 2 - 1;
-    const rustle = ctx.createBufferSource();
-    rustle.buffer = buffer;
-    rustle.loop = true;
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.value = 350;
-    filter.Q.value = .65;
-    const wind = ctx.createGain();
-    wind.gain.value = .04;
-    rustle.connect(filter).connect(wind).connect(master);
-    rustle.start();
-
-    const buzz = ctx.createOscillator();
-    buzz.type = 'sawtooth';
-    buzz.frequency.value = 124;
-    const soft = ctx.createBiquadFilter();
-    soft.type = 'lowpass';
-    soft.frequency.value = 430;
-    const volume = ctx.createGain();
-    volume.gain.value = 0;
-    buzz.connect(soft).connect(volume).connect(master);
-    buzz.start();
-    this.buzzing = volume;
-    this.flyTone = buzz;
-  }
-
-  nearby(distance: number, time: number) {
-    const ctx = this.context;
-    if (!ctx || ctx.state !== 'running' || !this.buzzing || !this.flyTone) return;
-    const strength = Math.max(0,1 - distance / 85);
-    this.buzzing.gain.setTargetAtTime(strength * .027,ctx.currentTime,.075);
-    this.flyTone.frequency.setTargetAtTime(122 + Math.sin(time * .014) * 15,ctx.currentTime,.075);
   }
 
   play(effect: Sound, delay = 0) {
     const ctx = this.context;
-    if (!this.enabled || this.paused || !ctx || !this.master) return;
+    if (this.paused || !ctx || !this.master) return;
     if (ctx.state !== 'running') {
       if (this.pending.length < 8) this.pending.push({effect,delay,at:performance.now()});
       return;

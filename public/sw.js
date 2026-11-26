@@ -1,13 +1,13 @@
 const prefix = 'tamago-shell-';
 const scope = self.registration.scope;
 const shell = new URL('index.html', scope).href;
-const staticFiles = ['manifest.webmanifest', 'touch.png', 'icon-192.png', 'icon-512.png', 'the-fly-has-ai.mp3'];
+const staticFiles = ['manifest.webmanifest', 'favicon.ico', 'spider-vs-fly-32.png', 'touch.png', 'icon-192.png', 'icon-512.png', 'the-fly-has-ai.mp3', 'the-fly-has-an-upgrade.mp3', 'the-room-has-a-space-bar.mp3', 'the-fly-is-you.mp3', 'infinite-loop.mp3', 'menusong.mp3'];
 const activeCache = prefix + build; // build is injected by Vite.
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const response = await fetch(shell, {cache: 'reload'});
-    if (!response.ok) throw new Error('Shell non disponibile');
+    if (!response.ok) throw new Error('Game shell unavailable');
     const html = await response.clone().text();
     const assets = [...html.matchAll(/(?:src|href)="([^"]*assets\/[^"]+)"/g)].map(match => match[1]);
     const cache = await caches.open(activeCache);
@@ -27,6 +27,7 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const {request} = event;
   if (request.method !== 'GET' || !request.url.startsWith(scope)) return;
+  if (request.url.startsWith(new URL('api/',scope).href)) return;
   event.respondWith((async () => {
     const cache = await caches.open(activeCache);
     if (request.mode === 'navigate') {

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {capStrands,createHunt,HEIGHT,LIMIT,platforms,ROUND,spawn,tickHunt,WEB_SECONDS,WIDTH} from '../src/hunt.ts';
+import {capStrands,createHunt,HEIGHT,LIMIT,platforms,spawn,tickHunt,WEB_SECONDS,WIDTH} from '../src/hunt.ts';
 import {createSpider,queueJump,shoot,tickSpider} from '../src/spider.ts';
+import {difficultyAt} from '../src/difficulty.ts';
 
 const dt=1/120;
 const far={x:345,y:187};
@@ -20,7 +21,7 @@ test('a visible web with room to turn is avoided rather than entered immediately
   assert.equal(hunt.phase,'hunting');
 });
 
-test('an obstructed committed run is caught, scores once, and spawns a single next fly at sixty',()=>{
+test('an obstructed committed run is caught, scores once, and spawns a single next fly at fifty-nine',()=>{
   const hunt=createHunt(0);
   hunt.fly.p={x:89,y:79};
   hunt.fly.v={x:72,y:0};
@@ -35,7 +36,7 @@ test('an obstructed committed run is caught, scores once, and spawns a single ne
   for(let i=0;i<90&&hunt.fly===previous;i++) tickHunt(hunt,far,dt);
   assert.notEqual(hunt.fly,previous);
   assert.equal(hunt.phase,'hunting');
-  assert.equal(hunt.time,ROUND);
+  assert.equal(hunt.time,59);
   assert.equal(hunt.score,1);
   assert.equal(hunt.strands.length,0);
 });
@@ -56,6 +57,33 @@ test('at capacity the oldest strand is retired and a fresh round starts clean',(
   assert.equal(restarted.strands.length,0);
   assert.equal(restarted.time,60);
   assert.equal(restarted.score,0);
+});
+
+test('Infinite Loop keeps twenty seconds across catches, difficulty thresholds and a new run',()=>{
+  const hunt=createHunt(0,'loop');
+  assert.equal(hunt.time,20);
+  for (let count=1;count<=20;count++) {
+    hunt.fly.p={x:89,y:79};
+    hunt.fly.v={x:72,y:0};
+    hunt.fly.locked=1;
+    hunt.fly.target=1;
+    hunt.strands.push(wire(89.3,62,95));
+    assert.equal(tickHunt(hunt,far,dt),'catch');
+    let result: ReturnType<typeof tickHunt>;
+    for (let i=0;i<90 && result!=='new';i++) result=tickHunt(hunt,far,dt);
+    assert.equal(result,'new');
+    assert.equal(hunt.score,count);
+    assert.equal(hunt.time,20);
+    assert.equal(hunt.strands.length,0);
+    assert.deepEqual(hunt.difficulty,{...difficultyAt(count),duration:20});
+  }
+  hunt.time=dt;
+  assert.equal(tickHunt(hunt,far,dt),'over');
+  const restarted=createHunt(1,'loop');
+  assert.equal(restarted.score,0);
+  assert.equal(restarted.time,20);
+  assert.equal(restarted.strands.length,0);
+  assert.deepEqual(restarted.difficulty,{...difficultyAt(0),duration:20});
 });
 
 test('L1 released during ascent cuts the jump and holding does not auto-jump on landing',()=>{
@@ -160,4 +188,18 @@ test('a full charge clears half of the playable arena and medium power lands bet
   const short=height(65),middle=height(162.5),full=height(260);
   assert.ok(short < middle && middle < full);
   assert.ok(full > (197-7)/2);
+});
+
+test('each new fly has one second less down to ten and restarts restore all starting values',()=>{
+  const hunt=createHunt(0);
+  const initial={...hunt.difficulty};
+  for (let catches=1;catches<=55;catches++) {
+    hunt.score=catches;
+    hunt.phase='caught';
+    hunt.countdown=dt;
+    assert.equal(tickHunt(hunt,far,dt),'new');
+    assert.equal(hunt.time,Math.max(10,60-catches));
+    assert.equal(hunt.difficulty.duration,hunt.time);
+  }
+  assert.deepEqual(createHunt(0).difficulty,initial);
 });
