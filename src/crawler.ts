@@ -1,6 +1,6 @@
 import {
   createSpider, DEFAULT_TUNING, detach, moveAxis, shoot, SPIDER_HALF_HEIGHT, SPIDER_HALF_WIDTH, tickSpider,
-  type Point, type Rect, type Spider, type WalkLine, type Tuning,
+  type Point, type Rect, type Spider, type WalkLine,
 } from './spider.ts';
 import {anchorSilk,type Strand} from './threads.ts';
 
@@ -37,10 +37,6 @@ function supports(spider: Spider,surfaces: readonly Rect[]) {
   return [...faces].filter(face=>dot({x:spider.vx,y:spider.vy},face)<=EPSILON);
 }
 
-export function crawlerIsSupported(spider:Crawler,surfaces:readonly Rect[]) {
-  return supports(spider,surfaces).length>0;
-}
-
 function grip(spider: Crawler,face: Support|undefined) {
   spider.support=face;
   if (face) {
@@ -58,9 +54,9 @@ export function createCrawler(point: Point,surfaces: readonly Rect[]) {
   return spider;
 }
 
-export function castCrawler(spider: Crawler,surfaces: readonly Rect[],target: Point,tuning?: Partial<Tuning>) {
+export function castCrawler(spider: Crawler,surfaces: readonly Rect[],target: Point) {
   const previous=spider.rope;
-  if (!shoot(spider,surfaces,target,tuning)) return false;
+  if (!shoot(spider,surfaces,target)) return false;
   if (previous && !spider.firstAnchor) spider.firstAnchor={x:previous.x,y:previous.y};
   spider.support=undefined;
   return true;
@@ -73,29 +69,28 @@ export function closeCrawlerRopes(spider: Crawler) {
   return old;
 }
 
-export function anchorCrawlerRope(spider: Crawler,surfaces: readonly Rect[],strands: Strand[],range=DEFAULT_TUNING.range) {
+export function anchorCrawlerRope(spider: Crawler,surfaces: readonly Rect[],strands: Strand[]) {
   const rope=spider.rope;
   if (!rope) return false;
   const face=supports(spider,surfaces)[0];
-  if (!face || !anchorSilk(strands,rope,range+SPIDER_HALF_HEIGHT,spider,surfaces)) return false;
+  if (!face || !anchorSilk(strands,rope,DEFAULT_TUNING.range+SPIDER_HALF_HEIGHT,spider,surfaces)) return false;
   closeCrawlerRopes(spider);
   grip(spider,face);
   return true;
 }
 
-export function jumpCrawler(spider: Crawler,speed=JUMP,direction?:Point) {
-  const tethered=!!spider.rope;
-  if (!tethered && !spider.support && !spider.airJump) return false;
-  if (tethered) closeCrawlerRopes(spider);
-  else if (!spider.support) spider.airJump=false;
-  if (direction) {
-    spider.vx=direction.x*speed;
-    spider.vy=direction.y*speed;
-  } else if (!tethered && spider.support) {
+export function jumpCrawler(spider: Crawler) {
+  if (spider.rope) {
+    closeCrawlerRopes(spider);
+    spider.vy=-JUMP;
+  } else if (spider.support) {
     const away=normals[spider.support];
-    if (away.x) spider.vx=away.x*speed;
-    else spider.vy=away.y*speed;
-  } else spider.vy=-speed;
+    if (away.x) spider.vx=away.x*JUMP;
+    else spider.vy=away.y*JUMP;
+  } else if (spider.airJump) {
+    spider.airJump=false;
+    spider.vy=-JUMP;
+  } else return false;
   spider.support=undefined;
   spider.thread=undefined;
   spider.grounded=false;
@@ -107,11 +102,10 @@ const approach = (n: number,target: number,step: number) =>
 
 export function tickCrawler(
   spider: Crawler,surfaces: readonly Rect[],stick: Point,reel: boolean,dt: number,strands: readonly WalkLine[],
-  {crawlSpeed=CRAWL,airAcceleration=290,ropeMinimum=DEFAULT_TUNING.minLength,reelSpeed=DEFAULT_TUNING.reelSpeed}={},
 ) {
   if (spider.rope) {
     spider.support=undefined;
-    tickSpider(spider,surfaces,{move:stick.x,reel,gripThread:false},dt,{minLength:ropeMinimum,reelSpeed});
+    tickSpider(spider,surfaces,{move:stick.x,reel,gripThread:false},dt);
     if (supports(spider,surfaces).length) spider.airJump=true;
     return;
   }
@@ -119,7 +113,7 @@ export function tickCrawler(
     const oldSide=spider.support;
     const axis=normals[oldSide].x ? 'y' : 'x';
     const velocity=axis==='x' ? 'vx' : 'vy';
-    spider[velocity]=approach(spider[velocity],stick[axis]*crawlSpeed,780*dt);
+    spider[velocity]=approach(spider[velocity],stick[axis]*CRAWL,780*dt);
     const delta=spider[velocity]*dt;
     const blocked=moveAxis(spider,surfaces,axis,delta);
     const faces=supports(spider,surfaces);
@@ -136,7 +130,7 @@ export function tickCrawler(
     return;
   }
   const approachVelocity={x:spider.vx+stick.x*3,y:spider.vy+2.5};
-  tickSpider(spider,surfaces,{move:stick.x,reel:false,gripThread:reel},dt,{airAcceleration},strands);
+  tickSpider(spider,surfaces,{move:stick.x,reel:false,gripThread:reel},dt,{airAcceleration:290},strands);
   const faces=supports(spider,surfaces).sort((a,b)=>dot(approachVelocity,a)-dot(approachVelocity,b));
   grip(spider,faces[0]);
 }

@@ -1,10 +1,9 @@
 import {crossesSolid, sweptHit, type Strand, type Web} from './threads.ts';
 import type {Point, Rect} from './spider.ts';
-import {difficultyAt,difficultyConfig,type HuntMode} from './difficulty.ts';
 
 export const WIDTH = 360;
 export const HEIGHT = 204;
-
+export const ROUND = 60;
 export const WEB_SECONDS = 10;
 export const LIMIT = 6;
 export const spawn = {x:45,y:189};
@@ -16,17 +15,6 @@ export const platforms: Rect[] = [
   {x:89,y:53,w:51,h:7,grip:true}, {x:220,y:53,w:51,h:7,grip:true},
   {x:145,y:101,w:70,h:10,grip:true},
   {x:89,y:150,w:51,h:8,grip:true}, {x:220,y:150,w:51,h:8,grip:true},
-];
-export const arenaLayouts: readonly (readonly Rect[])[] = [
-  platforms,
-  [...platforms.slice(0,4),
-    {x:77,y:46,w:66,h:8,grip:true}, {x:222,y:63,w:54,h:7,grip:true},
-    {x:133,y:106,w:81,h:8,grip:true},
-    {x:83,y:153,w:51,h:8,grip:true}, {x:236,y:143,w:59,h:8,grip:true}],
-  [...platforms.slice(0,4),
-    {x:72,y:54,w:54,h:7,grip:true}, {x:237,y:43,w:55,h:8,grip:true},
-    {x:152,y:94,w:62,h:9,grip:true},
-    {x:98,y:139,w:58,h:8,grip:true}, {x:211,y:156,w:66,h:8,grip:true}],
 ];
 const lanes = [
   {x:49,y:79}, {x:114,y:79}, {x:180,y:79}, {x:246,y:79}, {x:311,y:79},
@@ -46,8 +34,8 @@ function direction(from: Point,to: Point) {
   const len = Math.max(.001,distance(from,to));
   return {x:(to.x-from.x)/len,y:(to.y-from.y)/len};
 }
-const clear = (a: Point,b: Point,surfaces:readonly Rect[]) =>
-  !surfaces.some(r => crossesSolid(a,b,{x:r.x-3,y:r.y-3,w:r.w+6,h:r.h+6}));
+const clear = (a: Point,b: Point) =>
+  !platforms.some(r => crossesSolid(a,b,{x:r.x-3,y:r.y-3,w:r.w+6,h:r.h+6}));
 
 export interface Fly {
   p: Point;
@@ -63,11 +51,7 @@ export interface Fly {
   visits: number[];
 }
 export interface Hunt extends Pick<Web,'loose'|'strands'> {
-  mode: HuntMode;
-  surfaces: readonly Rect[];
-  rotate: boolean;
   fly: Fly;
-  difficulty: ReturnType<typeof difficultyAt>;
   score: number;
   time: number;
   phase: 'hunting'|'caught'|'over';
@@ -77,16 +61,15 @@ export interface Hunt extends Pick<Web,'loose'|'strands'> {
   entropy: number;
 }
 
-function makeFly(score: number,seed: number,reaction: number): Fly {
+function makeFly(score: number,seed: number): Fly {
   const entry = entrances[score%entrances.length];
   return {
     p:{...lanes[entry]},v:{x:0,y:0},target:(entry+1)%10,last:entry,
-    notice:reaction+.01,locked:.24,turn:0,bias:(seed+score)%2 ? 1 : -1,age:0,alert:false,visits:lanes.map(()=>0),
+    notice:.18,locked:.24,turn:0,bias:(seed+score)%2 ? 1 : -1,age:0,alert:false,visits:lanes.map(()=>0),
   };
 }
-export function createHunt(seed = Math.floor(Math.random()*4294967296), mode: HuntMode='story',rotate=false): Hunt {
-  const difficulty=difficultyAt(0,mode);
-  return {mode,surfaces:platforms,rotate,fly:makeFly(0,seed,difficulty.reactionTime),difficulty,score:0,time:difficulty.duration,phase:'hunting',countdown:0,
+export function createHunt(seed = Math.floor(Math.random()*4294967296)): Hunt {
+  return {fly:makeFly(0,seed),score:0,time:ROUND,phase:'hunting',countdown:0,
     strands:[],loose:[],clock:0,entropy:seed};
 }
 
@@ -96,7 +79,7 @@ export function expireStrands(hunt: Hunt) {
 
 function threat(from: Point,to: Point,strands: Strand[]) {
   const d = direction(from,to);
-  const length = Math.min(distance(from,to),difficultyConfig.webSight);
+  const length = Math.min(distance(from,to),48);
   const ahead = {x:from.x+d.x*length,y:from.y+d.y*length};
   return strands.some(strand => sweptHit(from,ahead,strand));
 }
@@ -109,9 +92,9 @@ function route(hunt: Hunt,spider: Point,arrived: boolean) {
     ? links[current]
     : lanes.map((_,i)=>i).filter(i=>distance(from,lanes[i])<94 && distance(from,lanes[i])>9);
   hunt.entropy = (Math.imul(hunt.entropy,1664525)+1013904223)>>>0;
-  const pressure = distance(from,spider)<hunt.difficulty.routeRadius;
+  const pressure = distance(from,spider)<56;
   if (arrived) fly.visits[current]++;
-  const options = candidates.filter(index => clear(from,lanes[index],hunt.surfaces)).map(index => {
+  const options = candidates.filter(index => clear(from,lanes[index])).map(index => {
     const toward = direction(from,lanes[index]);
     const escape = direction(spider,from);
     const score = (threat(from,lanes[index],hunt.strands) ? -5 : 0) +
@@ -127,7 +110,7 @@ function route(hunt: Hunt,spider: Point,arrived: boolean) {
     fly.locked = pressure ? .32 : .23;
     fly.turn = .24;
   }
-  fly.notice = hunt.difficulty.reactionTime;
+  fly.notice = .17;
 }
 
 export function capStrands(hunt: Hunt) {
@@ -147,12 +130,8 @@ export function tickHunt(hunt: Hunt,spider: Point,dt: number) {
       hunt.strands.length = 0;
       hunt.loose.length = 0;
       hunt.retired = undefined;
-      hunt.difficulty = difficultyAt(hunt.score,hunt.mode);
-      if (hunt.rotate && hunt.score%10===0) {
-        hunt.surfaces=arenaLayouts[Math.floor(hunt.score/10)%arenaLayouts.length];
-      }
-      hunt.fly = makeFly(hunt.score,hunt.entropy,hunt.difficulty.reactionTime);
-      hunt.time = hunt.difficulty.duration;
+      hunt.fly = makeFly(hunt.score,hunt.entropy);
+      hunt.time = ROUND;
       hunt.phase = 'hunting';
       return 'new';
     }
@@ -164,19 +143,18 @@ export function tickHunt(hunt: Hunt,spider: Point,dt: number) {
   fly.locked-=dt;
   fly.turn-=dt;
   const arrived = distance(fly.p,lanes[fly.target])<7;
-  const pressure = distance(fly.p,spider)<hunt.difficulty.alertRadius;
+  const pressure = distance(fly.p,spider)<47;
   const alarm = pressure || threat(fly.p,lanes[fly.target],hunt.strands);
-  if (alarm && !fly.alert) fly.notice = hunt.difficulty.reactionTime;
+  if (alarm && !fly.alert) fly.notice = .17;
   fly.alert = alarm;
   if (arrived || (alarm && fly.locked<=0 && fly.notice<=0)) route(hunt,spider,arrived);
   const d = direction(fly.p,lanes[fly.target]);
-  const speed = (pressure ? hunt.difficulty.escapeSpeed : hunt.difficulty.cruiseSpeed) +
-    difficultyConfig.speed.variation*Math.sin(fly.age*4+fly.bias);
+  const speed = (pressure ? 75 : 49) + 5*Math.sin(fly.age*4+fly.bias);
   const easing = 1-Math.exp(-dt*(fly.turn>0 ? 13 : 8));
   fly.v.x += (d.x*speed-fly.v.x)*easing;
   fly.v.y += (d.y*speed-fly.v.y)*easing;
   let next = {x:within(fly.p.x+fly.v.x*dt,12,WIDTH-12),y:within(fly.p.y+fly.v.y*dt,20,177)};
-  if (!clear(fly.p,next,hunt.surfaces)) {
+  if (!clear(fly.p,next)) {
     fly.v = {x:0,y:0};
     route(hunt,spider,false);
     next = fly.p;

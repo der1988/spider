@@ -1,4 +1,4 @@
-# Spider vs Fly
+# Tamago
 
 - Lavora nel checkout esistente. Leggi README.md e docs/architettura.md prima di cambiare il gioco.
 - Mantieni la fisica in src/spider.ts e la trama in src/threads.ts indipendenti dal DOM. Il renderer in src/hunt-render.ts riceve lo stato senza scrivere il salvataggio.

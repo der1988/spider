@@ -104,12 +104,13 @@ function rayDistance(origin: Point, direction: Point, surface: Rect): number {
   return near
 }
 
-export function traceSurface(spider: Point, surfaces: readonly Rect[], target: Point, range: number) {
+export function aimHit(spider: Spider, surfaces: readonly Rect[], target: Point, tuning?: Partial<Tuning>): Point | undefined {
   const dx = target.x - spider.x
   const dy = target.y - spider.y
   const magnitude = Math.hypot(dx, dy)
   if (!Number.isFinite(magnitude) || magnitude < EPSILON) return
   const direction = {x: dx / magnitude, y: dy / magnitude}
+  const range = tuning?.range ?? DEFAULT_TUNING.range
   let nearest = Infinity
   let grip = false
   for (const surface of surfaces) {
@@ -121,14 +122,9 @@ export function traceSurface(spider: Point, surfaces: readonly Rect[], target: P
       grip = false
     }
   }
-  if (Number.isFinite(nearest) && nearest <= range) {
-    return {point:{x: spider.x + direction.x * nearest, y: spider.y + direction.y * nearest},grip}
+  if (grip && nearest <= range) {
+    return {x: spider.x + direction.x * nearest, y: spider.y + direction.y * nearest}
   }
-}
-
-export function aimHit(spider: Point, surfaces: readonly Rect[], target: Point, tuning?: Partial<Tuning>): Point | undefined {
-  const hit=traceSurface(spider,surfaces,target,tuning?.range??DEFAULT_TUNING.range)
-  return hit?.grip ? hit.point : undefined
 }
 
 export function shoot(spider: Spider, surfaces: readonly Rect[], target: Point, tuning?: Partial<Tuning>): boolean {
@@ -144,13 +140,12 @@ function approach(value: number, target: number, maxDelta: number) {
 }
 
 /** Sweep the body along one axis, clipping motion to the nearest solid face. */
-export function moveAxis(spider: Pick<Spider,'x'|'y'|'vx'|'vy'>, surfaces: readonly Rect[], axis: 'x' | 'y', delta: number,
-  halfWidth=SPIDER_HALF_WIDTH,halfHeight=SPIDER_HALF_HEIGHT) {
+export function moveAxis(spider: Spider, surfaces: readonly Rect[], axis: 'x' | 'y', delta: number) {
   if (Math.abs(delta) < EPSILON) return false
   const horizontal = axis === 'x'
   const across = horizontal ? 'y' : 'x'
-  const half = horizontal ? halfWidth : halfHeight
-  const acrossHalf = horizontal ? halfHeight : halfWidth
+  const half = horizontal ? SPIDER_HALF_WIDTH : SPIDER_HALF_HEIGHT
+  const acrossHalf = horizontal ? SPIDER_HALF_HEIGHT : SPIDER_HALF_WIDTH
   const bodyMin = spider[across] - acrossHalf
   const bodyMax = spider[across] + acrossHalf
   const forward = delta > 0

@@ -1,162 +1,63 @@
 <!doctype html>
-<html lang="en">
+<html lang="it">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="tamago-soundtrack" content="./the-fly-has-ai.mp3">
-<meta name="tamago-upgrade" content="./the-fly-has-an-upgrade.mp3">
-<meta name="tamago-room" content="./the-room-has-a-space-bar.mp3">
-<meta name="tamago-fly" content="./the-fly-is-you.mp3">
-<meta name="tamago-loop" content="./infinite-loop.mp3">
-<meta name="tamago-menu" content="./menusong.mp3">
 <meta name="theme-color" content="#202f24">
-<meta property="og:site_name" content="Spider vs Fly">
-<meta property="og:title" content="Spider vs Fly">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./touch.png">
-<link rel="icon" href="./favicon.ico" sizes="any">
-<link rel="icon" href="./spider-vs-fly-32.png" type="image/png" sizes="32x32">
-<link rel="preload" href="/frank-cast.png" as="image">
-<title>SPIDER vs FLY</title>
+<link rel="icon" href="./icon-192.png">
+<title>Tamago · La caccia</title>
 </head>
 <body>
-<main id="shell" class="shell" data-screen="start">
-  <section id="launch" class="launch" aria-labelledby="launch-title">
-    <canvas id="menu-room" width="360" height="204" aria-hidden="true"></canvas>
-    <div class="launch-copy">
-      <h1 id="launch-title"><img src="/src/menu-title.png" alt="SPIDER vs FLY" width="224" height="124"></h1>
-      <p>Use your controller</p>
-    </div>
-    <div class="mode-choices">
-      <button id="story" type="button" data-selected="true"><span>STORY</span><code aria-hidden="true">story()</code></button>
-      <button id="loop" type="button" data-selected="false"><span>Different Story</span><code aria-hidden="true">case()</code></button>
-    </div>
-    <p id="start-status" role="status"></p>
-  </section>
+<main class="shell">
   <header>
     <div class="hunt-info">
-      <h1>Spider vs Fly</h1>
-      <div class="catch-count">
-        <label id="score-label" for="score">Catches</label>
-        <output id="score">0</output>
+      <h1>Tamago</h1>
+      <div class="scores">
+        <span id="level" class="level">Livello 1</span>
+        <output id="score" aria-label="Catture">0 catture</output>
+        <output id="strands" aria-label="Fili fissati">0 / 6 fili</output>
       </div>
     </div>
     <div id="clock" class="clock" data-phase="ready">
-      <span class="clock-caption">Time · <span id="round-time">60 s</span></span>
+      <span class="clock-caption" aria-hidden="true">Tempo</span>
       <span class="clock-rhythm" aria-hidden="true"></span>
-      <output id="time" aria-label="Seconds remaining" aria-live="off">60 s</output>
+      <output id="time" aria-label="Secondi rimanenti" aria-live="off">60 s</output>
       <span class="clock-rhythm" aria-hidden="true"></span>
       <div class="clock-track" aria-hidden="true"><span id="clock-meter"></span></div>
     </div>
-    <code id="ending-code" class="ending-code" aria-hidden="true"></code>
+    <div class="tools">
+      <button id="start" type="button">Avvia</button>
+      <button id="pause" type="button" aria-pressed="false" disabled>Pausa</button>
+      <button id="calibrate" type="button">Sincronizza</button>
+      <button id="sound" type="button" aria-pressed="true">Audio On</button>
+    </div>
   </header>
-  <div class="playfield">
-    <section class="stage" aria-label="Hunting arena">
-    <canvas id="world" width="360" height="204" aria-label="Spider, fly and webs"></canvas>
-    <div id="frank-title" class="frank-title" hidden></div>
-    <section id="loop-defeat" class="defeat" aria-labelledby="defeat-title" hidden>
-      <div class="defeat-panel">
-        <h2 id="defeat-title">Arcade cleared</h2>
-        <p id="endless-status" role="status"></p>
-        <div class="mode-choices">
-          <button id="main-menu" type="button" data-selected="false">Main Menu</button>
-          <button id="retry" type="button" data-selected="true">Retry</button>
-        </div>
-      </div>
-    </section>
-    </section>
-  </div>
+  <section class="stage" aria-label="Arena di caccia">
+    <canvas id="world" width="360" height="204" aria-label="Ragno, mosca e ragnatele"></canvas>
+  </section>
   <footer>
-    <section id="frank-panel" aria-label="Different Story panel" hidden>
-      <section id="arcade-summary" aria-label="Different Story game status">
-        <ul id="arcade-targets" role="list" aria-label="Enemies"></ul>
-        <p id="arcade-lives" role="img"></p>
-      </section>
-      <div id="frank-touch" hidden>
-        <button type="button" data-move="-1,0" aria-label="Move left">←</button><button type="button" data-move="1,0" aria-label="Move right">→</button>
-        <button type="button" data-move="0,-1" aria-label="Climb">↑</button><button type="button" data-move="0,1" aria-label="Descend">↓</button>
-        <button type="button" data-action="1">Jump</button><button type="button" data-action="2">Silk</button><button type="button" data-action="4">Break free</button>
-      </div>
-      <span id="frank-scene" role="status" hidden>Cutscene · Controls paused</span>
-      <div id="frank-cast" role="group" aria-label="Chapter cast" hidden></div>
-      <button id="frank-narration" class="frank-narration" type="button" hidden><strong></strong><span></span></button>
-      <button id="frank-speaker" type="button" hidden>
-        <span id="frank-portrait" class="frank-portrait" aria-hidden="true"></span>
-        <strong id="frank-speaker-name"></strong>
-      </button>
-    </section>
-    <section id="open-goal" class="open-goal" aria-label="Nest supplies" hidden>
-      <strong>Stock the nest</strong>
-      <span id="nest-common" data-tier="common">Common</span>
-      <span id="nest-uncommon" data-tier="uncommon">Uncommon</span>
-      <span id="nest-rare" data-tier="rare">Rare</span>
-    </section>
-    <section id="open-controls" class="open-controls" aria-label="Open World controls" hidden>
-      <span><kbd>LS</kbd> Move</span><span><kbd>L1</kbd> Jump</span>
-      <span><kbd>R1</kbd> Silk</span><span><kbd>R2</kbd> Grip</span>
-      <span><kbd>L2</kbd> Zoom out</span><span><kbd>△</kbd> Map</span><span><kbd>×</kbd> Eat</span><span id="open-cargo"></span>
-    </section>
-    <p id="window-hunt-info" hidden>L1 / Z to jump · R1 / X to fire · Hold to swing · Up to reel · Down to lower</p>
-    <p id="message" role="status"></p>
     <p id="lyric" class="lyric" lang="en"></p>
+    <p id="message" role="status">Collega il joypad PlayStation e seleziona Avvia.</p>
+    <p>Sinistro: corri sulle superfici, ↑ risali, ↓ stacca dal filo · Destro: mira · <kbd>R1</kbd> Tela · <kbd>L1</kbd> Salto / doppio salto · <kbd>Options</kbd> Pausa</p>
   </footer>
 </main>
-<dialog id="scoreboard" aria-labelledby="board-title">
-  <div class="board-header">
-    <h2 id="board-title">Leaderboard</h2>
-    <button id="board-close" type="button">Close</button>
+<dialog id="calibration" aria-labelledby="calibration-title">
+  <h2 id="calibration-title">Sincronizza il brano</h2>
+  <p>Scegli una riga e premi Segna al suo inizio. Il pannello passa alla riga successiva. Segnando «Left stick moves» aggiorni anche il punto del loop.</p>
+  <audio controls preload="metadata" id="calibration-audio"></audio>
+  <label for="calibration-line">Riga da segnare</label>
+  <select id="calibration-line"></select>
+  <p id="calibration-time" role="status"></p>
+  <div class="calibration-actions">
+    <button type="button" id="calibration-seek">Vai alla riga</button>
+    <button type="button" id="calibration-mark">Segna</button>
+    <button type="button" id="calibration-reset">Tempi originali</button>
+    <button type="button" id="calibration-save">Salva</button>
+    <button type="button" id="calibration-close">Chiudi</button>
   </div>
-  <p id="board-status" role="status"></p>
-  <button id="board-reload" type="button" hidden>Try again</button>
-  <ol id="board-entries" aria-label="Leaderboard by catches"></ol>
-</dialog>
-<dialog id="endless-board" aria-labelledby="endless-title">
-  <div class="board-header">
-    <h2 id="endless-title">Classic Endless Top 10</h2>
-    <button id="endless-close" type="button">Close</button>
-  </div>
-  <ol id="endless-entries" aria-label="Endless rank, name and catches"></ol>
-  <form id="endless-name-form" hidden>
-    <label for="endless-name">Name · 1–6 letters</label>
-    <input id="endless-name" type="text" autocomplete="off" spellcheck="false" maxlength="6" aria-describedby="name-controls">
-    <p id="name-controls">↑ ↓ Change letter · ← → Move · □ Delete · × Save · ○ Skip</p>
-    <div class="board-actions">
-      <button id="endless-publish" type="submit">Save Score</button>
-      <button id="endless-skip" type="button">Skip</button>
-    </div>
-  </form>
-  <p id="endless-board-status" role="status"></p>
-  <button id="endless-again" type="button" hidden>Try Again</button>
-</dialog>
-<dialog id="window-hunt-defeat" aria-labelledby="window-hunt-title">
-  <h2 id="window-hunt-title">Caught on patrol</h2>
-  <p id="window-hunt-result"></p>
-  <div class="mode-choices">
-    <button id="window-hunt-menu" type="button">Main Menu</button>
-    <button id="window-hunt-retry" type="button">Retry</button>
-  </div>
-</dialog>
-<dialog id="pause-panel" aria-labelledby="pause-title">
-  <h2 id="pause-title">Paused</h2>
-  <div class="pause-choices mode-choices">
-    <button id="resume" type="button">Resume</button>
-    <button id="pause-settings" type="button">Settings &amp; Controls</button>
-    <button id="pause-menu" type="button">Main Menu</button>
-  </div>
-</dialog>
-<dialog id="settings-panel" aria-labelledby="settings-title">
-  <h2 id="settings-title">Settings &amp; Controls</h2>
-  <div class="settings-fields">
-    <label for="music-volume">Music</label><input id="music-volume" type="range" min="0" max="100" step="10">
-    <label for="effects-volume">Effects</label><input id="effects-volume" type="range" min="0" max="100" step="10">
-    <label for="subtitle-mode">Subtitles</label><select id="subtitle-mode"><option>Normal</option><option>Large</option><option>Off</option></select>
-    <label for="motion-mode">Reduced motion</label><input id="motion-mode" type="checkbox">
-    <label for="escape-mode">Hold to escape webs</label><input id="escape-mode" type="checkbox">
-    <label for="keyboard-mode">Keyboard layout</label><select id="keyboard-mode"><option>WASD move</option><option>Arrows move</option></select>
-  </div>
-  <p>Controller · Left stick moves, right stick aims. L1 jumps, R1 fires. Options pauses.</p>
-  <p>Keyboard · WASD and arrows move or aim. Z jumps, X fires or escapes webs. Esc pauses.</p>
-  <button id="settings-close" type="button">Back</button>
 </dialog>
 <script type="module" src="/src/main.ts"></script>
 </body>
